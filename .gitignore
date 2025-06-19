@@ -88,6 +88,17 @@ web_modules
 .env.*.local
 .env.local
 
+# Credentials and secrets
+*cred*
+*secret*
+*password*
+*.key
+*.pem
+*.p12
+*.crt
+snowcred*
+'snowcred.env'.rtf
+
 # parcel-bundler cache (https://parceljs.org/)
 .cache
 .parcel-cache
