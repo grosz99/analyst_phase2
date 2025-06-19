@@ -169,3 +169,33 @@
   padding: 3rem;
   color: #6c757d;
 }
+
+/* New styles for dynamic data sources */
+.custom-select-option.disabled {
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.custom-select-option.disabled:hover {
+  background-color: transparent;
+}
+
+.source-name {
+  font-weight: 500;
+}
+
+.source-type {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin-top: 2px;
+}
+
+.loading-spinner {
+  animation: spin 1s linear infinite;
+  font-size: 16px;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

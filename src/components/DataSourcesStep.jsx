@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Search } from 'lucide-react';
 import './DataSourcesStep.css';
 
-const DataSourcesStep = ({ mockDataSources, selectedDataSource, setSelectedDataSource, availableFields }) => {
+const DataSourcesStep = ({ mockDataSources, selectedDataSource, setSelectedDataSource, availableFields, isLoadingDataSources = false }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const dropdownRef = useRef(null);
@@ -36,21 +36,34 @@ const DataSourcesStep = ({ mockDataSources, selectedDataSource, setSelectedDataS
         <h3 className="panel-title">Data Sources</h3>
         <p className="panel-subtitle">Select the data sources you want to explore.</p>
         <div className="custom-select-wrapper" ref={dropdownRef}>
-          <div className="custom-select-display" onClick={() => setIsOpen(!isOpen)}>
-            {selectedDataSource ? (
+          <div className="custom-select-display" onClick={() => !isLoadingDataSources && setIsOpen(!isOpen)}>
+            {isLoadingDataSources ? (
+              <span className="custom-select-placeholder">Loading data sources...</span>
+            ) : selectedDataSource ? (
               <span className="custom-select-chip">{selectedDataSource}</span>
             ) : (
               <span className="custom-select-placeholder">Select Data Sources</span>
             )}
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`dropdown-arrow ${isOpen ? 'open' : ''}`}><polyline points="6 9 12 15 18 9"></polyline></svg>
+            {isLoadingDataSources ? (
+              <div className="loading-spinner">⟳</div>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`dropdown-arrow ${isOpen ? 'open' : ''}`}><polyline points="6 9 12 15 18 9"></polyline></svg>
+            )}
           </div>
-          {isOpen && (
+          {isOpen && !isLoadingDataSources && (
             <div className="custom-select-dropdown">
-              {mockDataSources.map(source => (
-                <div key={source} className="custom-select-option" onClick={() => handleSelect(source)}>
-                  {source}
+              {mockDataSources.length > 0 ? (
+                mockDataSources.map(source => (
+                  <div key={source} className="custom-select-option" onClick={() => handleSelect(source)}>
+                    <div className="source-name">{source}</div>
+                    <div className="source-type">Snowflake Table</div>
+                  </div>
+                ))
+              ) : (
+                <div className="custom-select-option disabled">
+                  No data sources available
                 </div>
-              ))}
+              )}
             </div>
           )}
         </div>

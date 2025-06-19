@@ -22,7 +22,8 @@ const DataAnalysisApp = () => {
   ];
 
   // Data sources state
-  const [mockDataSources] = useState(['Sales Data', 'Customer Data', 'Product Data']);
+  const [availableDataSources, setAvailableDataSources] = useState([]);
+  const [isLoadingDataSources, setIsLoadingDataSources] = useState(false);
   const [selectedDataSource, setSelectedDataSource] = useState('');
   const [mockDataPreviews, setMockDataPreviews] = useState({});
 
@@ -39,6 +40,31 @@ const DataAnalysisApp = () => {
   const [datasetInfo, setDatasetInfo] = useState('');
   const [sessionId, setSessionId] = useState(null);
   const [isDatasetLoading, setIsDatasetLoading] = useState(false);
+
+  // Load available data sources from API
+  useEffect(() => {
+    const loadDataSources = async () => {
+      setIsLoadingDataSources(true);
+      try {
+        console.log('Loading available data sources from API...');
+        const dataSources = await datasetService.getAvailableDatasets();
+        
+        // Convert API format to frontend format
+        const sourceNames = dataSources.map(ds => ds.name);
+        setAvailableDataSources(sourceNames);
+        
+        console.log('Loaded data sources:', sourceNames);
+      } catch (error) {
+        console.error('Failed to load data sources:', error);
+        // Fallback to mock data sources
+        setAvailableDataSources(['Sales Data', 'Customer Data', 'Product Data']);
+      } finally {
+        setIsLoadingDataSources(false);
+      }
+    };
+
+    loadDataSources();
+  }, []);
 
   useEffect(() => {
     const initMockData = () => {
@@ -233,10 +259,11 @@ const DataAnalysisApp = () => {
         <div className="step-content-container">
           {currentStep === 1 && (
             <DataSourcesStep
-              mockDataSources={mockDataSources}
+              mockDataSources={availableDataSources}
               selectedDataSource={selectedDataSource}
               setSelectedDataSource={setSelectedDataSource}
               availableFields={availableFields}
+              isLoadingDataSources={isLoadingDataSources}
             />
           )}
 
