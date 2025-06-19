@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
+const snowflakeService = require('./services/snowflakeService');
 
 const app = express();
 
@@ -26,26 +27,83 @@ app.get('/api/health', (req, res) => {
 });
 
 // System status endpoint
-app.get('/api/status', (req, res) => {
-  res.json({
-    server: 'online',
-    database: 'pending', // Will be updated in M3
-    ai: 'pending',       // Will be updated in M4
-    cache: 'pending',    // Will be updated in M4
-    uptime: process.uptime(),
-    memory: process.memoryUsage(),
-    timestamp: new Date().toISOString()
-  });
+app.get('/api/status', async (req, res) => {
+  try {
+    const snowflakeStatus = snowflakeService.getStatus();
+    
+    res.json({
+      server: 'online',
+      database: snowflakeStatus.connected ? 'connected' : 'disconnected',
+      ai: process.env.ANTHROPIC_API_KEY ? 'configured' : 'pending',
+      cache: `${snowflakeStatus.cache_size} items cached`,
+      uptime: process.uptime(),
+      memory: process.memoryUsage(),
+      snowflake: {
+        connected: snowflakeStatus.connected,
+        error: snowflakeStatus.error,
+        config: snowflakeStatus.config
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      server: 'online',
+      database: 'error',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Snowflake connection test endpoint
+app.get('/api/snowflake/test', async (req, res) => {
+  try {
+    console.log('Testing Snowflake connection via API...');
+    const result = await snowflakeService.testConnection();
+    
+    if (result.success) {
+      res.json({
+        success: true,
+        message: 'Snowflake connection successful',
+        duration: result.duration,
+        config: {
+          account: result.account,
+          database: result.database,
+          schema: result.schema,
+          warehouse: result.warehouse
+        },
+        timestamp: new Date().toISOString()
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: result.error,
+        duration: result.duration,
+        timestamp: new Date().toISOString()
+      });
+    }
+  } catch (error) {
+    console.error('Snowflake test endpoint error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 // Root endpoint
 app.get('/api', (req, res) => {
   res.json({
-    message: 'Data Analysis API - Milestone 1',
-    version: '1.0.0',
+    message: 'Data Analysis API - Milestone 3',
+    version: '1.3.0',
     endpoints: {
       health: '/api/health',
-      status: '/api/status'
+      status: '/api/status',
+      snowflake_test: '/api/snowflake/test',
+      available_datasets: '/api/available-datasets',
+      load_dataset: 'POST /api/load-dataset',
+      ai_query: 'POST /api/ai-query'
     },
     documentation: 'https://github.com/grosz99/analyst_phase2'
   });
@@ -108,22 +166,64 @@ const mockColumns = {
 };
 
 // Get available datasets
-app.get('/api/available-datasets', (req, res) => {
-  setTimeout(() => {
-    res.json({
-      success: true,
-      datasets: mockDatasets,
-      total_count: mockDatasets.length,
-      timestamp: new Date().toISOString(),
-      source: 'mock_data'
+app.get('/api/available-datasets', async (req, res) => {
+  try {
+    console.log('Fetching available datasets...');
+    const startTime = Date.now();
+    
+    // Try to get real Snowflake tables first
+    try {
+      const snowflakeTables = await snowflakeService.discoverTables();
+      const duration = Date.now() - startTime;
+      
+      console.log(`Retrieved ${snowflakeTables.length} Snowflake tables in ${duration}ms`);
+      
+      res.json({
+        success: true,
+        datasets: snowflakeTables,
+        total_count: snowflakeTables.length,
+        timestamp: new Date().toISOString(),
+        source: 'snowflake',
+        performance: {
+          duration: duration,
+          cached: duration < 1000 // Fast response likely from cache
+        }
+      });
+      
+    } catch (snowflakeError) {
+      console.warn('Snowflake unavailable, using mock data:', snowflakeError.message);
+      
+      // Fallback to mock data
+      const duration = Date.now() - startTime;
+      res.json({
+        success: true,
+        datasets: mockDatasets,
+        total_count: mockDatasets.length,
+        timestamp: new Date().toISOString(),
+        source: 'mock_fallback',
+        snowflake_error: snowflakeError.message,
+        performance: {
+          duration: duration
+        }
+      });
+    }
+    
+  } catch (error) {
+    console.error('Available datasets endpoint error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      timestamp: new Date().toISOString()
     });
-  }, 300); // Simulate network delay
+  }
 });
 
 // Load dataset with filtering
-app.post('/api/load-dataset', (req, res) => {
+app.post('/api/load-dataset', async (req, res) => {
   try {
     const { datasetId, userSelections = {} } = req.body;
+    console.log(`Loading dataset ${datasetId} with selections:`, userSelections);
+    const startTime = Date.now();
     
     if (!datasetId) {
       return res.status(400).json({
@@ -132,18 +232,54 @@ app.post('/api/load-dataset', (req, res) => {
       });
     }
 
-    const dataset = mockDatasets.find(d => d.id === datasetId);
-    if (!dataset) {
-      return res.status(404).json({
-        success: false,
-        error: 'Dataset not found'
-      });
-    }
+    // Try Snowflake first
+    try {
+      // Get schema and sample data from Snowflake
+      const [schema, sampleData] = await Promise.all([
+        snowflakeService.discoverColumns(datasetId),
+        snowflakeService.sampleData(datasetId, userSelections.columns, 100)
+      ]);
+      
+      const duration = Date.now() - startTime;
+      console.log(`Loaded Snowflake dataset ${datasetId} in ${duration}ms`);
+      
+      const result = {
+        success: true,
+        dataset_id: datasetId,
+        schema: {
+          ...schema,
+          row_count: sampleData.length,
+          memory_usage: Math.round(sampleData.length * schema.total_columns * 0.1) // Estimate
+        },
+        sample_data: sampleData.slice(0, 10), // First 10 rows for preview
+        filters_applied: userSelections,
+        message: `Loaded ${datasetId.toUpperCase()} with ${schema.total_columns} columns from Snowflake`,
+        processing_time: duration,
+        timestamp: new Date().toISOString(),
+        source: 'snowflake',
+        performance: {
+          duration: duration,
+          rows_sampled: sampleData.length
+        }
+      };
 
-    const columns = mockColumns[datasetId] || [];
-    
-    // Simulate processing time
-    setTimeout(() => {
+      res.json(result);
+      
+    } catch (snowflakeError) {
+      console.warn(`Snowflake dataset loading failed for ${datasetId}, using mock:`, snowflakeError.message);
+      
+      // Fallback to mock data
+      const dataset = mockDatasets.find(d => d.id === datasetId);
+      if (!dataset) {
+        return res.status(404).json({
+          success: false,
+          error: 'Dataset not found'
+        });
+      }
+
+      const columns = mockColumns[datasetId] || [];
+      const duration = Date.now() - startTime;
+      
       const mockResult = {
         success: true,
         dataset_id: datasetId,
@@ -153,16 +289,18 @@ app.post('/api/load-dataset', (req, res) => {
           memory_usage: Math.round((dataset.row_count / 10000) * (userSelections.sample_rate || 1))
         },
         filters_applied: userSelections,
-        message: `Loaded ${dataset.name} with ${columns.length} columns`,
-        processing_time: Math.random() * 2000 + 500,
+        message: `Loaded ${dataset.name} with ${columns.length} columns (fallback mode)`,
+        processing_time: duration,
         timestamp: new Date().toISOString(),
-        source: 'mock_data'
+        source: 'mock_fallback',
+        snowflake_error: snowflakeError.message
       };
 
       res.json(mockResult);
-    }, 800); // Simulate loading time
+    }
     
   } catch (error) {
+    console.error('Load dataset endpoint error:', error);
     res.status(500).json({
       success: false,
       error: error.message,
@@ -294,32 +432,74 @@ result = result.head(5)`.trim();
 });
 
 // Get dataset schema/columns
-app.get('/api/dataset/:datasetId/schema', (req, res) => {
-  const { datasetId } = req.params;
-  
-  const dataset = mockDatasets.find(d => d.id === datasetId);
-  if (!dataset) {
-    return res.status(404).json({
+app.get('/api/dataset/:datasetId/schema', async (req, res) => {
+  try {
+    const { datasetId } = req.params;
+    console.log(`Getting schema for dataset: ${datasetId}`);
+    const startTime = Date.now();
+    
+    // Try Snowflake first
+    try {
+      const schema = await snowflakeService.discoverColumns(datasetId);
+      const duration = Date.now() - startTime;
+      
+      console.log(`Retrieved schema for ${datasetId} in ${duration}ms`);
+      
+      res.json({
+        success: true,
+        dataset_id: datasetId,
+        dataset_name: datasetId.toUpperCase(),
+        schema: schema,
+        timestamp: new Date().toISOString(),
+        source: 'snowflake',
+        performance: {
+          duration: duration,
+          cached: duration < 500
+        }
+      });
+      
+    } catch (snowflakeError) {
+      console.warn(`Snowflake schema unavailable for ${datasetId}, using mock:`, snowflakeError.message);
+      
+      // Fallback to mock data
+      const dataset = mockDatasets.find(d => d.id === datasetId);
+      if (!dataset) {
+        return res.status(404).json({
+          success: false,
+          error: 'Dataset not found'
+        });
+      }
+
+      const columns = mockColumns[datasetId] || [];
+      const duration = Date.now() - startTime;
+      
+      res.json({
+        success: true,
+        dataset_id: datasetId,
+        dataset_name: dataset.name,
+        schema: {
+          columns: columns,
+          total_columns: columns.length,
+          dimensions: columns.filter(c => c.category === 'dimension').length,
+          metrics: columns.filter(c => c.category === 'metric').length
+        },
+        timestamp: new Date().toISOString(),
+        source: 'mock_fallback',
+        snowflake_error: snowflakeError.message,
+        performance: {
+          duration: duration
+        }
+      });
+    }
+    
+  } catch (error) {
+    console.error('Schema endpoint error:', error);
+    res.status(500).json({
       success: false,
-      error: 'Dataset not found'
+      error: error.message,
+      timestamp: new Date().toISOString()
     });
   }
-
-  const columns = mockColumns[datasetId] || [];
-  
-  res.json({
-    success: true,
-    dataset_id: datasetId,
-    dataset_name: dataset.name,
-    schema: {
-      columns: columns,
-      total_columns: columns.length,
-      dimensions: columns.filter(c => c.category === 'dimension').length,
-      metrics: columns.filter(c => c.category === 'metric').length
-    },
-    timestamp: new Date().toISOString(),
-    source: 'mock_data'
-  });
 });
 
 // Handle 404 for API routes
