@@ -112,35 +112,69 @@ const DataAnalysisApp = () => {
     initMockData();
   }, []);
 
-  const getFieldsForDataSource = useCallback((source) => {
-    const fields = [];
-    if (mockDataPreviews[source]) {
-      const sample = mockDataPreviews[source][0] || {};
-      Object.keys(sample).forEach(field => {
-        const value = sample[field];
-        let type = typeof value;
-        if (type === 'number') type = Number.isInteger(value) ? 'integer' : 'number';
-        fields.push({ name: field, type, source });
-      });
-    }
-    const uniqueFields = [];
-    const fieldNames = new Set();
-    fields.forEach(field => {
-      if (!fieldNames.has(field.name)) {
-        fieldNames.add(field.name);
-        uniqueFields.push(field);
+  const getFieldsForDataSource = useCallback(async (source) => {
+    try {
+      console.log(`Getting fields for data source: ${source}`);
+      
+      // Map frontend display names to API dataset IDs
+      const datasetId = datasetService.mapDataSourceToId(source);
+      
+      // Get schema from API
+      const schema = await datasetService.getDatasetSchema(datasetId);
+      
+      if (schema && schema.columns) {
+        console.log(`Retrieved ${schema.columns.length} fields for ${source}`);
+        
+        // Convert API schema format to frontend format
+        const fields = schema.columns.map(col => ({
+          name: col.name,
+          type: col.type,
+          source: source,
+          category: col.category
+        }));
+        
+        return fields;
+      } else {
+        console.warn(`No schema returned for ${source}`);
+        return [];
       }
-    });
-    return uniqueFields;
+    } catch (error) {
+      console.error(`Failed to get fields for ${source}:`, error);
+      
+      // Fallback to mock data if API fails
+      const fields = [];
+      if (mockDataPreviews[source]) {
+        const sample = mockDataPreviews[source][0] || {};
+        Object.keys(sample).forEach(field => {
+          const value = sample[field];
+          let type = typeof value;
+          if (type === 'number') type = Number.isInteger(value) ? 'integer' : 'number';
+          fields.push({ name: field, type, source });
+        });
+      }
+      return fields;
+    }
   }, [mockDataPreviews]);
 
   // Update available fields when data source changes
   useEffect(() => {
-    if (selectedDataSource) {
-      setAvailableFields(getFieldsForDataSource(selectedDataSource));
-    } else {
-      setAvailableFields([]);
-    }
+    const loadFields = async () => {
+      if (selectedDataSource) {
+        console.log(`Loading fields for selected data source: ${selectedDataSource}`);
+        try {
+          const fields = await getFieldsForDataSource(selectedDataSource);
+          setAvailableFields(fields);
+          console.log(`Loaded ${fields.length} fields for ${selectedDataSource}`);
+        } catch (error) {
+          console.error('Failed to load fields:', error);
+          setAvailableFields([]);
+        }
+      } else {
+        setAvailableFields([]);
+      }
+    };
+
+    loadFields();
   }, [selectedDataSource, getFieldsForDataSource]);
 
   // Handle next step navigation

@@ -188,11 +188,24 @@ class DatasetService {
 
   mapDataSourceToId(dataSourceName) {
     const mapping = {
+      // Old mock data mappings (for fallback)
       'Sales Data': 'sales_data',
       'Customer Data': 'customer_data', 
-      'Product Data': 'product_data'
+      'Product Data': 'product_data',
+      // New Snowflake table mappings
+      'ORDERS': 'orders',
+      'CUSTOMERS': 'customers',
+      'PRODUCTS': 'products'
     };
-    return mapping[dataSourceName] || 'sales_data';
+    
+    // If exact match found, use it
+    if (mapping[dataSourceName]) {
+      return mapping[dataSourceName];
+    }
+    
+    // Try lowercase version
+    const lowercaseId = dataSourceName.toLowerCase();
+    return lowercaseId || 'orders'; // Default to orders table
   }
 
   generateMockDataFromSchema(schema, selectedColumns) {
