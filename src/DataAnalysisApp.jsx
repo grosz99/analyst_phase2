@@ -135,6 +135,13 @@ const DataAnalysisApp = () => {
       }
       setIsDatasetLoading(true);
       try {
+        console.log('Loading dataset with:', {
+          selectedDataSource,
+          selectedDimensions,
+          selectedMetrics,
+          selectedFilters
+        });
+        
         const result = await datasetService.loadDataset(
           selectedDataSource,
           selectedDimensions,
@@ -142,11 +149,20 @@ const DataAnalysisApp = () => {
           selectedFilters,
           mockDataPreviews
         );
+        
+        console.log('Dataset load result:', result);
+        
+        // Validate result structure
+        if (!result || !result.dataset) {
+          throw new Error('Invalid dataset result structure');
+        }
+        
         setProcessedData(result.dataset);
-        setDatasetInfo(result.info);
+        setDatasetInfo(result.info || 'Dataset loaded successfully');
         setSessionId(result.sessionId);
         setCurrentStep(4); // Go directly to Analysis step
       } catch (err) {
+        console.error('Dataset loading error:', err);
         setError(`Failed to load dataset: ${err.message}`);
       } finally {
         setIsDatasetLoading(false);

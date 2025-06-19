@@ -131,8 +131,11 @@ class DatasetService {
 
           console.log('Dataset loaded via API:', result);
           
+          // Convert API schema format to frontend format
+          const mockDataForUI = this.generateMockDataFromSchema(result.schema, userSelections.columns);
+          
           return {
-            dataset: result.schema,
+            dataset: mockDataForUI,
             info: result.message,
             sessionId: sessionId,
             processingTime: result.processing_time,
@@ -143,6 +146,7 @@ class DatasetService {
         }
       } catch (apiError) {
         console.warn('API loading failed, falling back to mock data:', apiError.message);
+        console.error('Full API error:', apiError);
         
         // Fallback to original mock data logic
         const sourceData = mockDataPreviews?.[selectedDataSource] || [];
@@ -177,6 +181,59 @@ class DatasetService {
       'Product Data': 'product_data'
     };
     return mapping[dataSourceName] || 'sales_data';
+  }
+
+  generateMockDataFromSchema(schema, selectedColumns) {
+    // Generate sample data rows based on the schema for UI display
+    const sampleSize = Math.min(50, schema.row_count || 50);
+    const mockData = [];
+
+    for (let i = 0; i < sampleSize; i++) {
+      const row = {};
+      
+      selectedColumns.forEach(columnName => {
+        const column = schema.columns.find(col => col.name === columnName);
+        if (column) {
+          row[columnName] = this.generateSampleValue(column.type, i);
+        } else {
+          // Fallback for missing columns
+          row[columnName] = this.generateSampleValue('String', i);
+        }
+      });
+      
+      mockData.push(row);
+    }
+
+    return mockData;
+  }
+
+  generateSampleValue(type, index) {
+    switch (type.toLowerCase()) {
+      case 'date':
+        const startDate = new Date('2024-01-01');
+        const randomDays = Math.floor(Math.random() * 180);
+        const sampleDate = new Date(startDate.getTime() + randomDays * 24 * 60 * 60 * 1000);
+        return sampleDate.toISOString().split('T')[0];
+      
+      case 'string':
+      case 'utf8':
+        const regions = ['North America', 'Europe', 'Asia Pacific', 'Latin America', 'Middle East'];
+        const products = ['Product A', 'Product B', 'Product C', 'Product D'];
+        const segments = ['Enterprise', 'SMB', 'Consumer'];
+        const allStrings = [...regions, ...products, ...segments];
+        return allStrings[index % allStrings.length];
+      
+      case 'number':
+      case 'float64':
+        return Math.round((Math.random() * 1000000 + 10000) * 100) / 100;
+      
+      case 'int64':
+      case 'integer':
+        return Math.floor(Math.random() * 10000) + 100;
+      
+      default:
+        return `Sample_${index + 1}`;
+    }
   }
 
   applyFilters(data, filters) {
