@@ -70,6 +70,60 @@ const mockResponses = {
 const getAnalysis = async (question, context, sessionId, dataSource) => {
   console.log('Sending analysis request:', { question, context, sessionId, dataSource });
 
+  // Try API first, fallback to mock
+  try {
+    return await getAnalysisFromAPI(question, context, sessionId);
+  } catch (apiError) {
+    console.warn('API analysis failed, using mock response:', apiError.message);
+    return getMockAnalysis(question, context, sessionId, dataSource);
+  }
+};
+
+const getAnalysisFromAPI = async (question, context, sessionId) => {
+  const baseURL = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3001';
+  
+  // Extract dataset ID from context/session
+  const datasetId = extractDatasetId(context, sessionId);
+  
+  const response = await fetch(`${baseURL}/api/ai-query`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      query: question,
+      datasetId: datasetId || 'sales_data' // Default fallback
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+  }
+
+  const result = await response.json();
+
+  if (!result.success) {
+    throw new Error(result.error || 'AI query failed');
+  }
+
+  // Transform API response to frontend format
+  const analysisResult = result.result;
+  
+  return {
+    answer: analysisResult.summary || 'Analysis complete',
+    tableData: analysisResult.data || [],
+    chartData: transformToChartData(analysisResult.data, analysisResult.chart_type),
+    followUpQuestions: analysisResult.insights?.map(insight => 
+      `Tell me more about: ${insight}`
+    ) || ['Show me more details', 'What caused this pattern?', 'How does this compare to last period?'],
+    pythonCode: result.python_code,
+    executionTime: result.execution_time,
+    cached: result.cached,
+    source: 'api'
+  };
+};
+
+const getMockAnalysis = async (question, context, sessionId, dataSource) => {
   // Simulate network delay
   await new Promise(resolve => setTimeout(resolve, 1500));
 
@@ -93,7 +147,8 @@ const getAnalysis = async (question, context, sessionId, dataSource) => {
           backgroundColor: 'rgba(153, 102, 255, 0.5)',
         }]
       },
-      followUpQuestions: ['Summarize these results.', 'Why are these at the top?']
+      followUpQuestions: ['Summarize these results.', 'Why are these at the top?'],
+      source: 'mock'
     };
   }
 
@@ -104,7 +159,53 @@ const getAnalysis = async (question, context, sessionId, dataSource) => {
     responseKey = 'products';
   }
 
-  return mockResponses[responseKey];
+  return {
+    ...mockResponses[responseKey],
+    source: 'mock'
+  };
+};
+
+const extractDatasetId = (context, sessionId) => {
+  // Try to extract dataset ID from context or session
+  // This is a simplified implementation
+  if (context && context.dataset_id) {
+    return context.dataset_id;
+  }
+  
+  // Default mapping based on common patterns
+  return 'sales_data';
+};
+
+const transformToChartData = (data, chartType = 'bar') => {
+  if (!data || data.length === 0) {
+    return { labels: [], datasets: [] };
+  }
+
+  const firstRow = data[0];
+  const keys = Object.keys(firstRow);
+  
+  // Assume first column is labels, rest are data
+  const labelKey = keys[0];
+  const dataKeys = keys.slice(1);
+  
+  const colors = [
+    'rgb(75, 192, 192)',
+    'rgb(255, 99, 132)', 
+    'rgb(54, 162, 235)',
+    'rgb(153, 102, 255)',
+    'rgb(255, 205, 86)'
+  ];
+
+  return {
+    labels: data.map(row => row[labelKey]),
+    datasets: dataKeys.map((key, index) => ({
+      label: key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+      data: data.map(row => row[key]),
+      borderColor: colors[index % colors.length],
+      backgroundColor: colors[index % colors.length].replace('rgb', 'rgba').replace(')', ', 0.5)'),
+      fill: chartType === 'area'
+    }))
+  };
 };
 
 const analysisService = {
