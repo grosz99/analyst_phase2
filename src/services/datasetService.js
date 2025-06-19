@@ -131,15 +131,27 @@ class DatasetService {
 
           console.log('Dataset loaded via API:', result);
           
-          // Convert API schema format to frontend format
-          const mockDataForUI = this.generateMockDataFromSchema(result.schema, userSelections.columns);
+          let dataForUI;
+          
+          // Check if we have real Snowflake data or need to generate mock data
+          if (result.sample_data && result.sample_data.length > 0) {
+            // Use real Snowflake sample data
+            console.log('Using real Snowflake sample data');
+            dataForUI = result.sample_data;
+          } else {
+            // Generate mock data from schema
+            console.log('Generating mock data from schema');
+            dataForUI = this.generateMockDataFromSchema(result.schema, userSelections.columns);
+          }
           
           return {
-            dataset: mockDataForUI,
+            dataset: dataForUI,
             info: result.message,
             sessionId: sessionId,
-            processingTime: result.processing_time,
-            source: 'api'
+            processingTime: result.processing_time || result.performance?.duration,
+            source: result.source || 'api',
+            performance: result.performance,
+            snowflake_connected: result.source === 'snowflake'
           };
         } else {
           throw new Error(result.error || 'API call failed');
