@@ -194,10 +194,10 @@ class DatasetService {
       selectedColumns.forEach(columnName => {
         const column = schema.columns.find(col => col.name === columnName);
         if (column) {
-          row[columnName] = this.generateSampleValue(column.type, i);
+          row[columnName] = this.generateSampleValue(column.type, i, columnName);
         } else {
           // Fallback for missing columns
-          row[columnName] = this.generateSampleValue('String', i);
+          row[columnName] = this.generateSampleValue('String', i, columnName);
         }
       });
       
@@ -207,33 +207,144 @@ class DatasetService {
     return mockData;
   }
 
-  generateSampleValue(type, index) {
+  generateSampleValue(type, index, columnName) {
+    // Create deterministic but varied data based on column name and index
+    const seed = this.simpleHash(columnName + index);
+    const random = this.seededRandom(seed);
+    
     switch (type.toLowerCase()) {
       case 'date':
         const startDate = new Date('2024-01-01');
-        const randomDays = Math.floor(Math.random() * 180);
+        const randomDays = Math.floor(random() * 180);
         const sampleDate = new Date(startDate.getTime() + randomDays * 24 * 60 * 60 * 1000);
         return sampleDate.toISOString().split('T')[0];
       
       case 'string':
       case 'utf8':
-        const regions = ['North America', 'Europe', 'Asia Pacific', 'Latin America', 'Middle East'];
-        const products = ['Product A', 'Product B', 'Product C', 'Product D'];
-        const segments = ['Enterprise', 'SMB', 'Consumer'];
-        const allStrings = [...regions, ...products, ...segments];
-        return allStrings[index % allStrings.length];
+        return this.generateStringValue(columnName, index, random);
       
       case 'number':
       case 'float64':
-        return Math.round((Math.random() * 1000000 + 10000) * 100) / 100;
+        return this.generateNumberValue(columnName, random);
       
       case 'int64':
       case 'integer':
-        return Math.floor(Math.random() * 10000) + 100;
+        return this.generateIntegerValue(columnName, random);
       
       default:
-        return `Sample_${index + 1}`;
+        return `${columnName}_${index + 1}`;
     }
+  }
+
+  generateStringValue(columnName, index, random) {
+    const columnLower = columnName.toLowerCase();
+    
+    if (columnLower.includes('region')) {
+      const regions = ['North America', 'Europe', 'Asia Pacific', 'Latin America', 'Middle East', 'Africa'];
+      return regions[Math.floor(random() * regions.length)];
+    }
+    
+    if (columnLower.includes('product') || columnLower.includes('item')) {
+      const products = ['Electronics', 'Clothing', 'Home & Garden', 'Sports', 'Books', 'Automotive', 'Health', 'Beauty'];
+      return products[Math.floor(random() * products.length)];
+    }
+    
+    if (columnLower.includes('customer') || columnLower.includes('segment')) {
+      const segments = ['Enterprise', 'SMB', 'Consumer', 'Government', 'Education', 'Healthcare'];
+      return segments[Math.floor(random() * segments.length)];
+    }
+    
+    if (columnLower.includes('category')) {
+      const categories = ['Premium', 'Standard', 'Basic', 'Luxury', 'Budget'];
+      return categories[Math.floor(random() * categories.length)];
+    }
+    
+    if (columnLower.includes('status')) {
+      const statuses = ['Active', 'Inactive', 'Pending', 'Completed', 'In Progress'];
+      return statuses[Math.floor(random() * statuses.length)];
+    }
+    
+    // Default varied string values
+    const prefixes = ['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'Zeta', 'Eta', 'Theta'];
+    const suffixes = ['Pro', 'Plus', 'Max', 'Elite', 'Standard', 'Basic', 'Premium', 'Essential'];
+    
+    const prefix = prefixes[Math.floor(random() * prefixes.length)];
+    const suffix = suffixes[Math.floor(random() * suffixes.length)];
+    
+    return `${prefix} ${suffix}`;
+  }
+
+  // Simple hash function for deterministic randomness
+  simpleHash(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    return Math.abs(hash);
+  }
+
+  // Seeded random number generator
+  seededRandom(seed) {
+    return function() {
+      seed = (seed * 9301 + 49297) % 233280;
+      return seed / 233280;
+    };
+  }
+
+  generateNumberValue(columnName, random) {
+    const columnLower = columnName.toLowerCase();
+    
+    if (columnLower.includes('revenue') || columnLower.includes('sales')) {
+      // Revenue: $10K to $10M
+      return Math.round((random() * 9990000 + 10000) * 100) / 100;
+    }
+    
+    if (columnLower.includes('price') || columnLower.includes('cost')) {
+      // Price: $1 to $1000
+      return Math.round((random() * 999 + 1) * 100) / 100;
+    }
+    
+    if (columnLower.includes('margin') || columnLower.includes('percent')) {
+      // Percentage: 0% to 100%
+      return Math.round(random() * 100 * 100) / 100;
+    }
+    
+    if (columnLower.includes('rating') || columnLower.includes('score')) {
+      // Rating: 1 to 5
+      return Math.round((random() * 4 + 1) * 100) / 100;
+    }
+    
+    // Default: general business metric
+    return Math.round((random() * 100000 + 1000) * 100) / 100;
+  }
+
+  generateIntegerValue(columnName, random) {
+    const columnLower = columnName.toLowerCase();
+    
+    if (columnLower.includes('units') || columnLower.includes('quantity') || columnLower.includes('sold')) {
+      // Units: 1 to 10,000
+      return Math.floor(random() * 9999) + 1;
+    }
+    
+    if (columnLower.includes('customer') || columnLower.includes('user')) {
+      // Customer count: 100 to 100,000
+      return Math.floor(random() * 99900) + 100;
+    }
+    
+    if (columnLower.includes('id') || columnLower.includes('identifier')) {
+      // ID: 1000 to 999999
+      return Math.floor(random() * 999000) + 1000;
+    }
+    
+    if (columnLower.includes('day') || columnLower.includes('week') || columnLower.includes('month')) {
+      // Time periods: 1 to 365
+      return Math.floor(random() * 365) + 1;
+    }
+    
+    // Default: general count
+    return Math.floor(random() * 1000) + 10;
   }
 
   applyFilters(data, filters) {
