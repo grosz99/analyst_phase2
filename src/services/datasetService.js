@@ -92,7 +92,7 @@ class DatasetService {
     }
   }
 
-  async loadDataset(selectedDataSource, dimensions, metrics, filters, mockDataPreviews = null) {
+  async loadDataset(selectedDataSource, dimensions, metrics, filters) {
     try {
       console.log('Loading dataset with:', { selectedDataSource, dimensions, metrics, filters });
       
@@ -157,27 +157,29 @@ class DatasetService {
           throw new Error(result.error || 'API call failed');
         }
       } catch (apiError) {
-        console.warn('API loading failed, falling back to mock data:', apiError.message);
+        console.warn('API loading failed, no fallback available:', apiError.message);
         console.error('Full API error:', apiError);
         
-        // Fallback to original mock data logic
-        const sourceData = mockDataPreviews?.[selectedDataSource] || [];
-        const filteredData = this.applyFilters(sourceData, filters);
+        // Generate minimal mock data as last resort to prevent UI breakage
         const finalColumns = [...dimensions, ...metrics];
-        const processedData = filteredData.map(row => 
-          Object.fromEntries(finalColumns.map(col => [col, row[col]]))
-        );
+        const mockData = Array(10).fill().map((_, i) => {
+          const row = {};
+          finalColumns.forEach(col => {
+            row[col] = this.generateSampleValue('string', i, col);
+          });
+          return row;
+        });
 
         const sessionId = `session-${Date.now()}`;
-        const info = `Your dataset with ${processedData.length} rows and ${finalColumns.length} columns is loaded from ${selectedDataSource} (fallback mode).`;
+        const info = `Unable to connect to data source. Showing sample data structure for ${selectedDataSource}.`;
 
-        console.log(`Dataset loaded via fallback: ${processedData.length} rows × ${finalColumns.length} columns`);
+        console.log(`Dataset loaded via emergency fallback: ${mockData.length} rows × ${finalColumns.length} columns`);
         
         return {
-          dataset: processedData,
+          dataset: mockData,
           info,
           sessionId,
-          source: 'fallback'
+          source: 'emergency_fallback'
         };
       }
     } catch (err) {
@@ -370,6 +372,72 @@ class DatasetService {
     
     // Default: general count
     return Math.floor(random() * 1000) + 10;
+  }
+
+  async getSampleDataForFilters(datasetId, fieldName) {
+    try {
+      // Try to get real sample data from API
+      const response = await fetch(`${this.baseURL}/api/load-dataset`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          datasetId: datasetId,
+          userSelections: {
+            columns: [fieldName],
+            filters: {},
+            sample_rate: 0.1 // Get 10% sample for faster filter loading
+          }
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+
+      if (result.success && result.sample_data && result.sample_data.length > 0) {
+        // Extract unique values from the sample data
+        const values = result.sample_data.map(row => row[fieldName]);
+        return [...new Set(values)].filter(v => v != null).sort();
+      } else {
+        throw new Error('No sample data available');
+      }
+    } catch (error) {
+      console.warn(`Failed to get sample data for ${fieldName}:`, error.message);
+      
+      // Fallback to generated sample values based on field name
+      return this.generateSampleFilterValues(fieldName);
+    }
+  }
+
+  generateSampleFilterValues(fieldName) {
+    const fieldLower = fieldName.toLowerCase();
+    
+    if (fieldLower.includes('region')) {
+      return ['North America', 'Europe', 'Asia Pacific', 'Latin America'];
+    }
+    
+    if (fieldLower.includes('product') || fieldLower.includes('item')) {
+      return ['Electronics', 'Clothing', 'Home & Garden', 'Sports', 'Books'];
+    }
+    
+    if (fieldLower.includes('customer') || fieldLower.includes('segment')) {
+      return ['Enterprise', 'SMB', 'Consumer', 'Government'];
+    }
+    
+    if (fieldLower.includes('category')) {
+      return ['Premium', 'Standard', 'Basic', 'Luxury'];
+    }
+    
+    if (fieldLower.includes('status')) {
+      return ['Active', 'Inactive', 'Pending', 'Completed'];
+    }
+    
+    // Default fallback
+    return ['Option A', 'Option B', 'Option C', 'Option D'];
   }
 
   applyFilters(data, filters) {

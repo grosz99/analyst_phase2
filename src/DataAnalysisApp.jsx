@@ -25,7 +25,6 @@ const DataAnalysisApp = () => {
   const [availableDataSources, setAvailableDataSources] = useState([]);
   const [isLoadingDataSources, setIsLoadingDataSources] = useState(false);
   const [selectedDataSource, setSelectedDataSource] = useState('');
-  const [mockDataPreviews, setMockDataPreviews] = useState({});
 
   // Filters state
   const [selectedFilters, setSelectedFilters] = useState({});
@@ -66,51 +65,7 @@ const DataAnalysisApp = () => {
     loadDataSources();
   }, []);
 
-  useEffect(() => {
-    const initMockData = () => {
-      const mockData = {
-        'Sales Data': Array(50).fill().map((_, i) => ({
-          date: `2023-${Math.floor(i / 4) + 1}-01`,
-          Region: ['North', 'South', 'East', 'West'][i % 4],
-          Product: ['Widget A', 'Widget B', 'Widget C'][i % 3],
-          Sales: Math.floor(Math.random() * 10000) + 1000,
-          Units: Math.floor(Math.random() * 100) + 10,
-          Profit: Math.floor(Math.random() * 5000) + 500,
-          revenue: Math.floor(Math.random() * 10000) + 1000,
-          unitsSold: Math.floor(Math.random() * 100) + 10,
-          billability: Math.random() * 100,
-          projectedWork: Math.floor(Math.random() * 200) + 50,
-          revenueLW: Math.floor(Math.random() * 9000) + 1000,
-          revenueLY: Math.floor(Math.random() * 8000) + 1000,
-          unitsSoldLW: Math.floor(Math.random() * 90) + 10,
-          unitsSoldLY: Math.floor(Math.random() * 80) + 10,
-          billabilityLW: Math.random() * 90,
-          billabilityLY: Math.random() * 80,
-          projectedWorkLW: Math.floor(Math.random() * 180) + 50,
-          projectedWorkLY: Math.floor(Math.random() * 160) + 50,
-          plan: Math.floor(Math.random() * 12000) + 1000,
-        })),
-        'Customer Data': Array(40).fill().map((_, i) => ({
-          CustomerId: `CUST-${1000 + i}`,
-          Name: `Customer ${i + 1}`,
-          Segment: ['Enterprise', 'SMB', 'Consumer'][i % 3],
-          Country: ['USA', 'Canada', 'UK', 'Germany', 'France'][i % 5],
-          Active: i % 5 !== 0,
-          Revenue: Math.floor(Math.random() * 50000) + 5000
-        })),
-        'Product Data': Array(30).fill().map((_, i) => ({
-          ProductId: `PROD-${100 + i}`,
-          Name: `Product ${i + 1}`,
-          Category: ['Electronics', 'Office', 'Furniture'][i % 3],
-          Price: Math.floor(Math.random() * 1000) + 50,
-          Stock: Math.floor(Math.random() * 200) + 10,
-          Rating: (Math.random() * 4 + 1).toFixed(1)
-        }))
-      };
-      setMockDataPreviews(mockData);
-    };
-    initMockData();
-  }, []);
+  // Mock data previews removed - now using real Snowflake data throughout
 
   const getFieldsForDataSource = useCallback(async (source) => {
     try {
@@ -141,20 +96,11 @@ const DataAnalysisApp = () => {
     } catch (error) {
       console.error(`Failed to get fields for ${source}:`, error);
       
-      // Fallback to mock data if API fails
-      const fields = [];
-      if (mockDataPreviews[source]) {
-        const sample = mockDataPreviews[source][0] || {};
-        Object.keys(sample).forEach(field => {
-          const value = sample[field];
-          let type = typeof value;
-          if (type === 'number') type = Number.isInteger(value) ? 'integer' : 'number';
-          fields.push({ name: field, type, source });
-        });
-      }
-      return fields;
+      // Fallback: return empty array if API fails
+      console.warn('No fallback fields available - API required for field discovery');
+      return [];
     }
-  }, [mockDataPreviews]);
+  }, []);
 
   // Update available fields when data source changes
   useEffect(() => {
@@ -206,8 +152,7 @@ const DataAnalysisApp = () => {
           selectedDataSource,
           selectedDimensions,
           selectedMetrics,
-          selectedFilters,
-          mockDataPreviews
+          selectedFilters
         );
         
         console.log('Dataset load result:', result);
@@ -306,7 +251,6 @@ const DataAnalysisApp = () => {
               selectedFilters={selectedFilters}
               setSelectedFilters={setSelectedFilters}
               availableFields={availableFields}
-              mockDataPreviews={mockDataPreviews}
               selectedDataSource={selectedDataSource}
             />
           )}
