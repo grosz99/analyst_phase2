@@ -1,3 +1,20 @@
+# Dependencies
+node_modules/
+/frontend/node_modules
+
+# Build artifacts
+build/
+/frontend/build
+dist/
+.next/
+out/
+.nuxt/
+.output/
+
+# IDE files
+.idea/
+.vscode/
+
 # Logs
 logs
 *.log
@@ -37,8 +54,6 @@ bower_components
 # Compiled binary addons (https://nodejs.org/api/addons.html)
 build/Release
 
-# Dependency directories
-node_modules/
 jspm_packages/
 
 # Snowpack dependency directory (https://snowpack.dev/)
@@ -70,25 +85,12 @@ web_modules
 
 # dotenv environment variables file
 .env
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*.local
 .env.local
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
 .parcel-cache
-
-# Next.js build output
-.next
-out
-
-# Nuxt.js build output
-.nuxt
-dist
-
-# Nuxt.js generated files
-.output
 
 # Gatsby files
 .cache/
@@ -98,5 +100,3 @@ dist
 
 .DS_Store
 
-# Vite build output
-dist
