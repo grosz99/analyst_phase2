@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mock Data Test</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+        'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      background-color: #f5f5f5;
+    }
+    code {
+      font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+      background-color: #f0f0f0;
+      padding: 2px 4px;
+      border-radius: 4px;
+    }
+    pre {
+      background-color: #f0f0f0;
+      padding: 8px;
+      border-radius: 4px;
+      overflow-x: auto;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .test-log {
+      background-color: #f0f0f0;
+      padding: 16px;
+      border-radius: 8px;
+      font-family: monospace;
+      white-space: pre-wrap;
+      margin-top: 20px;
+    }
+    .button {
+      background-color: #3b82f6;
+      color: white;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      border: none;
+    }
+    .button:hover {
+      background-color: #2563eb;
+    }
+    .button:disabled {
+      background-color: #93c5fd;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1 class="text-3xl font-bold mb-8">Mock Data Test</h1>
+    
+    <div class="mb-4">
+      <button id="runTestButton" class="button">Run Mock Data Test</button>
+    </div>
+    
+    <div id="errorContainer" class="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded hidden"></div>
+    
+    <div id="testLog" class="test-log">Test results will appear here...</div>
+  </div>
+
+  <script>
+    // Mock implementation of datasetService
+    const datasetService = {
+      currentDataset: null,
+      datasetInfo: null,
+      datasetSession: null,
+      
+      async loadDataset(sources, dimensions, metrics, filters, csvData, mockDataPreviews) {
+        console.log('Loading dataset with:', { sources, dimensions, metrics, filters });
+        
+        // Prepare dataset from user selections
+        const combinedData = sources.flatMap(source => {
+          if (csvData[source]) {
+            console.log(`Found CSV data for ${source}:`, csvData[source].length, 'rows');
+            return csvData[source];
+          } else if (mockDataPreviews[source]) {
+            console.log(`Found mock data for ${source}:`, mockDataPreviews[source].length, 'rows');
+            return mockDataPreviews[source];
+          }
+          console.log(`No data found for source: ${source}`);
+          return [];
+        });
+
+        // Apply filters if any
+        const filteredData = this.applyFilters(combinedData, filters);
+        
+        // Select only chosen dimensions + metrics
+        const finalColumns = [...dimensions, ...metrics];
+        const processedData = filteredData.map(row => 
+          Object.fromEntries(finalColumns.map(col => [col, row[col]]))
+        );
+
+        // Store dataset info
+        this.currentDataset = processedData;
+        this.datasetInfo = {
+          shape: [processedData.length, finalColumns.length],
+          columns: finalColumns,
+          preview: processedData.slice(0, 10),
+          sources: sources,
+          dimensions: dimensions,
+          metrics: metrics,
+          filters: filters,
+          memory_usage: JSON.stringify(processedData).length,
+          created_at: Date.now()
+        };
+        
+        // Generate a unique session ID
+        this.datasetSession = {
+          id: `dataset-${Date.now()}`,
+          loaded: true,
+          rowCount: processedData.length,
+          columnCount: finalColumns.length
+        };
+
+        console.log(`Dataset loaded: ${processedData.length} rows × ${finalColumns.length} columns`);
+        
+        return {
+          data: processedData,
+          info: this.datasetInfo,
+          session: this.datasetSession
+        };
+      },
+
+      applyFilters(data, filters) {
+        // If no filters, return original data
+        if (!filters || Object.keys(filters).length === 0) {
+          return data;
+        }
+
+        // Apply each filter
+        return data.filter(row => {
+          for (const [key, value] of Object.entries(filters)) {
+            // Skip empty filters
+            if (!value) continue;
+            
+            // If row doesn't have the key or value doesn't match, exclude it
+            if (!row.hasOwnProperty(key) || row[key] !== value) {
+              return false;
+            }
+          }
+          return true;
+        });
+      },
+
+      async initializeClaudeDataset() {
+        if (!this.currentDataset || !this.datasetInfo) {
+          throw new Error('No dataset loaded. Please load a dataset first.');
+        }
+
+        // Mock initialization
+        return "Dataset loaded successfully in mock Claude environment.\nReady for analysis!";
+      },
+
+      isDatasetLoaded() {
+        return !!this.currentDataset;
+      },
+
+      async analyzeQuestion(question) {
+        if (!this.currentDataset || !this.datasetInfo) {
+          throw new Error('No dataset loaded. Please load a dataset first.');
+        }
+
+        // Mock analysis result
+        return {
+          answer: "Based on the mock data analysis, the average sales by region are: North: $5,432, South: $4,987, East: $6,123, West: $5,789.",
+          code: "# Python code to analyze sales by region\nimport pandas as pd\n\n# Group by region and calculate average\nresult = df.groupby('Region')['Sales'].mean()\nprint(result)",
+          visualization: null
+        };
+      }
+    };
+
+    // Mock data for testing
+    const mockDataPreviews = {
+      'Sales Data': Array(50).fill().map((_, i) => ({
+        Date: `2023-${Math.floor(i / 4) + 1}-${(i % 4) * 7 + 1}`,
+        Region: ['North', 'South', 'East', 'West'][i % 4],
+        Product: ['Widget A', 'Widget B', 'Widget C'][i % 3],
+        Sales: Math.floor(Math.random() * 10000) + 1000,
+        Units: Math.floor(Math.random() * 100) + 10,
+        Profit: Math.floor(Math.random() * 5000) + 500
+      })),
+      'Customer Data': Array(40).fill().map((_, i) => ({
+        CustomerId: `CUST-${1000 + i}`,
+        Name: `Customer ${i + 1}`,
+        Segment: ['Enterprise', 'SMB', 'Consumer'][i % 3],
+        Country: ['USA', 'Canada', 'UK', 'Germany', 'France'][i % 5],
+        Active: i % 5 !== 0,
+        Revenue: Math.floor(Math.random() * 50000) + 5000
+      }))
+    };
+
+    // DOM elements
+    const runTestButton = document.getElementById('runTestButton');
+    const errorContainer = document.getElementById('errorContainer');
+    const testLog = document.getElementById('testLog');
+
+    // Add a log message to the test results
+    function addLog(message) {
+      testLog.textContent += '\n' + message;
+    }
+
+    // Clear the test log
+    function clearLog() {
+      testLog.textContent = '';
+    }
+
+    // Show error message
+    function showError(message) {
+      errorContainer.textContent = message;
+      errorContainer.classList.remove('hidden');
+    }
+
+    // Hide error message
+    function hideError() {
+      errorContainer.classList.add('hidden');
+    }
+
+    // Run tests
+    async function runTests() {
+      runTestButton.disabled = true;
+      clearLog();
+      hideError();
+
+      try {
+        addLog("=== Testing Mock Data Loading ===");
+        
+        // Test parameters
+        const sources = ['Sales Data', 'Customer Data'];
+        const dimensions = ['Region', 'Product', 'Segment'];
+        const metrics = ['Sales', 'Units', 'Profit', 'Revenue'];
+        const filters = { Region: 'North' };
+        
+        addLog("Loading dataset with mock data...");
+        const result = await datasetService.loadDataset(
+          sources,
+          dimensions,
+          metrics,
+          filters,
+          {}, // Empty CSV data
+          mockDataPreviews
+        );
+        
+        addLog("Dataset loaded successfully!");
+        addLog(`Session ID: ${result.session.id}`);
+        addLog(`Rows: ${result.session.rowCount}`);
+        addLog(`Columns: ${result.session.columnCount}`);
+        addLog("\nData preview:");
+        addLog(JSON.stringify(result.data.slice(0, 3), null, 2));
+        
+        // Test question analysis
+        addLog("\n=== Testing Question Analysis ===");
+        addLog("Initializing Claude dataset...");
+        await datasetService.initializeClaudeDataset();
+        
+        addLog("Analyzing question...");
+        const question = "What is the average sales by region?";
+        const analysisResult = await datasetService.analyzeQuestion(question);
+        
+        addLog("\nAnalysis Result:");
+        addLog(`Answer: ${analysisResult.answer}`);
+        addLog(`Code: ${analysisResult.code}`);
+        
+        addLog("\nAll tests completed successfully!");
+      } catch (error) {
+        showError(`Test failed: ${error.message}`);
+        console.error("Test failed:", error);
+      } finally {
+        runTestButton.disabled = false;
+      }
+    }
+
+    // Event listeners
+    runTestButton.addEventListener('click', runTests);
+  </script>
+</body>
+</html>
