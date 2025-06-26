@@ -287,3 +287,30 @@
 .reset-button:hover {
   background-color: #f3f4f6;
 }
+
+.context-selection {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: 0 0.5rem;
+}
+
+.context-label {
+  font-size: 0.875rem; /* 14px */
+  font-weight: 500;
+  color: #4b5563; /* gray-600 */
+}
+
+.context-selection label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: #374151; /* gray-700 */
+  cursor: pointer;
+}
+
+.context-selection input[type="radio"] {
+  cursor: pointer;
+}

@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import datasetService from './services/datasetService';
-import StepIndicator from './components/StepIndicator';
-import DataSourcesStep from './components/DataSourcesStep';
-import ColumnSelectionStep from './components/ColumnSelectionStep';
-import FiltersStep from './components/FiltersStep';
+import React, { useState, useEffect, useCallback } from 'react';
+import datasetService from './services/datasetService.js';
+import Header from './components/Header.jsx';
+import DataSourcesStep from './components/DataSourcesStep.jsx';
+import ColumnSelectionStep from './components/ColumnSelectionStep.jsx';
+import FiltersStep from './components/FiltersStep.jsx';
 
-import UnifiedAnalysisView from './components/UnifiedAnalysisView';
+import UnifiedAnalysisView from './components/UnifiedAnalysisView.jsx';
+import './App.css'; // Import the new central stylesheet
 
 const DataAnalysisApp = () => {
   // State management
@@ -39,7 +40,6 @@ const DataAnalysisApp = () => {
   const [sessionId, setSessionId] = useState(null);
   const [isDatasetLoading, setIsDatasetLoading] = useState(false);
 
-  // Initialize mock data
   useEffect(() => {
     const initMockData = () => {
       const mockData = {
@@ -86,7 +86,7 @@ const DataAnalysisApp = () => {
     initMockData();
   }, []);
 
-  const getFieldsForDataSource = (source) => {
+  const getFieldsForDataSource = useCallback((source) => {
     const fields = [];
     if (mockDataPreviews[source]) {
       const sample = mockDataPreviews[source][0] || {};
@@ -106,7 +106,16 @@ const DataAnalysisApp = () => {
       }
     });
     return uniqueFields;
-  };
+  }, [mockDataPreviews]);
+
+  // Update available fields when data source changes
+  useEffect(() => {
+    if (selectedDataSource) {
+      setAvailableFields(getFieldsForDataSource(selectedDataSource));
+    } else {
+      setAvailableFields([]);
+    }
+  }, [selectedDataSource, getFieldsForDataSource]);
 
   // Handle next step navigation
   const handleNextStep = async () => {
@@ -116,7 +125,6 @@ const DataAnalysisApp = () => {
         setError('Please select a data source.');
         return;
       }
-      setAvailableFields(getFieldsForDataSource(selectedDataSource));
       setCurrentStep(2);
     } else if (currentStep === 2) { // From Filters to Columns
       setCurrentStep(3);
@@ -186,76 +194,69 @@ const DataAnalysisApp = () => {
     );
   };
 
-  const renderNavigation = () => {
-    if (currentStep >= 4) return null; // No navigation on the final analysis view
+    const renderNavigation = () => {
+    if (currentStep >= 4) return null;
     return (
-      <div className="mt-10 flex justify-between items-center pt-6 border-t border-gray-200">
-        <div>
-          {currentStep > 1 && (
-            <button onClick={handlePrevStep} className="px-5 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-all">
-              Back
-            </button>
-          )}
-        </div>
-        <div>
-          <button onClick={handleNextStep} disabled={isDatasetLoading} className="px-5 py-2.5 text-sm font-semibold text-white bg-emerald-600 rounded-lg shadow-sm hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:bg-emerald-300 disabled:cursor-not-allowed transition-all">
-            {isDatasetLoading ? 'Loading...' : 'Continue'}
+      <div className="navigation-container">
+        {currentStep > 1 && (
+          <button onClick={handlePrevStep} className="btn btn-secondary">
+            Back
           </button>
-        </div>
+        )}
+        <button onClick={handleNextStep} disabled={isDatasetLoading} className="btn btn-primary">
+          {isDatasetLoading ? 'Loading...' : 'Continue'}
+        </button>
       </div>
     );
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
-      <div className="max-w-5xl mx-auto">
-        <div className="bg-white rounded-lg shadow-xl overflow-hidden">
-          <StepIndicator currentStep={currentStep} steps={steps} />
-          
-          <div className="p-6 sm:p-8">
-            {currentStep === 1 && (
-              <DataSourcesStep
-                mockDataSources={mockDataSources}
-                selectedDataSource={selectedDataSource}
-                setSelectedDataSource={setSelectedDataSource}
-                mockDataPreviews={mockDataPreviews}
-              />
-            )}
+    <div className="min-h-screen bg-gray-100">
+      <Header currentStep={currentStep} />
+      <main className="main-content">
+        <div className="step-content-container">
+          {currentStep === 1 && (
+            <DataSourcesStep
+              mockDataSources={mockDataSources}
+              selectedDataSource={selectedDataSource}
+              setSelectedDataSource={setSelectedDataSource}
+              availableFields={availableFields}
+            />
+          )}
 
-            {currentStep === 2 && (
-              <FiltersStep
-                selectedFilters={selectedFilters}
-                setSelectedFilters={setSelectedFilters}
-                availableFields={availableFields}
-                mockDataPreviews={mockDataPreviews}
-                selectedDataSource={selectedDataSource}
-              />
-            )}
-            
-            {currentStep === 3 && (
-              <ColumnSelectionStep
-                availableFields={availableFields}
-                selectedDimensions={selectedDimensions}
-                setSelectedDimensions={setSelectedDimensions}
-                selectedMetrics={selectedMetrics}
-                setSelectedMetrics={setSelectedMetrics}
-              />
-            )}
-            
-            {currentStep === 4 && (
-              <UnifiedAnalysisView 
-                initialData={processedData}
-                datasetInfo={datasetInfo}
-                sessionId={sessionId}
-                onReset={handleReset}
-              />
-            )}
-            
-            {renderError()}
-            {renderNavigation()}
-          </div>
+          {currentStep === 2 && (
+            <FiltersStep
+              selectedFilters={selectedFilters}
+              setSelectedFilters={setSelectedFilters}
+              availableFields={availableFields}
+              mockDataPreviews={mockDataPreviews}
+              selectedDataSource={selectedDataSource}
+            />
+          )}
+          
+          {currentStep === 3 && (
+            <ColumnSelectionStep
+              availableFields={availableFields}
+              selectedDimensions={selectedDimensions}
+              setSelectedDimensions={setSelectedDimensions}
+              selectedMetrics={selectedMetrics}
+              setSelectedMetrics={setSelectedMetrics}
+            />
+          )}
+          
+          {currentStep === 4 && (
+            <UnifiedAnalysisView 
+              initialData={processedData} 
+              datasetInfo={datasetInfo}
+              sessionId={sessionId}
+              onReset={handleReset}
+            />
+          )}
+
+          {renderError()}
+          {renderNavigation()}
         </div>
-      </div>
+      </main>
     </div>
   );
 };

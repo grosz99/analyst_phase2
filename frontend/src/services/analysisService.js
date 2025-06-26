@@ -67,8 +67,8 @@ const mockResponses = {
   }
 };
 
-const getAnalysis = async (question, context, sessionId, initialData) => {
-  console.log('Sending analysis request:', { question, context, sessionId });
+const getAnalysis = async (question, context, sessionId, dataSource) => {
+  console.log('Sending analysis request:', { question, context, sessionId, dataSource });
 
   // Simulate network delay
   await new Promise(resolve => setTimeout(resolve, 1500));
@@ -76,6 +76,25 @@ const getAnalysis = async (question, context, sessionId, initialData) => {
   // Mocked response logic
   if (question.toLowerCase().includes('error')) {
     throw new Error('This is a mock error from the analysis service.');
+  }
+
+  // More dynamic mock logic
+  if (dataSource && Array.isArray(dataSource) && (question.toLowerCase().includes('top 3') || question.toLowerCase().includes('top three'))) {
+    const top3Data = dataSource.slice(0, 3);
+    return {
+      answer: `Here are the top 3 results from your previous query.`, 
+      tableData: top3Data,
+      chartData: { // Regenerate chart data for the subset
+        labels: top3Data.map(d => Object.values(d)[0]),
+        datasets: [{
+          label: Object.keys(top3Data[0])[1],
+          data: top3Data.map(d => Object.values(d)[1]),
+          borderColor: 'rgb(153, 102, 255)',
+          backgroundColor: 'rgba(153, 102, 255, 0.5)',
+        }]
+      },
+      followUpQuestions: ['Summarize these results.', 'Why are these at the top?']
+    };
   }
 
   let responseKey = 'default';
