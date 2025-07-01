@@ -722,7 +722,7 @@ tables:
     const analystMessage = messages.find(m => m.role === 'analyst');
     
     if (!analystMessage || !analystMessage.content) {
-      return this.createFallbackResponse(question, originalData);
+      throw new Error('No valid analyst response received from Cortex Analyst');
     }
 
     const content = analystMessage.content;
@@ -778,9 +778,9 @@ tables:
         }
       }
 
-      // Fallback to simulation on cached data
+      // Execute SQL simulation on cached data
       if (!sql || !data || data.length === 0) {
-        return this.createFallbackTable(data);
+        throw new Error('No SQL query generated or no data available for analysis');
       }
 
       // Enhanced SQL pattern matching for Cortex Analyst queries
