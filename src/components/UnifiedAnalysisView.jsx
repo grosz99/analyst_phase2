@@ -99,7 +99,26 @@ function UnifiedAnalysisView({ initialData, cachedDataset, dataLoadedTimestamp, 
         }
       } catch (error) {
         console.error('Failed to initialize AI service:', error);
-        setError('AI service initialization failed');
+        // Don't set error - let user try anyway
+        console.warn('AI service initialization had issues, but continuing with fallback');
+        
+        // Set fallback backends so user can still select
+        setAvailableBackends([
+          {
+            id: 'anthropic',
+            name: 'Anthropic Claude',
+            description: 'Advanced AI analysis with custom pandas execution',
+            features: ['Natural language understanding', 'Python code generation'],
+            status: 'available'
+          },
+          {
+            id: 'cortex_analyst',
+            name: 'Snowflake Cortex Analyst',
+            description: 'Native Snowflake AI analyst with semantic model understanding',
+            features: ['SQL generation', 'Semantic model integration'],
+            status: 'available'
+          }
+        ]);
       }
     };
 
@@ -342,11 +361,11 @@ function UnifiedAnalysisView({ initialData, cachedDataset, dataLoadedTimestamp, 
                   onChange={(e) => setCurrentQuestion(e.target.value)}
                   placeholder="e.g., Who are the most profitable customers?"
                   className="question-input"
-                  disabled={isAnalyzing || !aiServiceStatus?.success}
+                  disabled={isAnalyzing}
                 />
                 <button 
                   type="submit" 
-                  disabled={!currentQuestion.trim() || isAnalyzing || !aiServiceStatus?.success}
+                  disabled={!currentQuestion.trim() || isAnalyzing}
                   className="analyze-btn"
                 >
                   {isAnalyzing ? '⏳ Analyzing...' : '🔍 Analyze'}
@@ -366,7 +385,7 @@ function UnifiedAnalysisView({ initialData, cachedDataset, dataLoadedTimestamp, 
                   key={index}
                   onClick={() => handleSuggestedQuestion(question)}
                   className="suggestion-chip"
-                  disabled={!aiServiceStatus?.success}
+                  disabled={isAnalyzing}
                 >
                   {question}
                 </button>
