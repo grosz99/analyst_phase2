@@ -448,13 +448,21 @@ class DatasetService {
 
     // Apply each filter
     return data.filter(row => {
-      for (const [key, value] of Object.entries(filters)) {
+      for (const [key, filterValue] of Object.entries(filters)) {
         // Skip empty filters
-        if (!value) continue;
+        if (!filterValue || (Array.isArray(filterValue) && filterValue.length === 0)) continue;
         
-        // If row doesn't have the key or value doesn't match, exclude it
-        if (!row.hasOwnProperty(key) || row[key] !== value) {
-          return false;
+        // Handle array filters (multiselect)
+        if (Array.isArray(filterValue)) {
+          // Row must match at least one of the selected values
+          if (!row.hasOwnProperty(key) || !filterValue.includes(row[key])) {
+            return false;
+          }
+        } else {
+          // Handle single value filters (backward compatibility)
+          if (!row.hasOwnProperty(key) || row[key] !== filterValue) {
+            return false;
+          }
         }
       }
       return true;
