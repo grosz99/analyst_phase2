@@ -651,21 +651,162 @@ tables:
         return this.createFallbackTable(data);
       }
 
-      // Simple pattern matching for common queries
+      // Enhanced SQL pattern matching for Cortex Analyst queries
       const sqlLower = sql.toLowerCase();
+      console.log('🔍 Simulating SQL:', sql);
       
-      if (sqlLower.includes('group by') && sqlLower.includes('count')) {
-        return this.simulateGroupByCount(data, sql);
-      } else if (sqlLower.includes('sum') && sqlLower.includes('group by')) {
-        return this.simulateGroupBySum(data, sql);
-      } else if (sqlLower.includes('order by') && sqlLower.includes('limit')) {
-        return this.simulateTopResults(data, sql);
+      // Parse the SQL to extract components
+      const sqlComponents = this.parseSQLComponents(sql, data);
+      
+      if (sqlComponents) {
+        return this.executeSimulatedSQL(sqlComponents, data, question);
       }
       
       return this.createFallbackTable(data);
       
     } catch (error) {
       console.error('Error executing SQL:', error);
+      return this.createFallbackTable(data);
+    }
+  }
+
+  // Parse SQL components for simulation
+  parseSQLComponents(sql, data) {
+    try {
+      const sqlLower = sql.toLowerCase();
+      
+      // Extract SELECT columns
+      const selectMatch = sql.match(/select\s+(.*?)\s+from/i);
+      if (!selectMatch) return null;
+      
+      const selectPart = selectMatch[1];
+      const columns = selectPart.split(',').map(col => col.trim());
+      
+      // Extract GROUP BY column
+      const groupByMatch = sql.match(/group\s+by\s+(\w+)/i);
+      const groupByColumn = groupByMatch ? groupByMatch[1] : null;
+      
+      // Extract ORDER BY
+      const orderByMatch = sql.match(/order\s+by\s+(\w+)\s*(asc|desc)?/i);
+      const orderBy = orderByMatch ? {
+        column: orderByMatch[1],
+        direction: orderByMatch[2] ? orderByMatch[2].toLowerCase() : 'asc'
+      } : null;
+      
+      // Extract LIMIT
+      const limitMatch = sql.match(/limit\s+(\d+)/i);
+      const limit = limitMatch ? parseInt(limitMatch[1]) : null;
+      
+      return {
+        select: columns,
+        groupBy: groupByColumn,
+        orderBy: orderBy,
+        limit: limit,
+        originalSQL: sql
+      };
+      
+    } catch (error) {
+      console.error('Error parsing SQL:', error);
+      return null;
+    }
+  }
+
+  // Execute simulated SQL based on parsed components
+  executeSimulatedSQL(components, data, question) {
+    try {
+      let results = [];
+      
+      if (components.groupBy) {
+        // Group the data
+        const groups = {};
+        data.forEach(row => {
+          const groupValue = row[components.groupBy];
+          if (groupValue) {
+            if (!groups[groupValue]) {
+              groups[groupValue] = [];
+            }
+            groups[groupValue].push(row);
+          }
+        });
+        
+        // Process each group
+        results = Object.entries(groups).map(([groupValue, groupData]) => {
+          const result = { [components.groupBy]: groupValue };
+          
+          // Process each SELECT column
+          components.select.forEach(selectCol => {
+            if (selectCol.includes('SUM(')) {
+              const columnMatch = selectCol.match(/SUM\((\w+)\)\s*(?:as\s+(\w+))?/i);
+              if (columnMatch) {
+                const sourceCol = columnMatch[1];
+                const aliasCol = columnMatch[2] || `sum_${sourceCol.toLowerCase()}`;
+                const sum = groupData.reduce((total, row) => total + (parseFloat(row[sourceCol]) || 0), 0);
+                result[aliasCol] = Math.round(sum * 100) / 100;
+              }
+            } else if (selectCol.includes('COUNT(')) {
+              const columnMatch = selectCol.match(/COUNT\(\*?\)\s*(?:as\s+(\w+))?/i);
+              if (columnMatch) {
+                const aliasCol = columnMatch[1] || 'count';
+                result[aliasCol] = groupData.length;
+              }
+            } else if (selectCol.includes('AVG(')) {
+              const columnMatch = selectCol.match(/AVG\((\w+)\)\s*(?:as\s+(\w+))?/i);
+              if (columnMatch) {
+                const sourceCol = columnMatch[1];
+                const aliasCol = columnMatch[2] || `avg_${sourceCol.toLowerCase()}`;
+                const sum = groupData.reduce((total, row) => total + (parseFloat(row[sourceCol]) || 0), 0);
+                result[aliasCol] = Math.round((sum / groupData.length) * 100) / 100;
+              }
+            } else if (!selectCol.includes('(') && selectCol === components.groupBy) {
+              // Regular column (already added)
+            }
+          });
+          
+          return result;
+        });
+        
+        // Sort results
+        if (components.orderBy) {
+          const sortColumn = components.orderBy.column;
+          results.sort((a, b) => {
+            const aVal = a[sortColumn] || 0;
+            const bVal = b[sortColumn] || 0;
+            return components.orderBy.direction === 'desc' ? bVal - aVal : aVal - bVal;
+          });
+        }
+        
+        // Apply limit
+        if (components.limit) {
+          results = results.slice(0, components.limit);
+        }
+      }
+      
+      // Format as table
+      if (results.length === 0) {
+        return this.createFallbackTable(data);
+      }
+      
+      const columns = Object.keys(results[0]);
+      const formattedColumns = columns.map(col => col.replace(/_/g, ' ').toUpperCase());
+      
+      return {
+        title: `${question} (SQL Results)`,
+        columns: ['Rank', ...formattedColumns],
+        data: results.map((item, index) => ({
+          rank: index + 1,
+          ...Object.fromEntries(
+            Object.entries(item).map(([key, value]) => [
+              key.replace(/_/g, ' ').toUpperCase(),
+              typeof value === 'number' ? value.toLocaleString('en-US', { maximumFractionDigits: 2 }) : value
+            ])
+          )
+        })),
+        total_rows: results.length,
+        source: 'sql_simulation'
+      };
+      
+    } catch (error) {
+      console.error('Error executing simulated SQL:', error);
       return this.createFallbackTable(data);
     }
   }
