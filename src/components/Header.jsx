@@ -4,15 +4,13 @@ import './Header.css';
 const Header = ({ currentStep }) => {
   const steps = [
     { id: 1, name: 'Data Sources' },
-    { id: 2, name: 'Filters & Columns' },
+    { id: 2, name: 'Filters' },
     { id: 3, name: 'Analysis' },
   ];
 
-  // Maps the 4 app steps to the 3 header steps for accurate display
+  // Direct mapping since we now have 3 app steps matching 3 header steps
   const getActiveHeaderStep = (appStep) => {
-    if (appStep <= 1) return 1; // App step 1 (Data Sources) -> Header step 1
-    if (appStep === 2 || appStep === 3) return 2; // App steps 2 (Filters) & 3 (Columns) -> Header step 2
-    return 3; // App step 4 (Analysis) -> Header step 3
+    return appStep; // 1:1 mapping: Data Sources -> Filters -> Analysis
   };
   const activeHeaderStep = getActiveHeaderStep(currentStep);
 

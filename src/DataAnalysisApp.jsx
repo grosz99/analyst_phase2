@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import datasetService from './services/datasetService.js';
 import Header from './components/Header.jsx';
 import DataSourcesStep from './components/DataSourcesStep.jsx';
-import ColumnSelectionStep from './components/ColumnSelectionStep.jsx';
+// ColumnSelectionStep removed to streamline workflow
 import FiltersStep from './components/FiltersStep.jsx';
 
 import UnifiedAnalysisView from './components/UnifiedAnalysisView.jsx';
@@ -17,8 +17,7 @@ const DataAnalysisApp = () => {
   const steps = [
     { id: 1, name: 'Data Sources' },
     { id: 2, name: 'Filters' },
-    { id: 3, name: 'Columns' },
-    { id: 4, name: 'Analysis' },
+    { id: 3, name: 'Analysis' },
   ];
 
   // Data sources state
@@ -29,10 +28,8 @@ const DataAnalysisApp = () => {
   // Filters state
   const [selectedFilters, setSelectedFilters] = useState({});
 
-  // Column selection state
+  // Field discovery for filters (no manual column selection needed)
   const [availableFields, setAvailableFields] = useState([]);
-  const [selectedDimensions, setSelectedDimensions] = useState([]);
-  const [selectedMetrics, setSelectedMetrics] = useState([]);
 
   // Dataset state
   const [processedData, setProcessedData] = useState(null);
@@ -136,26 +133,29 @@ const DataAnalysisApp = () => {
         return;
       }
       setCurrentStep(2);
-    } else if (currentStep === 2) { // From Filters to Columns
-      setCurrentStep(3);
-    } else if (currentStep === 3) { // From Columns to Analysis
-      if (selectedDimensions.length === 0 && selectedMetrics.length === 0) {
-        setError('Please select at least one dimension or metric.');
-        return;
-      }
+    } else if (currentStep === 2) { // From Filters directly to Analysis
       setIsDatasetLoading(true);
       try {
         console.log('Loading dataset with:', {
           selectedDataSource,
-          selectedDimensions,
-          selectedMetrics,
-          selectedFilters
+          selectedFilters,
+          availableFields
         });
+        
+        // Automatically use all available fields for analysis
+        const allDimensions = availableFields
+          .filter(f => f.category === 'dimension')
+          .map(f => f.name);
+        const allMetrics = availableFields
+          .filter(f => f.category === 'metric')
+          .map(f => f.name);
+        
+        console.log('Auto-selected fields:', { allDimensions, allMetrics });
         
         const result = await datasetService.loadDataset(
           selectedDataSource,
-          selectedDimensions,
-          selectedMetrics,
+          allDimensions,
+          allMetrics,
           selectedFilters
         );
         
@@ -169,7 +169,7 @@ const DataAnalysisApp = () => {
         setProcessedData(result.dataset);
         setDatasetInfo(result.info || 'Dataset loaded successfully');
         setSessionId(result.sessionId);
-        setCurrentStep(4); // Go directly to Analysis step
+        setCurrentStep(3); // Go directly to Analysis step
       } catch (err) {
         console.error('Dataset loading error:', err);
         setError(`Failed to load dataset: ${err.message}`);
@@ -193,8 +193,6 @@ const DataAnalysisApp = () => {
     setSelectedDataSource('');
     setSelectedFilters({});
     setAvailableFields([]);
-    setSelectedDimensions([]);
-    setSelectedMetrics([]);
     setProcessedData(null);
     setDatasetInfo('');
     setSessionId(null);
@@ -220,7 +218,7 @@ const DataAnalysisApp = () => {
   };
 
     const renderNavigation = () => {
-    if (currentStep >= 4) return null;
+    if (currentStep >= 3) return null;
     return (
       <div className="navigation-container">
         {currentStep > 1 && (
@@ -260,16 +258,6 @@ const DataAnalysisApp = () => {
           )}
           
           {currentStep === 3 && (
-            <ColumnSelectionStep
-              availableFields={availableFields}
-              selectedDimensions={selectedDimensions}
-              setSelectedDimensions={setSelectedDimensions}
-              selectedMetrics={selectedMetrics}
-              setSelectedMetrics={setSelectedMetrics}
-            />
-          )}
-          
-          {currentStep === 4 && (
             <UnifiedAnalysisView 
               initialData={processedData} 
               datasetInfo={datasetInfo}
