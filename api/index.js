@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 const snowflakeService = require('./services/snowflakeService');
+const anthropicService = require('./services/anthropicService');
 
 const app = express();
 
@@ -502,6 +503,164 @@ app.get('/api/dataset/:datasetId/schema', async (req, res) => {
   }
 });
 
+// ========================================
+// AI ANALYSIS ENDPOINTS (SECURE)
+// ========================================
+
+// AI Analysis Health Check
+app.get('/api/ai/health', async (req, res) => {
+  try {
+    const healthStatus = await anthropicService.healthCheck();
+    res.json({
+      success: true,
+      ai_service: healthStatus,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('AI health check error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'AI health check failed',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// AI Analysis Status
+app.get('/api/ai/status', (req, res) => {
+  try {
+    const status = anthropicService.getStatus();
+    res.json({
+      success: true,
+      status: status,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('AI status error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get AI status',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Main AI Analysis Endpoint
+app.post('/api/ai/analyze', async (req, res) => {
+  try {
+    const { data, analysisType, userContext, sessionId } = req.body;
+    const startTime = Date.now();
+    
+    // Input validation
+    if (!data || !Array.isArray(data)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid data format. Expected array of objects.',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    if (data.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Dataset is empty. Cannot perform analysis.',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // Security: Use session ID for rate limiting (or IP as fallback)
+    const identifier = sessionId || req.ip || 'anonymous';
+    
+    console.log(`🤖 AI Analysis request: ${data.length} rows, type: ${analysisType || 'general'}`);
+    
+    // Perform secure AI analysis
+    const result = await anthropicService.analyzeData(
+      data, 
+      analysisType || 'general',
+      userContext || '',
+      identifier
+    );
+    
+    const totalDuration = Date.now() - startTime;
+    
+    if (result.success) {
+      console.log(`✅ AI Analysis completed successfully in ${totalDuration}ms`);
+      res.json({
+        success: true,
+        analysis: result.analysis,
+        metadata: {
+          ...result.metadata,
+          total_duration: totalDuration,
+          data_rows: data.length,
+          session_id: sessionId
+        },
+        timestamp: new Date().toISOString()
+      });
+    } else {
+      console.warn(`❌ AI Analysis failed: ${result.error}`);
+      res.status(400).json({
+        success: false,
+        error: result.error,
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+  } catch (error) {
+    console.error('AI analysis endpoint error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'AI analysis service temporarily unavailable',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Get Available Analysis Types
+app.get('/api/ai/analysis-types', (req, res) => {
+  try {
+    const analysisTypes = [
+      {
+        id: 'general',
+        name: 'General Analysis',
+        description: 'Comprehensive data analysis with key insights and trends'
+      },
+      {
+        id: 'trends',
+        name: 'Trend Analysis', 
+        description: 'Focus on temporal patterns and growth trends'
+      },
+      {
+        id: 'segmentation',
+        name: 'Customer Segmentation',
+        description: 'Analyze customer behavior and segmentation patterns'
+      },
+      {
+        id: 'performance',
+        name: 'Performance Analysis',
+        description: 'Evaluate business performance metrics and KPIs'
+      },
+      {
+        id: 'comparison',
+        name: 'Comparative Analysis',
+        description: 'Compare different segments, time periods, or categories'
+      }
+    ];
+    
+    res.json({
+      success: true,
+      analysis_types: analysisTypes,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Analysis types error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get analysis types',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // Handle 404 for API routes
 app.use('/api/*', (req, res) => {
   res.status(404).json({
@@ -514,7 +673,11 @@ app.use('/api/*', (req, res) => {
       'GET /api/available-datasets',
       'POST /api/load-dataset',
       'POST /api/ai-query',
-      'GET /api/dataset/:id/schema'
+      'GET /api/dataset/:id/schema',
+      'GET /api/ai/health',
+      'GET /api/ai/status',
+      'POST /api/ai/analyze',
+      'GET /api/ai/analysis-types'
     ],
     timestamp: new Date().toISOString()
   });
