@@ -1779,6 +1779,8 @@ ${productResults.slice(0, 5).map((p, i) => `${i + 1}. ${p.product}: $${p.total_s
         
         if (groupbyMatch) {
           const groupColumn = groupbyMatch[1];
+          console.log(`🔍 Executing groupby on column: ${groupColumn}`);
+          console.log(`📝 Full code: ${codeString.substring(0, 200)}...`);
           return this.performGroupByAggregation(df.data, groupColumn, codeString);
         }
       }
@@ -1835,42 +1837,54 @@ ${productResults.slice(0, 5).map((p, i) => `${i + 1}. ${p.product}: $${p.total_s
   performGroupByAggregation(data, groupColumn, codeString) {
     const groups = {};
     
+    // Group data by the specified column
     data.forEach(row => {
       const groupValue = row[groupColumn];
-      if (!groups[groupValue]) {
-        groups[groupValue] = [];
+      if (groupValue !== undefined && groupValue !== null) {
+        if (!groups[groupValue]) {
+          groups[groupValue] = [];
+        }
+        groups[groupValue].push(row);
       }
-      groups[groupValue].push(row);
     });
     
     // Determine what aggregations the AI wants
     const aggregations = this.parseAggregations(codeString);
+    console.log('🔍 Parsed aggregations:', aggregations);
     
     const results = Object.entries(groups).map(([groupValue, groupData]) => {
       const result = { [groupColumn]: groupValue };
       
       aggregations.forEach(agg => {
+        const values = groupData.map(row => parseFloat(row[agg.column]) || 0);
+        
         if (agg.operation === 'sum') {
-          result[`total_${agg.column}`] = groupData.reduce((sum, row) => sum + (parseFloat(row[agg.column]) || 0), 0);
+          const sum = values.reduce((total, val) => total + val, 0);
+          result[agg.column.toUpperCase()] = Math.round(sum * 100) / 100; // Round to 2 decimals
         } else if (agg.operation === 'count') {
-          result[`${agg.column}_count`] = groupData.length;
+          result[`${agg.column}_COUNT`] = groupData.length;
         } else if (agg.operation === 'mean') {
-          const sum = groupData.reduce((sum, row) => sum + (parseFloat(row[agg.column]) || 0), 0);
-          result[`avg_${agg.column}`] = sum / groupData.length;
+          const sum = values.reduce((total, val) => total + val, 0);
+          result[`${agg.column}_AVG`] = Math.round((sum / values.length) * 100) / 100;
         }
       });
       
-      // Always include count
-      result.count = groupData.length;
+      // Always include order count for customer analysis
+      result.ORDER_COUNT = groupData.length;
       
       return result;
     });
     
+    // Sort by the first aggregated column in descending order
+    const sortColumn = aggregations.length > 0 ? aggregations[0].column.toUpperCase() : 'ORDER_COUNT';
+    const sortedResults = results.sort((a, b) => (b[sortColumn] || 0) - (a[sortColumn] || 0));
+    
     return {
       type: 'groupby',
       groupColumn: groupColumn,
-      data: results.sort((a, b) => b.count - a.count),
-      aggregations: aggregations
+      data: sortedResults.slice(0, 20), // Limit to top 20 results
+      aggregations: aggregations,
+      totalGroups: results.length
     };
   }
 
@@ -1878,20 +1892,25 @@ ${productResults.slice(0, 5).map((p, i) => `${i + 1}. ${p.product}: $${p.total_s
   parseAggregations(codeString) {
     const aggregations = [];
     
-    // Look for .agg() calls
+    // Look for .agg() calls with various quote patterns
     const aggMatch = codeString.match(/\.agg\(\{([^}]+)\}\)/);
     if (aggMatch) {
       const aggContent = aggMatch[1];
-      const fieldMatches = aggContent.match(/'(\w+)':\s*'(\w+)'/g);
+      
+      // Handle different quote patterns: 'PROFIT': 'sum' or "PROFIT": "sum"
+      const fieldMatches = aggContent.match(/['"](\w+)['"]:\s*['"](\w+)['"]/g);
       if (fieldMatches) {
         fieldMatches.forEach(match => {
-          const [, column, operation] = match.match(/'(\w+)':\s*'(\w+)'/);
-          aggregations.push({ column, operation });
+          const parsed = match.match(/['"](\w+)['"]:\s*['"](\w+)['"]/);
+          if (parsed) {
+            const [, column, operation] = parsed;
+            aggregations.push({ column, operation });
+          }
         });
       }
     }
     
-    // Look for direct operations
+    // Look for direct operations like .sum(), .count(), .mean()
     if (codeString.includes('.sum()')) {
       const sumMatch = codeString.match(/\['(\w+)'\]\.sum\(\)/);
       if (sumMatch) {
@@ -1992,21 +2011,54 @@ ${productResults.slice(0, 5).map((p, i) => `${i + 1}. ${p.product}: $${p.total_s
     }
     
     if (results.type === 'groupby') {
-      const columns = ["Rank", results.groupColumn];
       const firstResult = results.data[0];
+      if (!firstResult) {
+        return {
+          title: "No Results Found",
+          columns: ["Message"],
+          data: [{ message: "No data available for groupby analysis" }],
+          total_rows: 0
+        };
+      }
+      
+      // Create proper column headers
+      const columns = ["Rank"];
+      
+      // Add the group column (e.g., CUSTOMER_ID)
+      const groupColDisplay = results.groupColumn.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+      columns.push(groupColDisplay);
+      
+      // Add aggregated columns with proper formatting
       Object.keys(firstResult).forEach(key => {
-        if (key !== results.groupColumn && !columns.includes(key)) {
-          columns.push(key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()));
+        if (key !== results.groupColumn && key !== 'rank') {
+          const displayName = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+          columns.push(displayName);
         }
       });
       
       return {
-        title: `Analysis by ${results.groupColumn.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}`,
+        title: `Top ${Math.min(results.data.length, 10)} ${groupColDisplay}s by ${results.aggregations.length > 0 ? results.aggregations[0].column.toUpperCase() : 'Performance'}`,
         columns: columns,
-        data: results.data.map((item, index) => ({
-          rank: index + 1,
-          ...item
-        })),
+        data: results.data.map((item, index) => {
+          const row = { rank: index + 1 };
+          
+          // Add all data with proper key formatting
+          Object.entries(item).forEach(([key, value]) => {
+            if (key === results.groupColumn) {
+              row[groupColDisplay] = value;
+            } else {
+              const displayKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+              // Format numbers properly
+              if (typeof value === 'number') {
+                row[displayKey] = value.toLocaleString('en-US', { maximumFractionDigits: 2 });
+              } else {
+                row[displayKey] = value;
+              }
+            }
+          });
+          
+          return row;
+        }),
         total_rows: results.data.length
       };
     }
