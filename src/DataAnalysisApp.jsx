@@ -73,12 +73,15 @@ const DataAnalysisApp = () => {
       
       // Map frontend display names to API dataset IDs
       const datasetId = datasetService.mapDataSourceToId(source);
+      console.log(`Mapped ${source} to dataset ID: ${datasetId}`);
       
       // Get schema from API
       const schema = await datasetService.getDatasetSchema(datasetId);
+      console.log(`Schema response for ${source}:`, schema);
       
       if (schema && schema.columns) {
         console.log(`Retrieved ${schema.columns.length} fields for ${source}`);
+        console.log('First few columns:', schema.columns.slice(0, 3));
         
         // Convert API schema format to frontend format
         const fields = schema.columns.map(col => ({
@@ -88,6 +91,7 @@ const DataAnalysisApp = () => {
           category: col.category
         }));
         
+        console.log(`Converted fields for ${source}:`, fields.slice(0, 3));
         return fields;
       } else {
         console.warn(`No schema returned for ${source}`);

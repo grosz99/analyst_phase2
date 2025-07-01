@@ -9,10 +9,28 @@ const FiltersStep = ({
   selectedDataSource 
 }) => {
 
-  const categoricalFields = availableFields.filter(field => field.type === 'string' || field.type === 'boolean');
+  // Filter to categorical fields - more inclusive type checking
+  const categoricalFields = availableFields.filter(field => {
+    const fieldType = field.type ? field.type.toLowerCase() : '';
+    return fieldType === 'string' || 
+           fieldType === 'boolean' || 
+           fieldType === 'date' ||
+           fieldType === 'utf8'; // Snowflake sometimes uses utf8 for strings
+  });
+
+  // Debug logging
+  console.log('FiltersStep - Available fields:', availableFields);
+  console.log('FiltersStep - Categorical fields:', categoricalFields);
+  console.log('FiltersStep - Selected data source:', selectedDataSource);
   const [activeTab, setActiveTab] = useState('');
   const [filterOptions, setFilterOptions] = useState({});
   const [loadingFilters, setLoadingFilters] = useState({});
+
+  // Clear filter options when data source changes
+  useEffect(() => {
+    setFilterOptions({});
+    setLoadingFilters({});
+  }, [selectedDataSource]);
 
   useEffect(() => {
     if (categoricalFields.length > 0 && !activeTab) {
@@ -23,7 +41,7 @@ const FiltersStep = ({
     } else if (categoricalFields.length === 0) {
       setActiveTab('');
     }
-  }, [categoricalFields, activeTab, selectedDataSource]);
+  }, [categoricalFields, activeTab]);
 
   const handleFilterChange = (field, value) => {
     setSelectedFilters(prev => {
@@ -65,7 +83,8 @@ const FiltersStep = ({
   
   // Load filter options when activeTab changes
   useEffect(() => {
-    if (activeTab) {
+    if (activeTab && selectedDataSource) {
+      console.log(`Loading filter values for ${activeTab} in ${selectedDataSource}`);
       loadFilterValues(activeTab);
     }
   }, [activeTab, selectedDataSource]);
@@ -128,7 +147,11 @@ const FiltersStep = ({
           )}
         </>
       ) : (
-        <p className="text-center text-gray-500">No available filters for the selected data source.</p>
+        <div className="text-center text-gray-500">
+        <p>No available filters for the selected data source.</p>
+        <p className="text-sm">Available fields: {availableFields.length}</p>
+        <p className="text-sm">Field types: {availableFields.map(f => f.type).join(', ')}</p>
+      </div>
       )}
     </div>
   );
