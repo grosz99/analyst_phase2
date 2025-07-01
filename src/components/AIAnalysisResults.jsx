@@ -45,7 +45,7 @@ const AIAnalysisResults = ({
     );
   }
 
-  const { analysis, metadata, results_table, visualization } = analysisResult;
+  const { analysis, metadata, results_table, visualization, refined_questions } = analysisResult;
   
   console.log('🔍 Debug AIAnalysisResults props:', { 
     analysisResult, 
@@ -318,19 +318,43 @@ const AIAnalysisResults = ({
       </div>
       </div>
 
-      {/* Suggested Questions */}
-      <div className="suggested-questions">
-        {suggestedQuestions.map((suggestion, index) => (
-          <button
-            key={index}
-            className="suggestion-pill"
-            onClick={() => handleSuggestedQuestion(suggestion)}
-            disabled={compactAnalyzing}
-          >
-            {suggestion}
-          </button>
-        ))}
-      </div>
+      {/* Refined Question Suggestions */}
+      {refined_questions && refined_questions.length > 0 && (
+        <div className="refined-questions-section">
+          <h4>💡 Better Questions for Your Data</h4>
+          <p className="refined-subtitle">Based on your data structure, try these questions instead:</p>
+          <div className="refined-questions">
+            {refined_questions.map((refinedQ, index) => (
+              <div key={index} className="refined-question-item">
+                <button
+                  className="refined-question-btn"
+                  onClick={() => handleSuggestedQuestion(refinedQ.question)}
+                  disabled={compactAnalyzing}
+                >
+                  <div className="refined-question-text">{refinedQ.question}</div>
+                  <div className="refined-question-reason">{refinedQ.reason}</div>
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* General Suggested Questions */}
+      {(!refined_questions || refined_questions.length === 0) && (
+        <div className="suggested-questions">
+          {suggestedQuestions.map((suggestion, index) => (
+            <button
+              key={index}
+              className="suggestion-pill"
+              onClick={() => handleSuggestedQuestion(suggestion)}
+              disabled={compactAnalyzing}
+            >
+              {suggestion}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

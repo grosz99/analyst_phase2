@@ -267,11 +267,15 @@ Format your response with clear headers. Focus on directly answering the user's 
       // Generate structured results from the analysis
       const structuredResults = this.generateStructuredResults(sanitizedData, userContext, analysisText);
       
+      // Generate refined question suggestions if data limitations detected
+      const refinedQuestions = this.generateRefinedQuestions(sanitizedData, userContext, analysisText);
+      
       return {
         success: true,
         analysis: analysisText,
         results_table: structuredResults.results_table,
         visualization: structuredResults.visualization,
+        refined_questions: refinedQuestions,
         metadata: {
           model: 'claude-3-5-sonnet',
           rows_analyzed: sanitizedData.length,
@@ -335,6 +339,224 @@ Format your response with clear headers. Focus on directly answering the user's 
         message: 'Anthropic API connectivity issue'
       };
     }
+  }
+
+  // Analyze data structure to understand what questions are possible
+  analyzeDataStructure(data) {
+    if (!data || data.length === 0) return {};
+    
+    const columns = Object.keys(data[0]);
+    const sampleRow = data[0];
+    const profile = {
+      columns: columns,
+      hasCustomer: false,
+      hasDate: false, 
+      hasRegion: false,
+      hasProduct: false,
+      hasQuantity: false,
+      hasFinancial: false,
+      numericColumns: [],
+      categoricalColumns: [],
+      possibleAnalyses: []
+    };
+    
+    // Intelligently detect column types and capabilities
+    columns.forEach(col => {
+      const colLower = col.toLowerCase();
+      const sampleValue = sampleRow[col];
+      
+      // Detect customer columns
+      if (colLower.includes('customer') || colLower.includes('client') || colLower.includes('user')) {
+        profile.hasCustomer = true;
+        profile.categoricalColumns.push(col);
+      }
+      
+      // Detect date columns
+      if (colLower.includes('date') || colLower.includes('time') || colLower.includes('created')) {
+        profile.hasDate = true;
+      }
+      
+      // Detect geographic columns
+      if (colLower.includes('region') || colLower.includes('country') || colLower.includes('state') || colLower.includes('city')) {
+        profile.hasRegion = true;
+        profile.categoricalColumns.push(col);
+      }
+      
+      // Detect product columns
+      if (colLower.includes('product') || colLower.includes('item') || colLower.includes('category')) {
+        profile.hasProduct = true;
+        profile.categoricalColumns.push(col);
+      }
+      
+      // Detect quantity columns
+      if (colLower.includes('quantity') || colLower.includes('qty') || colLower.includes('amount')) {
+        profile.hasQuantity = true;
+        profile.numericColumns.push(col);
+      }
+      
+      // Detect financial columns
+      if (colLower.includes('price') || colLower.includes('cost') || colLower.includes('revenue') || 
+          colLower.includes('sales') || colLower.includes('profit') || colLower.includes('total')) {
+        profile.hasFinancial = true;
+        profile.numericColumns.push(col);
+      }
+      
+      // Auto-detect numeric vs categorical
+      if (typeof sampleValue === 'number' || (!isNaN(parseFloat(sampleValue)) && isFinite(sampleValue))) {
+        if (!profile.numericColumns.includes(col)) {
+          profile.numericColumns.push(col);
+        }
+      } else {
+        if (!profile.categoricalColumns.includes(col)) {
+          profile.categoricalColumns.push(col);
+        }
+      }
+    });
+    
+    // Generate possible analyses based on data structure
+    if (profile.hasCustomer) {
+      profile.possibleAnalyses.push('customer_analysis');
+      if (profile.hasQuantity || profile.numericColumns.length > 0) {
+        profile.possibleAnalyses.push('customer_value');
+      }
+    }
+    
+    if (profile.hasRegion) {
+      profile.possibleAnalyses.push('regional_analysis');
+    }
+    
+    if (profile.hasProduct) {
+      profile.possibleAnalyses.push('product_analysis');
+    }
+    
+    if (profile.hasDate) {
+      profile.possibleAnalyses.push('temporal_analysis');
+    }
+    
+    if (profile.categoricalColumns.length > 0 && profile.numericColumns.length > 0) {
+      profile.possibleAnalyses.push('segmentation_analysis');
+    }
+    
+    return profile;
+  }
+
+  // Intelligent data-aware question generation
+  generateRefinedQuestions(data, userContext, analysisText) {
+    const questionLower = userContext.toLowerCase();
+    const columns = Object.keys(data[0] || {});
+    const refinedQuestions = [];
+    
+    // Analyze actual data structure intelligently
+    const dataProfile = this.analyzeDataStructure(data);
+    
+    // Check if this was a profitability question that failed
+    if (questionLower.includes('profitable') || questionLower.includes('profit')) {
+      if (analysisText.toLowerCase().includes('cannot determine') || 
+          analysisText.toLowerCase().includes('lacks') || 
+          analysisText.toLowerCase().includes('limitation')) {
+        
+        // Generate smart questions based on actual data structure
+        if (dataProfile.hasCustomer) {
+          refinedQuestions.push({
+            question: `Which ${dataProfile.categoricalColumns.find(c => c.toLowerCase().includes('customer')) || 'customers'} have the highest order frequency?`,
+            reason: "Measures customer engagement using available order data"
+          });
+        }
+        
+        if (dataProfile.hasQuantity) {
+          const qtyCol = dataProfile.numericColumns.find(c => c.toLowerCase().includes('quantity'));
+          refinedQuestions.push({
+            question: `What is the average ${qtyCol || 'quantity'} by customer?`,
+            reason: "Analyzes volume patterns using quantity data"
+          });
+        }
+        
+        if (dataProfile.hasRegion) {
+          const regionCol = dataProfile.categoricalColumns.find(c => c.toLowerCase().includes('region'));
+          refinedQuestions.push({
+            question: `Which ${regionCol || 'regions'} have the most active customers?`,
+            reason: "Geographic analysis using available location data"
+          });
+        }
+        
+        if (dataProfile.hasDate) {
+          refinedQuestions.push({
+            question: "What are the ordering patterns over time?",
+            reason: "Temporal analysis using date information"
+          });
+        }
+      }
+    }
+    
+    // Check if this was a revenue/sales question without financial data
+    if ((questionLower.includes('revenue') || questionLower.includes('sales')) && 
+        !columns.some(col => col.toLowerCase().includes('sales') || col.toLowerCase().includes('revenue'))) {
+      
+      refinedQuestions.push({
+        question: "Which customers place the most orders?",
+        reason: "Order frequency can be a proxy for business value"
+      });
+      
+      refinedQuestions.push({
+        question: "What products or categories are ordered most frequently?",
+        reason: "Shows popular items based on available data"
+      });
+    }
+    
+    // Always suggest questions that work well with current data structure
+    const hasCustomer = columns.some(col => col.toLowerCase().includes('customer'));
+    const hasRegion = columns.some(col => col.toLowerCase().includes('region'));
+    const hasDate = columns.some(col => col.toLowerCase().includes('date'));
+    const hasProduct = columns.some(col => col.toLowerCase().includes('product'));
+    
+    // Add intelligent suggestions based on data capabilities
+    if (refinedQuestions.length < 3) {
+      // Prioritize by data richness
+      dataProfile.possibleAnalyses.forEach(analysisType => {
+        if (refinedQuestions.length >= 4) return;
+        
+        switch(analysisType) {
+          case 'customer_analysis':
+            refinedQuestions.push({
+              question: "Show me customer behavior patterns and trends",
+              reason: `Comprehensive analysis using ${dataProfile.categoricalColumns.filter(c => c.toLowerCase().includes('customer')).join(', ')} data`
+            });
+            break;
+            
+          case 'regional_analysis':
+            const regionCols = dataProfile.categoricalColumns.filter(c => c.toLowerCase().includes('region') || c.toLowerCase().includes('country'));
+            refinedQuestions.push({
+              question: `Compare performance across different ${regionCols[0] || 'regions'}`,
+              reason: "Geographic comparison using location data"
+            });
+            break;
+            
+          case 'product_analysis':
+            const productCols = dataProfile.categoricalColumns.filter(c => c.toLowerCase().includes('product') || c.toLowerCase().includes('category'));
+            refinedQuestions.push({
+              question: `What are the top performing ${productCols[0] || 'products'}?`,
+              reason: "Product performance analysis using catalog data"
+            });
+            break;
+            
+          case 'temporal_analysis':
+            refinedQuestions.push({
+              question: "What are the trends in our data over time?",
+              reason: "Time-based analysis using date information"
+            });
+            break;
+            
+          case 'segmentation_analysis':
+            refinedQuestions.push({
+              question: `How do ${dataProfile.numericColumns[0]} vary by ${dataProfile.categoricalColumns[0]}?`,
+              reason: "Segmentation analysis comparing categories to metrics"
+            });
+            break;
+        }
+      });
+    }
+    
+    return refinedQuestions.slice(0, 4); // Return max 4 suggestions
   }
 
   // Generate structured results from AI analysis text
