@@ -3,6 +3,7 @@ const cors = require('cors');
 require('dotenv').config();
 const snowflakeService = require('./services/snowflakeService');
 const anthropicService = require('./services/anthropicService');
+const cortexAnalystService = require('./services/cortexAnalystService');
 
 const app = express();
 
@@ -96,15 +97,23 @@ app.get('/api/snowflake/test', async (req, res) => {
 // Root endpoint
 app.get('/api', (req, res) => {
   res.json({
-    message: 'Data Analysis API - Milestone 3',
-    version: '1.3.0',
+    message: 'Data Analysis API - Milestone 4: Dual AI Backend',
+    version: '1.4.0',
     endpoints: {
       health: '/api/health',
       status: '/api/status',
       snowflake_test: '/api/snowflake/test',
       available_datasets: '/api/available-datasets',
       load_dataset: 'POST /api/load-dataset',
-      ai_query: 'POST /api/ai-query'
+      ai_query: 'POST /api/ai-query',
+      ai_health: '/api/ai/health',
+      ai_status: '/api/ai/status',
+      ai_backends: '/api/ai/backends',
+      ai_analyze: 'POST /api/ai/analyze'
+    },
+    ai_backends: {
+      anthropic: 'Anthropic Claude with intelligent pandas execution',
+      cortex_analyst: 'Snowflake Cortex Analyst with semantic model integration'
     },
     documentation: 'https://github.com/grosz99/analyst_phase2'
   });
@@ -509,13 +518,20 @@ app.get('/api/dataset/:datasetId/schema', async (req, res) => {
 // AI ANALYSIS ENDPOINTS (SECURE)
 // ========================================
 
-// AI Analysis Health Check
+// AI Analysis Health Check (Both Backends)
 app.get('/api/ai/health', async (req, res) => {
   try {
-    const healthStatus = await anthropicService.healthCheck();
+    const [anthropicHealth, cortexHealth] = await Promise.all([
+      anthropicService.healthCheck(),
+      cortexAnalystService.healthCheck()
+    ]);
+    
     res.json({
       success: true,
-      ai_service: healthStatus,
+      backends: {
+        anthropic: anthropicHealth,
+        cortex_analyst: cortexHealth
+      },
       timestamp: new Date().toISOString()
     });
   } catch (error) {
@@ -528,13 +544,18 @@ app.get('/api/ai/health', async (req, res) => {
   }
 });
 
-// AI Analysis Status
+// AI Analysis Status (Both Backends)
 app.get('/api/ai/status', (req, res) => {
   try {
-    const status = anthropicService.getStatus();
+    const anthropicStatus = anthropicService.getStatus();
+    const cortexStatus = cortexAnalystService.getStatus();
+    
     res.json({
       success: true,
-      status: status,
+      backends: {
+        anthropic: anthropicStatus,
+        cortex_analyst: cortexStatus
+      },
       timestamp: new Date().toISOString()
     });
   } catch (error) {
@@ -547,10 +568,56 @@ app.get('/api/ai/status', (req, res) => {
   }
 });
 
-// Main AI Analysis Endpoint
+// Get Available Analysis Backends
+app.get('/api/ai/backends', (req, res) => {
+  try {
+    const backends = [
+      {
+        id: 'anthropic',
+        name: 'Anthropic Claude',
+        description: 'Advanced AI analysis with custom pandas execution on cached data',
+        features: [
+          'Natural language understanding',
+          'Python code generation',
+          'Intelligent data analysis',
+          'Custom execution engine'
+        ],
+        status: anthropicService.getStatus().initialized ? 'available' : 'unavailable'
+      },
+      {
+        id: 'cortex_analyst',
+        name: 'Snowflake Cortex Analyst',
+        description: 'Native Snowflake AI analyst with semantic model understanding',
+        features: [
+          'SQL generation from natural language',
+          'Semantic model integration',
+          'Direct Snowflake execution',
+          'Business context understanding'
+        ],
+        status: cortexAnalystService.getStatus().initialized ? 'available' : 'unavailable'
+      }
+    ];
+    
+    res.json({
+      success: true,
+      backends: backends,
+      default: 'anthropic',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Backends endpoint error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get available backends',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Main AI Analysis Endpoint with Backend Choice
 app.post('/api/ai/analyze', async (req, res) => {
   try {
-    const { data, analysisType, userContext, question, sessionId } = req.body;
+    const { data, analysisType, userContext, question, sessionId, backend } = req.body;
     const startTime = Date.now();
     
     // Input validation
@@ -574,15 +641,30 @@ app.post('/api/ai/analyze', async (req, res) => {
     const identifier = sessionId || req.ip || 'anonymous';
     
     const questionText = question || userContext || '';
-    console.log(`🤖 AI Analysis request: ${data.length} rows, question: "${questionText}", type: ${analysisType || 'general'}`);
+    const selectedBackend = backend || 'anthropic'; // Default to Anthropic
     
-    // Perform secure AI analysis
-    const result = await anthropicService.analyzeData(
-      data, 
-      analysisType || 'general',
-      questionText,
-      identifier
-    );
+    console.log(`🤖 AI Analysis request: ${data.length} rows, question: "${questionText}", backend: ${selectedBackend}, type: ${analysisType || 'general'}`);
+    
+    // Choose analysis backend
+    let result;
+    
+    if (selectedBackend === 'cortex_analyst') {
+      console.log('🧠 Using Snowflake Cortex Analyst backend');
+      result = await cortexAnalystService.analyzeData(
+        data,
+        questionText,
+        analysisType || 'general',
+        identifier
+      );
+    } else {
+      console.log('🤖 Using Anthropic Claude backend');
+      result = await anthropicService.analyzeData(
+        data, 
+        analysisType || 'general',
+        questionText,
+        identifier
+      );
+    }
     
     const totalDuration = Date.now() - startTime;
     

@@ -71,6 +71,8 @@ function UnifiedAnalysisView({ initialData, cachedDataset, dataLoadedTimestamp, 
   const [suggestedQuestions, setSuggestedQuestions] = useState([]);
   const [analysisTypes, setAnalysisTypes] = useState([]);
   const [selectedAnalysisType, setSelectedAnalysisType] = useState('general');
+  const [selectedBackend, setSelectedBackend] = useState('anthropic');
+  const [availableBackends, setAvailableBackends] = useState([]);
   
   const questionInputRef = useRef(null);
 
@@ -85,6 +87,10 @@ function UnifiedAnalysisView({ initialData, cachedDataset, dataLoadedTimestamp, 
         // Load analysis types
         const types = await aiAnalysisService.getAnalysisTypes();
         setAnalysisTypes(types);
+        
+        // Load available backends
+        const backends = await aiAnalysisService.getAvailableBackends();
+        setAvailableBackends(backends);
         
         // Generate suggested questions based on data
         if (initialData && initialData.length > 0) {
@@ -131,7 +137,8 @@ function UnifiedAnalysisView({ initialData, cachedDataset, dataLoadedTimestamp, 
         dataToAnalyze,
         question || `Perform ${analysisType} analysis`,
         analysisType,
-        sessionId
+        sessionId,
+        selectedBackend
       );
 
       console.log('✅ AI analysis result:', result);
@@ -287,6 +294,39 @@ function UnifiedAnalysisView({ initialData, cachedDataset, dataLoadedTimestamp, 
       {/* Compact Analysis Interface */}
       {analysisHistory.length === 0 && (
         <div className="analysis-interface">
+          {/* Backend Selection */}
+          {availableBackends.length > 0 && (
+            <div className="backend-selector">
+              <div className="selector-header">
+                <h4>🤖 Choose AI Backend</h4>
+                <p>Select the AI engine for your data analysis</p>
+              </div>
+              <div className="backend-options">
+                {availableBackends.map((backend) => (
+                  <div
+                    key={backend.id}
+                    className={`backend-option ${selectedBackend === backend.id ? 'selected' : ''} ${backend.status !== 'available' ? 'disabled' : ''}`}
+                    onClick={() => backend.status === 'available' && setSelectedBackend(backend.id)}
+                  >
+                    <div className="backend-info">
+                      <div className="backend-name">
+                        {backend.name}
+                        {backend.status !== 'available' && <span className="status-badge unavailable">Unavailable</span>}
+                        {selectedBackend === backend.id && <span className="status-badge selected">Selected</span>}
+                      </div>
+                      <div className="backend-description">{backend.description}</div>
+                      <div className="backend-features">
+                        {backend.features.slice(0, 2).map((feature, idx) => (
+                          <span key={idx} className="feature-tag">{feature}</span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <form onSubmit={handleSubmitQuestion} className="question-form">
             <div className="form-header">
               <h3>🔍 Ask a Question About Your Data</h3>

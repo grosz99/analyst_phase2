@@ -1,0 +1,442 @@
+name: Superstore Business Analytics
+description: Comprehensive semantic model for Superstore sales, customer, and product analytics
+comments: Enables natural language queries for business intelligence and data analysis
+
+tables:
+  # Main superstore sales data
+  - name: superstore_sales
+    description: Comprehensive sales data including orders, customers, products, and financial metrics
+    base_table:
+      database: SUPERSTOREDB
+      schema: DATA
+      table: SUPERSTORE
+    
+    # Time dimensions for temporal analysis
+    time_dimensions:
+      - name: order_date
+        expr: ORDER_DATE
+        description: Date when the order was placed
+        unique: false
+        data_type: date
+        synonyms:
+          - sale date
+          - purchase date
+          - transaction date
+      
+      - name: ship_date
+        expr: SHIP_DATE
+        description: Date when the order was shipped
+        unique: false
+        data_type: date
+        synonyms:
+          - shipping date
+          - delivery date
+    
+    # Customer dimensions
+    dimensions:
+      - name: row_id
+        expr: ROW_ID
+        description: Unique identifier for each row
+        data_type: number
+        unique: true
+      
+      - name: order_id
+        expr: ORDER_ID
+        description: Unique identifier for each order
+        data_type: varchar
+        synonyms:
+          - order number
+          - transaction id
+      
+      - name: customer_id
+        expr: CUSTOMER_ID
+        description: Unique identifier for each customer
+        data_type: varchar
+        synonyms:
+          - customer identifier
+          - customer code
+      
+      - name: customer_name
+        expr: CUSTOMER_NAME
+        description: Full name of the customer
+        data_type: varchar
+        synonyms:
+          - customer
+          - client name
+          - buyer name
+      
+      - name: customer_segment
+        expr: SEGMENT
+        description: Customer segment classification
+        data_type: varchar
+        sample_values:
+          - "Consumer"
+          - "Corporate"
+          - "Home Office"
+        synonyms:
+          - segment
+          - customer type
+          - customer category
+      
+      # Geographic dimensions
+      - name: country
+        expr: COUNTRY
+        description: Country where the order was placed
+        data_type: varchar
+        sample_values:
+          - "United States"
+        synonyms:
+          - nation
+      
+      - name: city
+        expr: CITY
+        description: City where the order was placed
+        data_type: varchar
+        synonyms:
+          - location
+          - city name
+      
+      - name: state
+        expr: STATE
+        description: State or province where the order was placed
+        data_type: varchar
+        synonyms:
+          - province
+          - region
+          - state name
+      
+      - name: postal_code
+        expr: POSTAL_CODE
+        description: Postal or ZIP code
+        data_type: varchar
+        synonyms:
+          - zip code
+          - postal
+      
+      - name: region
+        expr: REGION
+        description: Geographic region classification
+        data_type: varchar
+        sample_values:
+          - "Central"
+          - "East"
+          - "South"
+          - "West"
+        synonyms:
+          - geographic region
+          - territory
+      
+      # Product dimensions
+      - name: product_id
+        expr: PRODUCT_ID
+        description: Unique identifier for each product
+        data_type: varchar
+        synonyms:
+          - product code
+          - item id
+      
+      - name: product_name
+        expr: PRODUCT_NAME
+        description: Full name of the product
+        data_type: varchar
+        synonyms:
+          - product
+          - item name
+          - product title
+      
+      - name: category
+        expr: CATEGORY
+        description: Product category classification
+        data_type: varchar
+        sample_values:
+          - "Furniture"
+          - "Office Supplies"
+          - "Technology"
+        synonyms:
+          - product category
+          - product type
+      
+      - name: sub_category
+        expr: SUB_CATEGORY
+        description: Product sub-category classification
+        data_type: varchar
+        synonyms:
+          - subcategory
+          - product subcategory
+          - sub category
+      
+      # Shipping dimensions
+      - name: ship_mode
+        expr: SHIP_MODE
+        description: Shipping method used for the order
+        data_type: varchar
+        sample_values:
+          - "Standard Class"
+          - "Second Class"
+          - "First Class"
+          - "Same Day"
+        synonyms:
+          - shipping mode
+          - delivery method
+          - shipping method
+    
+    # Facts (raw measures at row level)
+    facts:
+      - name: sales_amount
+        expr: SALES
+        description: Sales revenue for the order
+        data_type: number
+        default_aggregation: sum
+        synonyms:
+          - sales
+          - revenue
+          - sales revenue
+      
+      - name: quantity
+        expr: QUANTITY
+        description: Number of units ordered
+        data_type: number
+        default_aggregation: sum
+        synonyms:
+          - qty
+          - units
+          - quantity sold
+      
+      - name: discount_amount
+        expr: DISCOUNT
+        description: Discount applied as a percentage
+        data_type: number
+        default_aggregation: avg
+        synonyms:
+          - discount
+          - discount rate
+          - discount percentage
+      
+      - name: profit_amount
+        expr: PROFIT
+        description: Profit generated from the order
+        data_type: number
+        default_aggregation: sum
+        synonyms:
+          - profit
+          - net profit
+          - earnings
+    
+    # Metrics (aggregated measures)
+    metrics:
+      - name: total_sales
+        synonyms:
+          - total revenue
+          - gross sales
+          - sales total
+        description: Total sales revenue across all orders
+        expr: SUM(SALES)
+        data_type: number
+        default_aggregation: sum
+      
+      - name: total_profit
+        synonyms:
+          - total earnings
+          - net profit
+          - profit total
+        description: Total profit across all orders
+        expr: SUM(PROFIT)
+        data_type: number
+        default_aggregation: sum
+      
+      - name: total_quantity
+        synonyms:
+          - total units
+          - units sold
+          - quantity total
+        description: Total quantity of items sold
+        expr: SUM(QUANTITY)
+        data_type: number
+        default_aggregation: sum
+      
+      - name: average_order_value
+        synonyms:
+          - AOV
+          - avg order size
+          - mean order value
+        description: Average revenue per order
+        expr: AVG(SALES)
+        data_type: number
+        default_aggregation: avg
+      
+      - name: profit_margin
+        synonyms:
+          - margin
+          - profit percentage
+          - profitability
+        description: Profit as percentage of sales
+        expr: (SUM(PROFIT) / SUM(SALES)) * 100
+        data_type: number
+        default_aggregation: avg
+      
+      - name: order_count
+        synonyms:
+          - number of orders
+          - total orders
+          - order total
+        description: Count of unique orders
+        expr: COUNT(DISTINCT ORDER_ID)
+        data_type: number
+        default_aggregation: count
+      
+      - name: customer_count
+        synonyms:
+          - number of customers
+          - unique customers
+          - customer total
+        description: Count of unique customers
+        expr: COUNT(DISTINCT CUSTOMER_ID)
+        data_type: number
+        default_aggregation: count
+      
+      - name: average_discount
+        synonyms:
+          - avg discount
+          - mean discount
+        description: Average discount percentage applied
+        expr: AVG(DISCOUNT)
+        data_type: number
+        default_aggregation: avg
+
+# Verified queries for improved accuracy and business context
+verified_queries:
+  - name: top_customers_by_sales
+    question: "Who are the top 10 customers by sales?"
+    sql: |
+      SELECT 
+        CUSTOMER_NAME,
+        SUM(SALES) as total_sales,
+        COUNT(DISTINCT ORDER_ID) as order_count
+      FROM SUPERSTOREDB.DATA.SUPERSTORE
+      GROUP BY CUSTOMER_NAME
+      ORDER BY total_sales DESC
+      LIMIT 10
+  
+  - name: top_customers_by_profit
+    question: "Who are the most profitable customers?"
+    sql: |
+      SELECT 
+        CUSTOMER_NAME,
+        SUM(PROFIT) as total_profit,
+        SUM(SALES) as total_sales,
+        COUNT(DISTINCT ORDER_ID) as order_count
+      FROM SUPERSTOREDB.DATA.SUPERSTORE
+      GROUP BY CUSTOMER_NAME
+      ORDER BY total_profit DESC
+      LIMIT 10
+  
+  - name: sales_by_region
+    question: "What are sales by region?"
+    sql: |
+      SELECT 
+        REGION,
+        SUM(SALES) as total_sales,
+        SUM(PROFIT) as total_profit,
+        COUNT(DISTINCT ORDER_ID) as order_count
+      FROM SUPERSTOREDB.DATA.SUPERSTORE
+      GROUP BY REGION
+      ORDER BY total_sales DESC
+  
+  - name: product_category_performance
+    question: "Which product categories perform best?"
+    sql: |
+      SELECT 
+        CATEGORY,
+        SUM(SALES) as total_sales,
+        SUM(PROFIT) as total_profit,
+        SUM(QUANTITY) as total_quantity,
+        COUNT(DISTINCT ORDER_ID) as order_count
+      FROM SUPERSTOREDB.DATA.SUPERSTORE
+      GROUP BY CATEGORY
+      ORDER BY total_sales DESC
+  
+  - name: monthly_sales_trend
+    question: "What is the monthly sales trend?"
+    sql: |
+      SELECT 
+        DATE_TRUNC('MONTH', ORDER_DATE) as month,
+        SUM(SALES) as monthly_sales,
+        SUM(PROFIT) as monthly_profit,
+        COUNT(DISTINCT ORDER_ID) as monthly_orders
+      FROM SUPERSTOREDB.DATA.SUPERSTORE
+      GROUP BY DATE_TRUNC('MONTH', ORDER_DATE)
+      ORDER BY month
+  
+  - name: ship_mode_analysis
+    question: "What is the most common shipping mode?"
+    sql: |
+      SELECT 
+        SHIP_MODE,
+        COUNT(*) as order_count,
+        ROUND((COUNT(*) * 100.0 / SUM(COUNT(*)) OVER ()), 2) as percentage
+      FROM SUPERSTOREDB.DATA.SUPERSTORE
+      GROUP BY SHIP_MODE
+      ORDER BY order_count DESC
+  
+  - name: customer_segment_analysis
+    question: "How do customer segments perform?"
+    sql: |
+      SELECT 
+        SEGMENT,
+        COUNT(DISTINCT CUSTOMER_ID) as customer_count,
+        SUM(SALES) as total_sales,
+        SUM(PROFIT) as total_profit,
+        AVG(SALES) as avg_order_value
+      FROM SUPERSTOREDB.DATA.SUPERSTORE
+      GROUP BY SEGMENT
+      ORDER BY total_sales DESC
+  
+  - name: top_products_by_sales
+    question: "Which products sell the most?"
+    sql: |
+      SELECT 
+        PRODUCT_NAME,
+        SUM(SALES) as total_sales,
+        SUM(QUANTITY) as total_quantity,
+        COUNT(DISTINCT ORDER_ID) as order_count
+      FROM SUPERSTOREDB.DATA.SUPERSTORE
+      GROUP BY PRODUCT_NAME
+      ORDER BY total_sales DESC
+      LIMIT 15
+  
+  - name: profit_margin_by_category
+    question: "What is the profit margin by category?"
+    sql: |
+      SELECT 
+        CATEGORY,
+        SUM(SALES) as total_sales,
+        SUM(PROFIT) as total_profit,
+        ROUND((SUM(PROFIT) / SUM(SALES)) * 100, 2) as profit_margin_percent
+      FROM SUPERSTOREDB.DATA.SUPERSTORE
+      GROUP BY CATEGORY
+      ORDER BY profit_margin_percent DESC
+  
+  - name: yearly_performance
+    question: "How has performance changed year over year?"
+    sql: |
+      SELECT 
+        EXTRACT(YEAR FROM ORDER_DATE) as year,
+        SUM(SALES) as total_sales,
+        SUM(PROFIT) as total_profit,
+        COUNT(DISTINCT ORDER_ID) as total_orders,
+        COUNT(DISTINCT CUSTOMER_ID) as unique_customers
+      FROM SUPERSTOREDB.DATA.SUPERSTORE
+      GROUP BY EXTRACT(YEAR FROM ORDER_DATE)
+      ORDER BY year
+
+# Custom instructions for business context
+custom_instructions:
+  - "When calculating profit margins, always use the formula: (profit / sales) * 100"
+  - "Customer segments include Consumer (individual buyers), Corporate (business buyers), and Home Office (small business/remote workers)"
+  - "Regions are: Central, East, South, West representing US geographic territories"
+  - "Ship modes from fastest to slowest: Same Day, First Class, Second Class, Standard Class"
+  - "All monetary values are in USD"
+  - "Discount is expressed as a percentage (0.0 to 1.0 where 0.2 = 20% discount)"
+  - "Product categories: Furniture (chairs, tables, bookcases), Office Supplies (paper, binders, pens), Technology (phones, computers, accessories)"
+  - "Focus on actionable business insights when answering questions"
+  - "When asked about 'top' or 'best', default to sorting by sales unless profit or another metric is specifically mentioned"
