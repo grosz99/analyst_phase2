@@ -591,6 +591,7 @@ app.post('/api/ai/analyze', async (req, res) => {
       res.json({
         success: true,
         analysis: result.analysis,
+        python_code: result.python_code,
         results_table: result.results_table,
         visualization: result.visualization,
         refined_questions: result.refined_questions,

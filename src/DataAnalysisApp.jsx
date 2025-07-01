@@ -37,6 +37,10 @@ const DataAnalysisApp = () => {
   const [datasetInfo, setDatasetInfo] = useState('');
   const [sessionId, setSessionId] = useState(null);
   const [isDatasetLoading, setIsDatasetLoading] = useState(false);
+  
+  // Cached data for AI analysis optimization
+  const [cachedDataset, setCachedDataset] = useState(null);
+  const [dataLoadedTimestamp, setDataLoadedTimestamp] = useState(null);
 
   // Load available data sources from API
   useEffect(() => {
@@ -171,6 +175,13 @@ const DataAnalysisApp = () => {
         setPreviewData(result.previewData || result.dataset?.slice(0, 10)); // Preview data for UI
         setDatasetInfo(result.info || 'Dataset loaded successfully');
         setSessionId(result.sessionId);
+        
+        // Cache the dataset for optimized AI analysis
+        setCachedDataset(result.dataset);
+        setDataLoadedTimestamp(new Date().toISOString());
+        
+        console.log(`📊 Dataset cached in memory: ${result.dataset?.length} rows, ${Object.keys(result.dataset?.[0] || {}).length} columns`);
+        
         setCurrentStep(3); // Go directly to Analysis step
       } catch (err) {
         console.error('Dataset loading error:', err);
@@ -199,6 +210,8 @@ const DataAnalysisApp = () => {
     setPreviewData(null);
     setDatasetInfo('');
     setSessionId(null);
+    setCachedDataset(null);
+    setDataLoadedTimestamp(null);
   };
 
   const renderError = () => {
@@ -263,6 +276,8 @@ const DataAnalysisApp = () => {
           {currentStep === 3 && (
             <UnifiedAnalysisView 
               initialData={processedData}
+              cachedDataset={cachedDataset}
+              dataLoadedTimestamp={dataLoadedTimestamp}
               previewData={previewData}
               datasetInfo={datasetInfo}
               sessionId={sessionId}

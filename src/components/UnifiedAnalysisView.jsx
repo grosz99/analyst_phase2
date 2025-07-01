@@ -59,7 +59,7 @@ const DataPreview = ({ previewData, totalRows, onExport }) => {
   );
 };
 
-function UnifiedAnalysisView({ initialData, previewData, datasetInfo, sessionId, onReset }) {
+function UnifiedAnalysisView({ initialData, cachedDataset, dataLoadedTimestamp, previewData, datasetInfo, sessionId, onReset }) {
   // AI Analysis State
   const [currentQuestion, setCurrentQuestion] = useState('');
   const [analysisHistory, setAnalysisHistory] = useState([]);
@@ -102,7 +102,9 @@ function UnifiedAnalysisView({ initialData, previewData, datasetInfo, sessionId,
 
   // Handle AI Analysis
   const handleAnalyzeData = async (question = '', analysisType = 'general') => {
-    if (!initialData || initialData.length === 0) {
+    const dataToAnalyze = cachedDataset || initialData;
+    
+    if (!dataToAnalyze || dataToAnalyze.length === 0) {
       setError('No data available for analysis');
       return;
     }
@@ -117,10 +119,16 @@ function UnifiedAnalysisView({ initialData, previewData, datasetInfo, sessionId,
     setCurrentQuestion('');
 
     try {
-      console.log('🤖 Starting AI analysis:', { question, analysisType, dataRows: initialData.length });
+      const loadTime = dataLoadedTimestamp ? new Date(dataLoadedTimestamp) : new Date();
+      console.log(`🤖 Starting AI analysis using cached dataset (loaded ${loadTime.toLocaleTimeString()}):`, { 
+        question, 
+        analysisType, 
+        dataRows: dataToAnalyze.length,
+        cached: !!cachedDataset 
+      });
       
       const result = await aiAnalysisService.analyzeData(
-        initialData,
+        dataToAnalyze,
         question || `Perform ${analysisType} analysis`,
         analysisType,
         sessionId
@@ -257,8 +265,15 @@ function UnifiedAnalysisView({ initialData, previewData, datasetInfo, sessionId,
       
       {/* Dataset Info Bar */}
       <div className="dataset-info-bar">
-        <span className="dataset-status">✅ AI Analysis Ready</span>
-        <span className="dataset-details">{datasetInfo}</span>
+        <span className="dataset-status">
+          {cachedDataset ? '⚡ Data Cached in Memory' : '✅ AI Analysis Ready'}
+        </span>
+        <span className="dataset-details">
+          {cachedDataset 
+            ? `${cachedDataset.length} rows cached • Loaded ${dataLoadedTimestamp ? new Date(dataLoadedTimestamp).toLocaleTimeString() : 'now'}`
+            : datasetInfo
+          }
+        </span>
       </div>
 
       <div className="content-area">
@@ -347,7 +362,7 @@ function UnifiedAnalysisView({ initialData, previewData, datasetInfo, sessionId,
               <div className="conversation-number">#{index + 1}</div>
               <AIAnalysisResults
                 analysisResult={item.result}
-                originalData={initialData}
+                originalData={cachedDataset || initialData}
                 question={item.question}
                 onNewAnalysis={handleNewAnalysis}
                 isLoading={false}

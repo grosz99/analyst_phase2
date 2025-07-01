@@ -207,7 +207,7 @@ SPECIFIC ANALYSIS REQUEST: Regional analysis. Focus on geographic patterns, regi
 GENERAL ANALYSIS REQUEST: Provide comprehensive insights based on the available data structure and patterns.`;
     }
 
-    const basePrompt = `You are a professional data analyst. Answer the user's specific question accurately using only the available data.
+    const basePrompt = `You are a professional data analyst with Python expertise. The user has loaded a dataset into memory (available as 'df' pandas DataFrame) and wants to analyze it.
 
 Dataset Information:
 - Total Rows: ${totalRows}
@@ -220,13 +220,32 @@ Sample Data (first 5 rows):
 ${JSON.stringify(dataPreview, null, 2)}
 
 ANALYSIS REQUIREMENTS:
-1. **Answer the specific question asked** - don't provide generic insights
-2. **Use only available data** - don't invent metrics that aren't present  
-3. **Be transparent about limitations** - if required data is missing, explain this clearly
-4. **Provide actionable insights** based on what the data actually shows
-5. **Use clear business language** - avoid technical jargon
+1. **Write Python code** to analyze the dataset and answer the user's question
+2. **Use pandas operations** like groupby, sum, sort_values, etc.
+3. **Generate insights** based on the computed results
+4. **Return both code and analysis** in your response
 
-Format your response with clear headers. Focus on directly answering the user's question.`;
+RESPONSE FORMAT:
+# Analysis: [Question Title]
+
+## Python Code
+\`\`\`python
+import pandas as pd
+import numpy as np
+
+# [Your analysis code here]
+# df is already loaded with the dataset
+result = df.groupby('column').agg({'metric': 'sum'}).sort_values('metric', ascending=False)
+print(result.head(10))
+\`\`\`
+
+## Key Findings
+[Your business insights here]
+
+## Recommendations
+[Actionable recommendations based on the analysis]
+
+Focus on writing efficient Python code that directly answers the user's question using the available columns.`;
 
     if (basePrompt.length > this.MAX_PROMPT_LENGTH) {
       throw new Error('Analysis prompt too large. Please reduce dataset size or context.');
@@ -284,12 +303,16 @@ Format your response with clear headers. Focus on directly answering the user's 
       // Generate structured results from the analysis
       const structuredResults = this.generateStructuredResults(sanitizedData, userContext, analysisText);
       
+      // Extract Python code from the response
+      const pythonCode = this.extractPythonCode(analysisText);
+      
       // Generate refined question suggestions if data limitations detected
       const refinedQuestions = this.generateRefinedQuestions(sanitizedData, userContext, analysisText);
       
       return {
         success: true,
         analysis: analysisText,
+        python_code: pythonCode,
         results_table: structuredResults.results_table,
         visualization: structuredResults.visualization,
         refined_questions: refinedQuestions,
@@ -299,7 +322,8 @@ Format your response with clear headers. Focus on directly answering the user's 
           analysis_type: analysisType,
           processing_time: duration,
           timestamp: new Date().toISOString(),
-          token_usage: response.usage
+          token_usage: response.usage,
+          cached_analysis: true
         }
       };
 
@@ -322,6 +346,50 @@ Format your response with clear headers. Focus on directly answering the user's 
         error: clientError,
         timestamp: new Date().toISOString()
       };
+    }
+  }
+
+  // Extract Python code from AI response
+  extractPythonCode(analysisText) {
+    try {
+      // Look for Python code blocks in the response
+      const codeBlockRegex = /```python\n([\s\S]*?)\n```/g;
+      const matches = [];
+      let match;
+      
+      while ((match = codeBlockRegex.exec(analysisText)) !== null) {
+        matches.push(match[1].trim());
+      }
+      
+      if (matches.length > 0) {
+        return {
+          code: matches.join('\n\n'),
+          blocks: matches,
+          executable: true
+        };
+      }
+      
+      // Fallback: look for any code-like patterns
+      const lines = analysisText.split('\n');
+      const codeLines = lines.filter(line => 
+        line.includes('df.') || 
+        line.includes('groupby(') || 
+        line.includes('import ') ||
+        line.includes('result =')
+      );
+      
+      if (codeLines.length > 0) {
+        return {
+          code: codeLines.join('\n'),
+          blocks: [codeLines.join('\n')],
+          executable: false
+        };
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error extracting Python code:', error);
+      return null;
     }
   }
 

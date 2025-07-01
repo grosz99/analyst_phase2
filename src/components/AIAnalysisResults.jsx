@@ -45,7 +45,7 @@ const AIAnalysisResults = ({
     );
   }
 
-  const { analysis, metadata, results_table, visualization, refined_questions } = analysisResult;
+  const { analysis, python_code, metadata, results_table, visualization, refined_questions } = analysisResult;
   
   console.log('🔍 Debug AIAnalysisResults props:', { 
     analysisResult, 
@@ -172,6 +172,30 @@ const AIAnalysisResults = ({
     }
 
     return <p className="no-items">Visualization type not supported</p>;
+  };
+
+  const renderPythonCode = () => {
+    if (!python_code) {
+      return <p className="no-items">No Python code generated</p>;
+    }
+
+    return (
+      <div className="python-code-container">
+        <div className="code-header">
+          <h4>Generated Python Analysis Code</h4>
+          <p className="code-subtitle">AI-generated code to analyze your cached dataset</p>
+        </div>
+        <pre className="python-code">
+          <code>{python_code.code || python_code}</code>
+        </pre>
+        {python_code.executable && (
+          <div className="code-info">
+            <span className="code-status">✅ Executable code generated</span>
+            <span className="code-note">This code operates on the cached DataFrame 'df'</span>
+          </div>
+        )}
+      </div>
+    );
   };
 
   // Generate dynamic AI response text
@@ -309,12 +333,21 @@ const AIAnalysisResults = ({
         >
           Visualization
         </button>
+        {python_code && (
+          <button 
+            className={`tab ${activeTab === 'python' ? 'active' : ''}`}
+            onClick={() => setActiveTab('python')}
+          >
+            Python Code
+          </button>
+        )}
       </div>
 
       {/* Tab Content */}
       <div className="tab-content">
         {activeTab === 'results' && renderResultsTable()}
         {activeTab === 'visualization' && renderVisualization()}
+        {activeTab === 'python' && renderPythonCode()}
       </div>
       </div>
 
