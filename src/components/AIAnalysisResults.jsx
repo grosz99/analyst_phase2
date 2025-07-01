@@ -11,6 +11,8 @@ const AIAnalysisResults = ({
 }) => {
   const [activeTab, setActiveTab] = useState('results');
   const [exportLoading, setExportLoading] = useState(false);
+  const [compactQuestion, setCompactQuestion] = useState('');
+  const [compactAnalyzing, setCompactAnalyzing] = useState(false);
 
   if (isLoading) {
     return (
@@ -25,14 +27,7 @@ const AIAnalysisResults = ({
   }
 
   if (!analysisResult) {
-    return (
-      <div className="ai-analysis-placeholder">
-        <div className="placeholder-content">
-          <h3>📊 Ready for AI Analysis</h3>
-          <p>Ask a question about your data to get AI-powered insights</p>
-        </div>
-      </div>
-    );
+    return null; // Don't render anything if no results - the question input will be shown above
   }
 
   if (!analysisResult.success) {
@@ -50,6 +45,13 @@ const AIAnalysisResults = ({
   }
 
   const { analysis, metadata, results_table, visualization } = analysisResult;
+  
+  console.log('🔍 Debug AIAnalysisResults props:', { 
+    analysisResult, 
+    hasResultsTable: !!results_table,
+    hasVisualization: !!visualization,
+    question 
+  });
 
   const handleExportResults = async (format) => {
     if (!results_table?.data) return;
@@ -99,6 +101,8 @@ const AIAnalysisResults = ({
   };
 
   const renderResultsTable = () => {
+    console.log('🔍 Debug renderResultsTable:', { results_table, hasData: results_table?.data?.length > 0 });
+    
     if (!results_table || !results_table.data || results_table.data.length === 0) {
       return <p className="no-items">No analysis results available</p>;
     }
@@ -169,6 +173,79 @@ const AIAnalysisResults = ({
     return <p className="no-items">Visualization type not supported</p>;
   };
 
+  // Generate dynamic AI response text
+  const getResponseText = (question) => {
+    if (!question) return "Here are the analysis results:";
+    
+    const lowerQuestion = question.toLowerCase();
+    if (lowerQuestion.includes('profitable customer')) {
+      return "Here are the most profitable customers:";
+    } else if (lowerQuestion.includes('region') && lowerQuestion.includes('sales')) {
+      return "Here are the top regions by sales:";
+    } else if (lowerQuestion.includes('region') && lowerQuestion.includes('revenue')) {
+      return "Here are the top regions by revenue:";
+    } else if (lowerQuestion.includes('product')) {
+      return "Here are the product analysis results:";
+    } else if (lowerQuestion.includes('trend')) {
+      return "Here are the trend analysis results:";
+    }
+    return "Here are the analysis results:";
+  };
+
+  // Handle compact question input analysis
+  const handleCompactAnalysis = async () => {
+    if (!compactQuestion.trim() || !originalData || compactAnalyzing) return;
+    
+    setCompactAnalyzing(true);
+    try {
+      const result = await aiAnalysisService.analyzeData(
+        originalData,
+        compactQuestion,
+        'general'
+      );
+      
+      if (result.success) {
+        // Trigger parent component to update with new analysis
+        onNewAnalysis(result, compactQuestion);
+        setCompactQuestion('');
+      } else {
+        console.error('Analysis failed:', result.error);
+        alert('Analysis failed: ' + result.error);
+      }
+    } catch (error) {
+      console.error('Analysis error:', error);
+      alert('Analysis failed: ' + error.message);
+    } finally {
+      setCompactAnalyzing(false);
+    }
+  };
+
+  // Handle suggested question clicks
+  const handleSuggestedQuestion = async (suggestion) => {
+    if (!originalData || compactAnalyzing) return;
+    
+    setCompactAnalyzing(true);
+    try {
+      const result = await aiAnalysisService.analyzeData(
+        originalData,
+        suggestion,
+        'general'
+      );
+      
+      if (result.success) {
+        onNewAnalysis(result, suggestion);
+      } else {
+        console.error('Analysis failed:', result.error);
+        alert('Analysis failed: ' + result.error);
+      }
+    } catch (error) {
+      console.error('Analysis error:', error);
+      alert('Analysis failed: ' + error.message);
+    } finally {
+      setCompactAnalyzing(false);
+    }
+  };
+
   // Generate suggested follow-up questions
   const suggestedQuestions = [
     "Show me the revenue trend for EMESA.",
@@ -178,18 +255,51 @@ const AIAnalysisResults = ({
 
   return (
     <div className="analysis-results-container">
-      {/* Question */}
-      <div className="analysis-question">
-        <h2>{question}</h2>
+      {/* Compact Question Input for Follow-ups */}
+      <div className="compact-question-section">
+        <div className="question-header">
+          <h3>🔍 Ask a Question About Your Data</h3>
+          <p>Use natural language to explore your data with AI analysis</p>
+        </div>
+        <div className="compact-input-wrapper">
+          <input
+            type="text"
+            value={compactQuestion}
+            onChange={(e) => setCompactQuestion(e.target.value)}
+            placeholder="e.g., Who are the most profitable customers?"
+            className="compact-question-input"
+            disabled={compactAnalyzing}
+            onKeyPress={(e) => e.key === 'Enter' && handleCompactAnalysis()}
+          />
+          <button 
+            className="compact-analyze-btn"
+            onClick={handleCompactAnalysis}
+            disabled={!compactQuestion.trim() || compactAnalyzing}
+          >
+            {compactAnalyzing ? '⏳ Analyzing...' : '🔍 Analyze'}
+          </button>
+        </div>
+        <div className="analysis-type-compact">
+          <label>Analysis Type:</label>
+          <select className="compact-dropdown">
+            <option>General Analysis</option>
+          </select>
+        </div>
       </div>
 
-      {/* AI Response */}
-      <div className="ai-response">
-        <p>Here are the top regions by revenue:</p>
-      </div>
+      {/* Current Question Result */}
+      <div className="current-result">
+        <div className="analysis-question">
+          <h2>{question}</h2>
+        </div>
 
-      {/* Tabs */}
-      <div className="results-tabs">
+        {/* AI Response */}
+        <div className="ai-response">
+          <p>{getResponseText(question)}</p>
+        </div>
+
+        {/* Tabs */}
+        <div className="results-tabs">
         <button 
           className={`tab ${activeTab === 'results' ? 'active' : ''}`}
           onClick={() => setActiveTab('results')}
@@ -216,10 +326,8 @@ const AIAnalysisResults = ({
           <button
             key={index}
             className="suggestion-pill"
-            onClick={() => {
-              // This should trigger a new analysis with the suggested question
-              console.log('Suggested question:', suggestion);
-            }}
+            onClick={() => handleSuggestedQuestion(suggestion)}
+            disabled={compactAnalyzing}
           >
             {suggestion}
           </button>

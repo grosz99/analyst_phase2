@@ -111,6 +111,8 @@ class AIAnalysisService {
         return {
           success: true,
           analysis: result.analysis,
+          results_table: result.results_table,
+          visualization: result.visualization,
           parsedAnalysis: parsedAnalysis,
           metadata: result.metadata,
           timestamp: result.timestamp

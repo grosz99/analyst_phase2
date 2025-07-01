@@ -161,13 +161,21 @@ function UnifiedAnalysisView({ initialData, previewData, datasetInfo, sessionId,
     }
   };
 
-  // Reset analysis
-  const handleNewAnalysis = () => {
-    setAnalysisResult(null);
-    setCurrentQuestion('');
-    setError(null);
-    setSelectedAnalysisType('general');
-    questionInputRef.current?.focus();
+  // Reset analysis or handle new analysis from compact input
+  const handleNewAnalysis = (newResult = null, newQuestion = '') => {
+    if (newResult && newQuestion) {
+      // Handle new analysis from compact input
+      setAnalysisResult(newResult);
+      setCurrentQuestion(newQuestion);
+      setError(null);
+    } else {
+      // Reset analysis
+      setAnalysisResult(null);
+      setCurrentQuestion('');
+      setError(null);
+      setSelectedAnalysisType('general');
+      questionInputRef.current?.focus();
+    }
   };
 
   return (
@@ -206,56 +214,56 @@ function UnifiedAnalysisView({ initialData, previewData, datasetInfo, sessionId,
         onExport={handleExportData} 
       />
 
-      {/* Analysis Interface */}
-      <div className="analysis-interface">
-        {/* Question Input */}
-        <form onSubmit={handleSubmitQuestion} className="question-form">
-          <div className="form-header">
-            <h3>🔍 Ask a Question About Your Data</h3>
-            <p>Use natural language to explore your data with AI analysis</p>
-          </div>
-          
-          <div className="input-group">
-            <div className="question-input-wrapper">
-              <input
-                ref={questionInputRef}
-                type="text"
-                value={currentQuestion}
-                onChange={(e) => setCurrentQuestion(e.target.value)}
-                placeholder="e.g., Who are the most profitable customers?"
-                className="question-input"
-                disabled={isAnalyzing || !aiServiceStatus?.success}
-              />
-              <button 
-                type="submit" 
-                disabled={!currentQuestion.trim() || isAnalyzing || !aiServiceStatus?.success}
-                className="analyze-btn"
-              >
-                {isAnalyzing ? '⏳ Analyzing...' : '🔍 Analyze'}
-              </button>
+      {/* Compact Analysis Interface */}
+      {!analysisResult && (
+        <div className="analysis-interface">
+          <form onSubmit={handleSubmitQuestion} className="question-form">
+            <div className="form-header">
+              <h3>🔍 Ask a Question About Your Data</h3>
+              <p>Use natural language to explore your data with AI analysis</p>
             </div>
             
-            {/* Analysis Type Selector */}
-            {analysisTypes.length > 0 && (
-              <div className="analysis-type-selector">
-                <label htmlFor="analysis-type">Analysis Type:</label>
-                <select 
-                  id="analysis-type"
-                  value={selectedAnalysisType} 
-                  onChange={(e) => handleAnalysisTypeChange(e.target.value)}
-                  className="analysis-type-dropdown"
-                  disabled={isAnalyzing}
+            <div className="input-group">
+              <div className="question-input-wrapper">
+                <input
+                  ref={questionInputRef}
+                  type="text"
+                  value={currentQuestion}
+                  onChange={(e) => setCurrentQuestion(e.target.value)}
+                  placeholder="e.g., Who are the most profitable customers?"
+                  className="question-input"
+                  disabled={isAnalyzing || !aiServiceStatus?.success}
+                />
+                <button 
+                  type="submit" 
+                  disabled={!currentQuestion.trim() || isAnalyzing || !aiServiceStatus?.success}
+                  className="analyze-btn"
                 >
-                  {analysisTypes.map(type => (
-                    <option key={type.id} value={type.id}>
-                      {type.name}
-                    </option>
-                  ))}
-                </select>
+                  {isAnalyzing ? '⏳ Analyzing...' : '🔍 Analyze'}
+                </button>
               </div>
-            )}
-          </div>
-        </form>
+              
+              {/* Analysis Type Selector */}
+              {analysisTypes.length > 0 && (
+                <div className="analysis-type-selector">
+                  <label htmlFor="analysis-type">Analysis Type:</label>
+                  <select 
+                    id="analysis-type"
+                    value={selectedAnalysisType} 
+                    onChange={(e) => handleAnalysisTypeChange(e.target.value)}
+                    className="analysis-type-dropdown"
+                    disabled={isAnalyzing}
+                  >
+                    {analysisTypes.map(type => (
+                      <option key={type.id} value={type.id}>
+                        {type.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+          </form>
 
         {/* Suggested Questions */}
         {suggestedQuestions.length > 0 && !isAnalyzing && (
