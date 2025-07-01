@@ -78,10 +78,32 @@
 .data-preview-container {
   background: white;
   border-radius: 12px;
-  padding: 2rem;
   margin-bottom: 2rem;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   border: 1px solid #e2e8f0;
+  overflow: hidden;
+}
+
+.preview-toggle {
+  width: 100%;
+  background: #f8fafc;
+  border: none;
+  padding: 1rem 2rem;
+  text-align: left;
+  font-weight: 600;
+  color: #374151;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  font-size: 1rem;
+  border-radius: 0;
+}
+
+.preview-toggle:hover {
+  background: #f1f5f9;
+}
+
+.preview-content {
+  padding: 0 2rem 2rem 2rem;
 }
 
 .preview-header {

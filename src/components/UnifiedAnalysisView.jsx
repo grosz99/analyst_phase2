@@ -5,11 +5,22 @@ import ResultsTable from './ResultsTable.jsx';
 import './UnifiedAnalysisView.css';
 
 const DataPreview = ({ previewData, totalRows, onExport }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  
   if (!previewData || previewData.length === 0) {
     return (
       <div className="data-preview-container">
-        <h3 className="preview-title">📊 Data Preview</h3>
-        <p className="placeholder-text">No data available for preview.</p>
+        <button 
+          className="preview-toggle"
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
+          📊 Data Preview {isExpanded ? '▼' : '▶'} 
+        </button>
+        {isExpanded && (
+          <div className="preview-content">
+            <p className="placeholder-text">No data available for preview.</p>
+          </div>
+        )}
       </div>
     );
   }
@@ -19,19 +30,30 @@ const DataPreview = ({ previewData, totalRows, onExport }) => {
   return (
     <div className="data-preview-container">
       <div className="preview-header">
-        <h3 className="preview-title">📊 Data Preview ({totalRows || previewData.length} rows)</h3>
-        <div className="preview-actions">
-          <button onClick={() => onExport('csv')} className="export-btn">
-            📊 Export CSV
-          </button>
-          <button onClick={() => onExport('json')} className="export-btn">
-            📄 Export JSON
-          </button>
-        </div>
+        <button 
+          className="preview-toggle"
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
+          📊 Data Preview ({totalRows || previewData.length} rows) {isExpanded ? '▼' : '▶'}
+        </button>
+        {isExpanded && (
+          <div className="preview-actions">
+            <button onClick={() => onExport('csv')} className="export-btn">
+              📊 Export CSV
+            </button>
+            <button onClick={() => onExport('json')} className="export-btn">
+              📄 Export JSON
+            </button>
+          </div>
+        )}
       </div>
-      <ResultsTable data={previewData} headers={headers} />
-      {totalRows > previewData.length && (
-        <p className="preview-note">Showing first {previewData.length} rows of {totalRows} total rows</p>
+      {isExpanded && (
+        <div className="preview-content">
+          <ResultsTable data={previewData} headers={headers} />
+          {totalRows > previewData.length && (
+            <p className="preview-note">Showing first {previewData.length} rows of {totalRows} total rows</p>
+          )}
+        </div>
       )}
     </div>
   );

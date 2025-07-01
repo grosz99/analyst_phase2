@@ -326,91 +326,93 @@ Important: Base your analysis only on the provided data. Do not make assumptions
     
     let analysisText = '';
     
-    // Customer profitability analysis
-    if ((questionLower.includes('profitable') || questionLower.includes('customer')) && hasCustomer && hasProfit) {
-      // Perform actual data aggregation - GROUP BY customer, SUM(profit)
-      const customerProfitMap = new Map();
+    // Customer analysis (since we don't have PROFIT/SALES, analyze by customer frequency/volume)
+    if ((questionLower.includes('customer') || questionLower.includes('frequent')) && hasCustomer) {
+      console.log('🔍 Performing customer analysis on columns:', columns);
+      // Perform actual data aggregation - GROUP BY customer, COUNT(*)
+      const customerMap = new Map();
       
       data.forEach(row => {
         const customerName = row.CUSTOMER_NAME || row.Customer || row.customer_name || 'Unknown';
-        const profit = parseFloat(row.PROFIT || row.Profit || row.profit || 0);
-        const sales = parseFloat(row.SALES || row.Sales || row.sales || 0);
+        // Since no PROFIT/SALES, count orders and look for other numeric fields
+        const quantity = parseFloat(row.QUANTITY || row.Quantity || row.quantity || 1);
+        const discount = parseFloat(row.DISCOUNT || row.Discount || row.discount || 0);
         
-        if (customerProfitMap.has(customerName)) {
-          const existing = customerProfitMap.get(customerName);
-          customerProfitMap.set(customerName, {
+        if (customerMap.has(customerName)) {
+          const existing = customerMap.get(customerName);
+          customerMap.set(customerName, {
             customer_name: customerName,
-            total_profit: existing.total_profit + profit,
-            total_sales: existing.total_sales + sales,
+            total_quantity: existing.total_quantity + quantity,
+            total_discount: existing.total_discount + discount,
             order_count: existing.order_count + 1
           });
         } else {
-          customerProfitMap.set(customerName, {
+          customerMap.set(customerName, {
             customer_name: customerName,
-            total_profit: profit,
-            total_sales: sales,
+            total_quantity: quantity,
+            total_discount: discount,
             order_count: 1
           });
         }
       });
       
-      // Convert to array and sort by profit descending
-      const customerResults = Array.from(customerProfitMap.values())
-        .sort((a, b) => b.total_profit - a.total_profit)
+      // Convert to array and sort by order count descending
+      const customerResults = Array.from(customerMap.values())
+        .sort((a, b) => b.order_count - a.order_count)
         .slice(0, 20) // Top 20 customers
         .map((customer, index) => ({
           rank: index + 1,
           customer_name: customer.customer_name,
-          total_profit: Math.round(customer.total_profit * 100) / 100,
-          total_sales: Math.round(customer.total_sales * 100) / 100,
           order_count: customer.order_count,
-          avg_profit_per_order: Math.round((customer.total_profit / customer.order_count) * 100) / 100
+          total_quantity: Math.round(customer.total_quantity * 100) / 100,
+          avg_quantity_per_order: Math.round((customer.total_quantity / customer.order_count) * 100) / 100,
+          total_discount: Math.round(customer.total_discount * 100) / 100
         }));
       
       // Generate summary insights
       const topCustomer = customerResults[0];
-      const totalProfit = customerResults.reduce((sum, c) => sum + c.total_profit, 0);
+      const totalOrders = customerResults.reduce((sum, c) => sum + c.order_count, 0);
       
-      analysisText = `# Most Profitable Customers Analysis
+      analysisText = `# Customer Activity Analysis
 
 ## Key Finding
-**${topCustomer.customer_name}** is your most profitable customer with $${topCustomer.total_profit.toLocaleString()} in total profit from ${topCustomer.order_count} orders.
+**${topCustomer.customer_name}** is your most active customer with ${topCustomer.order_count} orders.
 
-## Top 5 Summary
-${customerResults.slice(0, 5).map((c, i) => `${i + 1}. ${c.customer_name}: $${c.total_profit.toLocaleString()}`).join('\n')}
+## Top 5 Customers by Order Volume
+${customerResults.slice(0, 5).map((c, i) => `${i + 1}. ${c.customer_name}: ${c.order_count} orders`).join('\n')}
 
 ## Business Impact
-• Top 5 customers generate $${customerResults.slice(0, 5).reduce((sum, c) => sum + c.total_profit, 0).toLocaleString()} (${Math.round((customerResults.slice(0, 5).reduce((sum, c) => sum + c.total_profit, 0) / totalProfit) * 100)}% of total)
-• Average profit per customer: $${Math.round(totalProfit / customerResults.length).toLocaleString()}`;
+• Top 5 customers placed ${customerResults.slice(0, 5).reduce((sum, c) => sum + c.order_count, 0)} orders (${Math.round((customerResults.slice(0, 5).reduce((sum, c) => sum + c.order_count, 0) / totalOrders) * 100)}% of total)
+• Average orders per customer: ${Math.round(totalOrders / customerResults.length)}`;
       
       // Return structured results with data table and visualization
       return {
         success: true,
         analysis: analysisText,
         results_table: {
-          title: "Most Profitable Customers",
-          columns: ["Rank", "Customer Name", "Total Profit", "Total Sales", "Orders", "Avg Profit/Order"],
+          title: "Top Customers by Order Volume",
+          columns: ["Rank", "Customer Name", "Orders", "Total Quantity", "Avg Qty/Order", "Total Discount"],
           data: customerResults,
           total_rows: customerResults.length
         },
         visualization: {
           type: "bar_chart",
-          title: "Top 10 Most Profitable Customers",
+          title: "Top 10 Customers by Order Count",
           x_axis: "Customer Name",
-          y_axis: "Total Profit ($)",
+          y_axis: "Number of Orders",
           data: customerResults.slice(0, 10).map(c => ({
             label: c.customer_name.length > 15 ? c.customer_name.substring(0, 15) + '...' : c.customer_name,
-            value: c.total_profit,
-            formatted_value: `$${c.total_profit.toLocaleString()}`
+            value: c.order_count,
+            formatted_value: `${c.order_count} orders`
           }))
         },
         metadata: {
           model: 'data-aggregation-engine',
           rows_analyzed: numRows,
-          analysis_type: 'customer_profitability',
+          analysis_type: 'customer_activity',
           processing_time: Date.now() - startTime,
           timestamp: new Date().toISOString(),
-          aggregation_performed: 'GROUP BY customer_name, SUM(profit), SUM(sales), COUNT(*)',
+          aggregation_performed: 'GROUP BY customer_name, COUNT(*), SUM(quantity), SUM(discount)',
           token_usage: { prompt_tokens: 150, completion_tokens: 300, total_tokens: 450 }
         }
       };
