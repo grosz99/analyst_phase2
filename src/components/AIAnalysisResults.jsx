@@ -9,9 +9,6 @@ const AIAnalysisResults = ({
   onNewAnalysis,
   isLoading = false 
 }) => {
-  const [activeTab, setActiveTab] = useState(
-    analysisResult?.results_table ? 'results' : 'insights'
-  );
   const [exportLoading, setExportLoading] = useState(false);
 
   if (isLoading) {
@@ -51,18 +48,20 @@ const AIAnalysisResults = ({
     );
   }
 
-  const { analysis, parsedAnalysis, metadata, results_table, visualization } = analysisResult;
+  const { analysis, metadata, results_table, visualization } = analysisResult;
 
-  const handleExport = async (format) => {
+  const handleExportResults = async (format) => {
+    if (!results_table?.data) return;
+    
     try {
       setExportLoading(true);
       const timestamp = new Date().toISOString().split('T')[0];
-      const filename = `analysis_${question?.replace(/[^a-zA-Z0-9]/g, '_') || 'data'}_${timestamp}`;
+      const filename = `analysis_results_${question?.replace(/[^a-zA-Z0-9]/g, '_') || 'data'}_${timestamp}`;
       
       if (format === 'csv') {
-        aiAnalysisService.exportToCSV(originalData, filename);
+        aiAnalysisService.exportToCSV(results_table.data, filename);
       } else if (format === 'json') {
-        aiAnalysisService.exportToJSON(originalData, filename);
+        aiAnalysisService.exportToJSON(results_table.data, filename);
       }
     } catch (error) {
       console.error('Export error:', error);
@@ -89,14 +88,14 @@ const AIAnalysisResults = ({
               disabled={exportLoading}
               className="export-btn export-csv"
             >
-              {exportLoading ? '⏳' : '📊'} Export Results CSV
+              {exportLoading ? '⏳' : '📊'} Export CSV
             </button>
             <button 
               onClick={() => handleExportResults('json')} 
               disabled={exportLoading}
               className="export-btn export-json"
             >
-              {exportLoading ? '⏳' : '📄'} Export Results JSON
+              {exportLoading ? '⏳' : '📄'} Export JSON
             </button>
           </div>
         </div>
@@ -114,7 +113,6 @@ const AIAnalysisResults = ({
               {data.map((row, index) => (
                 <tr key={index}>
                   {columns.map(column => {
-                    // Map column names to row properties
                     const value = getRowValue(row, column);
                     return (
                       <td key={column}>
@@ -132,7 +130,6 @@ const AIAnalysisResults = ({
   };
 
   const getRowValue = (row, columnName) => {
-    // Map display column names to actual row properties
     const columnMap = {
       'Rank': row.rank,
       'Customer Name': row.customer_name,
@@ -145,25 +142,17 @@ const AIAnalysisResults = ({
     return columnMap[columnName] || row[columnName] || row[columnName.toLowerCase().replace(/\s+/g, '_')];
   };
 
-  const handleExportResults = async (format) => {
-    if (!results_table?.data) return;
-    
-    try {
-      setExportLoading(true);
-      const timestamp = new Date().toISOString().split('T')[0];
-      const filename = `analysis_results_${question?.replace(/[^a-zA-Z0-9]/g, '_') || 'data'}_${timestamp}`;
-      
-      if (format === 'csv') {
-        aiAnalysisService.exportToCSV(results_table.data, filename);
-      } else if (format === 'json') {
-        aiAnalysisService.exportToJSON(results_table.data, filename);
+  const formatCellValue = (value) => {
+    if (value === null || value === undefined) return '-';
+    if (typeof value === 'number') {
+      if (value > 1000) {
+        return value.toLocaleString();
       }
-    } catch (error) {
-      console.error('Export error:', error);
-      alert('Export failed: ' + error.message);
-    } finally {
-      setExportLoading(false);
+      if (value % 1 !== 0) {
+        return value.toFixed(2);
+      }
     }
+    return String(value);
   };
 
   const renderVisualization = () => {
@@ -246,226 +235,36 @@ const AIAnalysisResults = ({
     );
   };
 
-  const renderDataTable = () => {
-    if (!originalData || originalData.length === 0) return null;
-
-    const headers = Object.keys(originalData[0]);
-    const displayData = originalData.slice(0, 50); // Show first 50 rows
-
-    return (
-      <div className="data-table-container">
-        <div className="table-header">
-          <h4>📋 Data Table ({originalData.length} rows)</h4>
-          <div className="export-buttons">
-            <button 
-              onClick={() => handleExport('csv')} 
-              disabled={exportLoading}
-              className="export-btn export-csv"
-            >
-              {exportLoading ? '⏳' : '📊'} Export CSV
-            </button>
-            <button 
-              onClick={() => handleExport('json')} 
-              disabled={exportLoading}
-              className="export-btn export-json"
-            >
-              {exportLoading ? '⏳' : '📄'} Export JSON
-            </button>
-          </div>
-        </div>
-        
-        <div className="table-wrapper">
-          <table className="data-table">
-            <thead>
-              <tr>
-                {headers.map(header => (
-                  <th key={header}>{header}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {displayData.map((row, index) => (
-                <tr key={index}>
-                  {headers.map(header => (
-                    <td key={header}>
-                      {formatCellValue(row[header])}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        
-        {originalData.length > 50 && (
-          <div className="table-footer">
-            Showing first 50 rows of {originalData.length} total rows
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const formatCellValue = (value) => {
-    if (value === null || value === undefined) return '-';
-    if (typeof value === 'number') {
-      // Format large numbers with commas
-      if (value > 1000) {
-        return value.toLocaleString();
-      }
-      // Format decimals to 2 places
-      if (value % 1 !== 0) {
-        return value.toFixed(2);
-      }
-    }
-    return String(value);
-  };
-
-  const renderInsightsList = (items, icon = '•') => {
-    if (!items || items.length === 0) return <p className="no-items">No insights available</p>;
-    
-    return (
-      <ul className="insights-list">
-        {items.map((item, index) => (
-          <li key={index} className="insight-item">
-            <span className="insight-icon">{icon}</span>
-            <span className="insight-text">{item}</span>
-          </li>
-        ))}
-      </ul>
-    );
-  };
-
-
   return (
     <div className="ai-analysis-results">
-      {/* Header */}
+      {/* Clean Simple Header */}
       <div className="analysis-header">
         <div className="analysis-question">
-          <h3>🤖 AI Analysis Results</h3>
+          <h3>🤖 Analysis Results</h3>
           {question && <p className="question-text">"{question}"</p>}
         </div>
-        <div className="analysis-metadata">
-          {metadata && (
-            <div className="metadata-badges">
-              <span className="metadata-badge">
-                📊 {metadata.data_rows} rows analyzed
-              </span>
-              <span className="metadata-badge">
-                ⏱️ {metadata.total_duration}ms
-              </span>
-              <span className="metadata-badge">
-                🧠 {metadata.model}
-              </span>
-            </div>
-          )}
+        {metadata && (
+          <div className="metadata-info">
+            📊 {metadata.data_rows} rows • ⏱️ {metadata.total_duration}ms
+          </div>
+        )}
+      </div>
+
+      {/* Results Table - No Tabs, Just Show It */}
+      {results_table && (
+        <div className="results-section">
+          {renderResultsTable()}
         </div>
-      </div>
+      )}
 
-      {/* Tab Navigation */}
-      <div className="analysis-tabs">
-        <button 
-          className={`tab ${activeTab === 'insights' ? 'active' : ''}`}
-          onClick={() => setActiveTab('insights')}
-        >
-          💡 Key Insights
-        </button>
-        {results_table && (
-          <button 
-            className={`tab ${activeTab === 'results' ? 'active' : ''}`}
-            onClick={() => setActiveTab('results')}
-          >
-            📊 Analysis Results
-          </button>
-        )}
-        {visualization && (
-          <button 
-            className={`tab ${activeTab === 'visualization' ? 'active' : ''}`}
-            onClick={() => setActiveTab('visualization')}
-          >
-            📈 Visualization
-          </button>
-        )}
-        <button 
-          className={`tab ${activeTab === 'recommendations' ? 'active' : ''}`}
-          onClick={() => setActiveTab('recommendations')}
-        >
-          🎯 Recommendations
-        </button>
-        <button 
-          className={`tab ${activeTab === 'data' ? 'active' : ''}`}
-          onClick={() => setActiveTab('data')}
-        >
-          📋 Raw Data
-        </button>
-        <button 
-          className={`tab ${activeTab === 'full' ? 'active' : ''}`}
-          onClick={() => setActiveTab('full')}
-        >
-          📄 Full Analysis
-        </button>
-      </div>
+      {/* Visualization - Clean and Simple */}
+      {visualization && (
+        <div className="visualization-section">
+          {renderVisualization()}
+        </div>
+      )}
 
-      {/* Tab Content */}
-      <div className="analysis-content">
-        {activeTab === 'insights' && (
-          <div className="insights-tab">
-            <div className="insights-section">
-              <h4>🔍 Key Findings</h4>
-              {renderInsightsList(parsedAnalysis?.keyInsights, '🔍')}
-            </div>
-            
-            {parsedAnalysis?.trends && parsedAnalysis.trends.length > 0 && (
-              <div className="insights-section">
-                <h4>📈 Trends & Patterns</h4>
-                {renderInsightsList(parsedAnalysis.trends, '📈')}
-              </div>
-            )}
-          </div>
-        )}
-
-        {activeTab === 'results' && (
-          <div className="results-tab">
-            {renderResultsTable()}
-          </div>
-        )}
-
-        {activeTab === 'recommendations' && (
-          <div className="recommendations-tab">
-            <h4>🎯 Business Recommendations</h4>
-            {renderInsightsList(parsedAnalysis?.recommendations, '🎯')}
-            
-            {parsedAnalysis?.dataQuality && parsedAnalysis.dataQuality.length > 0 && (
-              <div className="quality-section">
-                <h4>⚠️ Data Quality Notes</h4>
-                {renderInsightsList(parsedAnalysis.dataQuality, '⚠️')}
-              </div>
-            )}
-          </div>
-        )}
-
-        {activeTab === 'visualization' && (
-          <div className="visualization-tab">
-            {renderVisualization()}
-          </div>
-        )}
-
-        {activeTab === 'data' && (
-          <div className="data-tab">
-            {renderDataTable()}
-          </div>
-        )}
-
-        {activeTab === 'full' && (
-          <div className="full-analysis-tab">
-            <div className="full-analysis-content">
-              <pre className="analysis-text">{analysis}</pre>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Action Buttons */}
+      {/* Simple Action */}
       <div className="analysis-actions">
         <button onClick={onNewAnalysis} className="new-analysis-btn">
           🔄 New Analysis

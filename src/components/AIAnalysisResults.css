@@ -131,41 +131,16 @@
   font-weight: 500;
 }
 
-/* Tabs */
-.analysis-tabs {
-  display: flex;
-  background: #f8f9fa;
-  border-bottom: 1px solid #dee2e6;
-  overflow-x: auto;
+.metadata-info {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
 }
 
-.tab {
-  background: none;
-  border: none;
-  padding: 1rem 1.5rem;
-  cursor: pointer;
-  font-weight: 500;
-  color: #6c757d;
-  white-space: nowrap;
-  transition: all 0.2s ease;
-  border-bottom: 3px solid transparent;
-}
-
-.tab:hover {
-  color: #00897b;
-  background: rgba(0, 137, 123, 0.05);
-}
-
-.tab.active {
-  color: #00897b;
-  background: white;
-  border-bottom-color: #00897b;
-}
-
-/* Content */
-.analysis-content {
-  padding: 2rem;
-  min-height: 400px;
+/* Content Sections */
+.results-section,
+.visualization-section {
+  margin-bottom: 2rem;
 }
 
 /* Insights */
