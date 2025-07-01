@@ -225,11 +225,11 @@ function UnifiedAnalysisView({ initialData, previewData, datasetInfo, sessionId,
 
   return (
     <div className="unified-analysis-view">
-      {/* Beacon Header */}
+      {/* Analysis Header */}
       <div className="beacon-header">
         <div className="beacon-logo">
-          <div className="logo-icon">🏗️</div>
-          <h1>Beacon</h1>
+          <div className="logo-icon">⚡</div>
+          <h1>AI Data Analysis</h1>
         </div>
         
         {/* 3-Step Process Bar */}

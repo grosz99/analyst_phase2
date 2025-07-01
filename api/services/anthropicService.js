@@ -164,26 +164,52 @@ class AnthropicService {
     const totalRows = data.length;
     const columns = Object.keys(data[0] || {});
     
-    const basePrompt = `You are a professional data analyst. Analyze this business dataset and provide actionable insights.
+    // Create context-aware prompt based on the question
+    let analysisInstructions = '';
+    const questionLower = sanitizedContext.toLowerCase();
+    
+    if (questionLower.includes('profitable') || questionLower.includes('profit')) {
+      analysisInstructions = `
+SPECIFIC ANALYSIS REQUEST: The user is asking about PROFITABILITY. 
+
+IMPORTANT: I can see this appears to be order/transaction data. If there are no explicit profit/revenue columns, please:
+1. Acknowledge that true profitability requires revenue and cost data not present in this dataset
+2. Instead analyze CUSTOMER VALUE using available metrics like order frequency, volume, etc.
+3. Explain what additional data would be needed for true profitability analysis
+4. Focus on customer value indicators rather than claiming to calculate actual profits
+
+Your answer should be honest about data limitations while providing valuable customer insights.`;
+    } else if (questionLower.includes('customer')) {
+      analysisInstructions = `
+SPECIFIC ANALYSIS REQUEST: Customer analysis. Focus on customer behavior patterns, frequency, volume, and segmentation based on available data.`;
+    } else if (questionLower.includes('region')) {
+      analysisInstructions = `
+SPECIFIC ANALYSIS REQUEST: Regional analysis. Focus on geographic patterns, regional performance differences, and location-based insights.`;
+    } else {
+      analysisInstructions = `
+GENERAL ANALYSIS REQUEST: Provide comprehensive insights based on the available data structure and patterns.`;
+    }
+
+    const basePrompt = `You are a professional data analyst. Answer the user's specific question accurately using only the available data.
 
 Dataset Information:
 - Total Rows: ${totalRows}
 - Columns: ${columns.join(', ')}
-- Analysis Type: ${analysisType}
-${sanitizedContext ? `- Context: ${sanitizedContext}` : ''}
+- User Question: "${sanitizedContext}"
+
+${analysisInstructions}
 
 Sample Data (first 5 rows):
 ${JSON.stringify(dataPreview, null, 2)}
 
-Please provide:
-1. **Key Insights**: 3-5 most important findings
-2. **Trends & Patterns**: Notable patterns in the data
-3. **Business Recommendations**: Actionable recommendations based on the analysis
-4. **Data Quality Notes**: Any data quality observations
+ANALYSIS REQUIREMENTS:
+1. **Answer the specific question asked** - don't provide generic insights
+2. **Use only available data** - don't invent metrics that aren't present  
+3. **Be transparent about limitations** - if required data is missing, explain this clearly
+4. **Provide actionable insights** based on what the data actually shows
+5. **Use clear business language** - avoid technical jargon
 
-Format your response clearly with headers and bullet points. Focus on business value and actionable insights.
-
-Important: Base your analysis only on the provided data. Do not make assumptions about data not shown.`;
+Format your response with clear headers. Focus on directly answering the user's question.`;
 
     if (basePrompt.length > this.MAX_PROMPT_LENGTH) {
       throw new Error('Analysis prompt too large. Please reduce dataset size or context.');
@@ -318,7 +344,7 @@ Important: Base your analysis only on the provided data. Do not make assumptions
     const hasCustomer = columns.some(col => col.toLowerCase().includes('customer'));
     
     // If it's a customer analysis, generate customer data table
-    if (questionLower.includes('customer') && hasCustomer) {
+    if ((questionLower.includes('customer') || questionLower.includes('profitable')) && hasCustomer) {
       const customerMap = new Map();
       
       data.forEach(row => {
@@ -352,16 +378,25 @@ Important: Base your analysis only on the provided data. Do not make assumptions
           avg_quantity: Math.round((customer.total_quantity / customer.order_count) * 100) / 100
         }));
       
+      // Determine title based on question type
+      const isProfitabilityQuestion = questionLower.includes('profitable') || questionLower.includes('profit');
+      const tableTitle = isProfitabilityQuestion ? 
+        "Customer Value Analysis (Note: Profit data not available)" : 
+        "Customer Activity Analysis";
+      const chartTitle = isProfitabilityQuestion ? 
+        "Top Customers by Order Volume (Proxy for Value)" : 
+        "Top Customers by Order Count";
+
       return {
         results_table: {
-          title: "Customer Activity Analysis",
+          title: tableTitle,
           columns: ["Rank", "Customer Name", "Orders", "Total Quantity", "Avg Quantity/Order"],
           data: customerResults,
           total_rows: customerResults.length
         },
         visualization: {
           type: "bar_chart",
-          title: "Top Customers by Order Count",
+          title: chartTitle,
           x_axis: "Customer Name",
           y_axis: "Number of Orders",
           data: customerResults.slice(0, 8).map(c => ({
