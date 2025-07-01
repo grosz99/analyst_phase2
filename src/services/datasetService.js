@@ -131,21 +131,29 @@ class DatasetService {
 
           console.log('Dataset loaded via API:', result);
           
-          let dataForUI;
+          let dataForUI, dataForAnalysis;
           
           // Check if we have real Snowflake data or need to generate mock data
-          if (result.sample_data && result.sample_data.length > 0) {
-            // Use real Snowflake sample data
-            console.log('Using real Snowflake sample data');
+          if (result.analysis_data && result.analysis_data.length > 0) {
+            // Use real Snowflake data - full dataset for analysis
+            console.log(`Using real Snowflake data: ${result.analysis_data.length} rows for analysis`);
+            dataForAnalysis = result.analysis_data;
+            dataForUI = result.sample_data || result.analysis_data.slice(0, 10); // Preview data
+          } else if (result.sample_data && result.sample_data.length > 0) {
+            // Fallback to sample data
+            console.log('Using sample data');
+            dataForAnalysis = result.sample_data;
             dataForUI = result.sample_data;
           } else {
             // Generate mock data from schema
             console.log('Generating mock data from schema');
-            dataForUI = this.generateMockDataFromSchema(result.schema, userSelections.columns);
+            dataForAnalysis = this.generateMockDataFromSchema(result.schema, userSelections.columns);
+            dataForUI = dataForAnalysis.slice(0, 10);
           }
           
           return {
-            dataset: dataForUI,
+            dataset: dataForAnalysis, // Full dataset for AI analysis
+            previewData: dataForUI, // Limited data for UI preview
             info: result.message,
             sessionId: sessionId,
             processingTime: result.processing_time || result.performance?.duration,

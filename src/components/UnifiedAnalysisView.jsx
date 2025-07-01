@@ -4,8 +4,8 @@ import AIAnalysisResults from './AIAnalysisResults.jsx';
 import ResultsTable from './ResultsTable.jsx';
 import './UnifiedAnalysisView.css';
 
-const DataPreview = ({ data, onExport }) => {
-  if (!data || data.length === 0) {
+const DataPreview = ({ previewData, totalRows, onExport }) => {
+  if (!previewData || previewData.length === 0) {
     return (
       <div className="data-preview-container">
         <h3 className="preview-title">📊 Data Preview</h3>
@@ -14,13 +14,12 @@ const DataPreview = ({ data, onExport }) => {
     );
   }
 
-  const previewData = data.slice(0, 10);
   const headers = previewData.length > 0 ? Object.keys(previewData[0]) : [];
 
   return (
     <div className="data-preview-container">
       <div className="preview-header">
-        <h3 className="preview-title">📊 Data Preview ({data.length} rows)</h3>
+        <h3 className="preview-title">📊 Data Preview ({totalRows || previewData.length} rows)</h3>
         <div className="preview-actions">
           <button onClick={() => onExport('csv')} className="export-btn">
             📊 Export CSV
@@ -31,14 +30,14 @@ const DataPreview = ({ data, onExport }) => {
         </div>
       </div>
       <ResultsTable data={previewData} headers={headers} />
-      {data.length > 10 && (
-        <p className="preview-note">Showing first 10 rows of {data.length} total rows</p>
+      {totalRows > previewData.length && (
+        <p className="preview-note">Showing first {previewData.length} rows of {totalRows} total rows</p>
       )}
     </div>
   );
 };
 
-function UnifiedAnalysisView({ initialData, datasetInfo, sessionId, onReset }) {
+function UnifiedAnalysisView({ initialData, previewData, datasetInfo, sessionId, onReset }) {
   // AI Analysis State
   const [currentQuestion, setCurrentQuestion] = useState('');
   const [analysisResult, setAnalysisResult] = useState(null);
@@ -201,7 +200,11 @@ function UnifiedAnalysisView({ initialData, datasetInfo, sessionId, onReset }) {
       </div>
 
       {/* Data Preview */}
-      <DataPreview data={initialData} onExport={handleExportData} />
+      <DataPreview 
+        previewData={previewData || initialData?.slice(0, 10)} 
+        totalRows={initialData?.length} 
+        onExport={handleExportData} 
+      />
 
       {/* Analysis Interface */}
       <div className="analysis-interface">

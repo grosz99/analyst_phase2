@@ -33,6 +33,7 @@ const DataAnalysisApp = () => {
 
   // Dataset state
   const [processedData, setProcessedData] = useState(null);
+  const [previewData, setPreviewData] = useState(null);
   const [datasetInfo, setDatasetInfo] = useState('');
   const [sessionId, setSessionId] = useState(null);
   const [isDatasetLoading, setIsDatasetLoading] = useState(false);
@@ -166,7 +167,8 @@ const DataAnalysisApp = () => {
           throw new Error('Invalid dataset result structure');
         }
         
-        setProcessedData(result.dataset);
+        setProcessedData(result.dataset); // Full dataset for AI analysis
+        setPreviewData(result.previewData || result.dataset?.slice(0, 10)); // Preview data for UI
         setDatasetInfo(result.info || 'Dataset loaded successfully');
         setSessionId(result.sessionId);
         setCurrentStep(3); // Go directly to Analysis step
@@ -194,6 +196,7 @@ const DataAnalysisApp = () => {
     setSelectedFilters({});
     setAvailableFields([]);
     setProcessedData(null);
+    setPreviewData(null);
     setDatasetInfo('');
     setSessionId(null);
   };
@@ -259,7 +262,8 @@ const DataAnalysisApp = () => {
           
           {currentStep === 3 && (
             <UnifiedAnalysisView 
-              initialData={processedData} 
+              initialData={processedData}
+              previewData={previewData}
               datasetInfo={datasetInfo}
               sessionId={sessionId}
               onReset={handleReset}

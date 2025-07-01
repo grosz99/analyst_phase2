@@ -235,32 +235,34 @@ app.post('/api/load-dataset', async (req, res) => {
 
     // Try Snowflake first
     try {
-      // Get schema and sample data from Snowflake
-      const [schema, sampleData] = await Promise.all([
+      // Get schema and full analysis data from Snowflake
+      const analysisRowLimit = userSelections.analysisMode ? 5000 : 1000; // Load more data for AI analysis
+      const [schema, analysisData] = await Promise.all([
         snowflakeService.discoverColumns(datasetId),
-        snowflakeService.sampleData(datasetId, userSelections.columns, 100)
+        snowflakeService.sampleData(datasetId, userSelections.columns, analysisRowLimit)
       ]);
       
       const duration = Date.now() - startTime;
-      console.log(`Loaded Snowflake dataset ${datasetId} in ${duration}ms`);
+      console.log(`Loaded Snowflake dataset ${datasetId} with ${analysisData.length} rows in ${duration}ms`);
       
       const result = {
         success: true,
         dataset_id: datasetId,
         schema: {
           ...schema,
-          row_count: sampleData.length,
-          memory_usage: Math.round(sampleData.length * schema.total_columns * 0.1) // Estimate
+          row_count: analysisData.length,
+          memory_usage: Math.round(analysisData.length * schema.total_columns * 0.1) // Estimate
         },
-        sample_data: sampleData.slice(0, 10), // First 10 rows for preview
+        sample_data: analysisData.slice(0, 10), // First 10 rows for preview
+        analysis_data: analysisData, // Full data for AI analysis
         filters_applied: userSelections,
-        message: `Loaded ${datasetId.toUpperCase()} with ${schema.total_columns} columns from Snowflake`,
+        message: `Loaded ${datasetId.toUpperCase()} with ${schema.total_columns} columns (${analysisData.length} rows) from Snowflake`,
         processing_time: duration,
         timestamp: new Date().toISOString(),
         source: 'snowflake',
         performance: {
           duration: duration,
-          rows_sampled: sampleData.length
+          rows_sampled: analysisData.length
         }
       };
 
@@ -548,7 +550,7 @@ app.get('/api/ai/status', (req, res) => {
 // Main AI Analysis Endpoint
 app.post('/api/ai/analyze', async (req, res) => {
   try {
-    const { data, analysisType, userContext, sessionId } = req.body;
+    const { data, analysisType, userContext, question, sessionId } = req.body;
     const startTime = Date.now();
     
     // Input validation
@@ -571,13 +573,14 @@ app.post('/api/ai/analyze', async (req, res) => {
     // Security: Use session ID for rate limiting (or IP as fallback)
     const identifier = sessionId || req.ip || 'anonymous';
     
-    console.log(`🤖 AI Analysis request: ${data.length} rows, type: ${analysisType || 'general'}`);
+    const questionText = question || userContext || '';
+    console.log(`🤖 AI Analysis request: ${data.length} rows, question: "${questionText}", type: ${analysisType || 'general'}`);
     
     // Perform secure AI analysis
     const result = await anthropicService.analyzeData(
       data, 
       analysisType || 'general',
-      userContext || '',
+      questionText,
       identifier
     );
     
