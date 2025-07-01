@@ -319,6 +319,7 @@ const AIAnalysisResults = ({
         {activeTab === 'results' && renderResultsTable()}
         {activeTab === 'visualization' && renderVisualization()}
       </div>
+      </div>
 
       {/* Suggested Questions */}
       <div className="suggested-questions">
