@@ -16,26 +16,34 @@ class AnthropicService {
 
   initializeClient() {
     try {
-      // Load credentials securely from environment file
-      const credentialsPath = path.resolve(__dirname, '../../snowcred.env');
-      
-      if (!fs.existsSync(credentialsPath)) {
-        console.warn('Anthropic credentials file not found. AI analysis will be disabled.');
-        return;
-      }
+      let apiKey = null;
 
-      // Parse environment file securely
-      const credentialsContent = fs.readFileSync(credentialsPath, 'utf8');
-      const credentials = {};
-      
-      credentialsContent.split('\n').forEach(line => {
-        const [key, value] = line.split('=');
-        if (key && value) {
-          credentials[key.trim()] = value.trim().replace(/['"]/g, '');
+      // Try environment variable first (for production/Vercel)
+      if (process.env.ANTHROPIC_API_KEY) {
+        apiKey = process.env.ANTHROPIC_API_KEY;
+        console.log('✅ Using Anthropic API key from environment variable');
+      } else {
+        // Fallback to local credentials file (for development)
+        const credentialsPath = path.resolve(__dirname, '../../snowcred.env');
+        
+        if (fs.existsSync(credentialsPath)) {
+          // Parse environment file securely
+          const credentialsContent = fs.readFileSync(credentialsPath, 'utf8');
+          const credentials = {};
+          
+          credentialsContent.split('\n').forEach(line => {
+            const [key, value] = line.split('=');
+            if (key && value) {
+              credentials[key.trim()] = value.trim().replace(/['"]/g, '');
+            }
+          });
+
+          apiKey = credentials.ANTHROPIC_API_KEY;
+          if (apiKey) {
+            console.log('✅ Using Anthropic API key from local credentials file');
+          }
         }
-      });
-
-      const apiKey = credentials.ANTHROPIC_API_KEY;
+      }
       
       if (!apiKey) {
         console.warn('ANTHROPIC_API_KEY not found in credentials. AI analysis will be disabled.');
