@@ -336,64 +336,6 @@ const AIAnalysisResults = ({
     );
   };
 
-  const renderVisualization = () => {
-    // Simple data summary visualization
-    if (!originalData || originalData.length === 0) return null;
-
-    const numericColumns = Object.keys(originalData[0]).filter(key => 
-      typeof originalData[0][key] === 'number' && originalData[0][key] !== null
-    );
-
-    if (numericColumns.length === 0) return <p>No numeric data for visualization</p>;
-
-    const stats = numericColumns.map(column => {
-      const values = originalData.map(row => row[column]).filter(val => val !== null && !isNaN(val));
-      const sum = values.reduce((a, b) => a + b, 0);
-      const avg = sum / values.length;
-      const max = Math.max(...values);
-      const min = Math.min(...values);
-
-      return {
-        column,
-        count: values.length,
-        sum: sum,
-        average: avg,
-        max: max,
-        min: min
-      };
-    });
-
-    return (
-      <div className="visualization-container">
-        <h4>📈 Data Summary</h4>
-        <div className="stats-grid">
-          {stats.map(stat => (
-            <div key={stat.column} className="stat-card">
-              <h5>{stat.column}</h5>
-              <div className="stat-values">
-                <div className="stat-item">
-                  <span className="stat-label">Average:</span>
-                  <span className="stat-value">{stat.average.toLocaleString(undefined, {maximumFractionDigits: 2})}</span>
-                </div>
-                <div className="stat-item">
-                  <span className="stat-label">Max:</span>
-                  <span className="stat-value">{stat.max.toLocaleString()}</span>
-                </div>
-                <div className="stat-item">
-                  <span className="stat-label">Min:</span>
-                  <span className="stat-value">{stat.min.toLocaleString()}</span>
-                </div>
-                <div className="stat-item">
-                  <span className="stat-label">Total:</span>
-                  <span className="stat-value">{stat.sum.toLocaleString()}</span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
 
   return (
     <div className="ai-analysis-results">
