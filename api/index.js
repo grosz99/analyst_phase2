@@ -591,6 +591,8 @@ app.post('/api/ai/analyze', async (req, res) => {
       res.json({
         success: true,
         analysis: result.analysis,
+        results_table: result.results_table,
+        visualization: result.visualization,
         metadata: {
           ...result.metadata,
           total_duration: totalDuration,

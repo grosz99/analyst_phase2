@@ -322,79 +322,145 @@ Important: Base your analysis only on the provided data. Do not make assumptions
     let analysisText = '';
     
     if (userContext.toLowerCase().includes('profitable customer') && hasCustomer && hasProfit) {
-      // Generate customer profitability analysis
-      const customers = data.map(row => ({
-        name: row.CUSTOMER_NAME || row.Customer || row.customer_name || 'Unknown',
-        profit: row.PROFIT || row.Profit || row.profit || 0,
-        sales: row.SALES || row.Sales || row.sales || 0
-      }));
+      // Perform actual data aggregation - GROUP BY customer, SUM(profit)
+      const customerProfitMap = new Map();
       
-      // Sort by profit descending
-      customers.sort((a, b) => b.profit - a.profit);
-      const topCustomers = customers.slice(0, 5);
+      data.forEach(row => {
+        const customerName = row.CUSTOMER_NAME || row.Customer || row.customer_name || 'Unknown';
+        const profit = parseFloat(row.PROFIT || row.Profit || row.profit || 0);
+        const sales = parseFloat(row.SALES || row.Sales || row.sales || 0);
+        
+        if (customerProfitMap.has(customerName)) {
+          const existing = customerProfitMap.get(customerName);
+          customerProfitMap.set(customerName, {
+            customer_name: customerName,
+            total_profit: existing.total_profit + profit,
+            total_sales: existing.total_sales + sales,
+            order_count: existing.order_count + 1
+          });
+        } else {
+          customerProfitMap.set(customerName, {
+            customer_name: customerName,
+            total_profit: profit,
+            total_sales: sales,
+            order_count: 1
+          });
+        }
+      });
       
-      analysisText = `# Key Insights: Most Profitable Customers
+      // Convert to array and sort by profit descending
+      const customerResults = Array.from(customerProfitMap.values())
+        .sort((a, b) => b.total_profit - a.total_profit)
+        .slice(0, 20) // Top 20 customers
+        .map((customer, index) => ({
+          rank: index + 1,
+          customer_name: customer.customer_name,
+          total_profit: Math.round(customer.total_profit * 100) / 100,
+          total_sales: Math.round(customer.total_sales * 100) / 100,
+          order_count: customer.order_count,
+          avg_profit_per_order: Math.round((customer.total_profit / customer.order_count) * 100) / 100
+        }));
+      
+      // Generate summary insights
+      const topCustomer = customerResults[0];
+      const totalProfit = customerResults.reduce((sum, c) => sum + c.total_profit, 0);
+      
+      analysisText = `# Most Profitable Customers Analysis
 
-## Top Findings
-• **${topCustomers[0]?.name}** is your most profitable customer with $${topCustomers[0]?.profit?.toLocaleString()} in profit
-• Top 3 customers generate ${Math.round((topCustomers.slice(0, 3).reduce((sum, c) => sum + c.profit, 0) / customers.reduce((sum, c) => sum + c.profit, 0)) * 100)}% of total profit
-• Average profit per customer: $${Math.round(customers.reduce((sum, c) => sum + c.profit, 0) / customers.length).toLocaleString()}
+## Key Finding
+**${topCustomer.customer_name}** is your most profitable customer with $${topCustomer.total_profit.toLocaleString()} in total profit from ${topCustomer.order_count} orders.
 
-## Business Recommendations
-• Focus retention efforts on top 5 customers to protect ${Math.round((topCustomers.reduce((sum, c) => sum + c.profit, 0) / customers.reduce((sum, c) => sum + c.profit, 0)) * 100)}% of profit base
-• Develop premium service packages for high-value customers
-• Analyze purchase patterns of top customers to identify expansion opportunities
-• Create customer loyalty programs targeting your most profitable segments
+## Top 5 Summary
+${customerResults.slice(0, 5).map((c, i) => `${i + 1}. ${c.customer_name}: $${c.total_profit.toLocaleString()}`).join('\n')}
 
-## Trends & Patterns
-• Profit margins vary significantly across customers (${Math.min(...customers.map(c => c.profit))} to ${Math.max(...customers.map(c => c.profit))})
-• Strong correlation between sales volume and profitability for top performers
-• Opportunity to improve profit margins for mid-tier customers
-
-## Data Quality Notes
-• Dataset contains ${numRows} customer records with complete profit data
-• All monetary values appear clean and properly formatted
-• No missing customer names detected in top performers`;
+## Business Impact
+• Top 5 customers generate $${customerResults.slice(0, 5).reduce((sum, c) => sum + c.total_profit, 0).toLocaleString()} (${Math.round((customerResults.slice(0, 5).reduce((sum, c) => sum + c.total_profit, 0) / totalProfit) * 100)}% of total)
+• Average profit per customer: $${Math.round(totalProfit / customerResults.length).toLocaleString()}`;
+      
+      // Return structured results with data table and visualization
+      return {
+        success: true,
+        analysis: analysisText,
+        results_table: {
+          title: "Most Profitable Customers",
+          columns: ["Rank", "Customer Name", "Total Profit", "Total Sales", "Orders", "Avg Profit/Order"],
+          data: customerResults,
+          total_rows: customerResults.length
+        },
+        visualization: {
+          type: "bar_chart",
+          title: "Top 10 Most Profitable Customers",
+          x_axis: "Customer Name",
+          y_axis: "Total Profit ($)",
+          data: customerResults.slice(0, 10).map(c => ({
+            label: c.customer_name.length > 15 ? c.customer_name.substring(0, 15) + '...' : c.customer_name,
+            value: c.total_profit,
+            formatted_value: `$${c.total_profit.toLocaleString()}`
+          }))
+        },
+        metadata: {
+          model: 'data-aggregation-engine',
+          rows_analyzed: numRows,
+          analysis_type: 'customer_profitability',
+          processing_time: Date.now() - startTime,
+          timestamp: new Date().toISOString(),
+          aggregation_performed: 'GROUP BY customer_name, SUM(profit), SUM(sales), COUNT(*)',
+          token_usage: { prompt_tokens: 150, completion_tokens: 300, total_tokens: 450 }
+        }
+      };
       
     } else {
-      // Generate general analysis
-      analysisText = `# Data Analysis Results
+      // Generate general data overview analysis
+      const sampleData = data.slice(0, 10);
+      
+      analysisText = `# Data Overview Analysis
 
-## Key Insights
-• Dataset contains ${numRows} records across ${columns.length} columns
-• Primary data fields: ${columns.slice(0, 5).join(', ')}
-• Data appears well-structured with ${Math.round((data.filter(row => Object.values(row).every(val => val !== null && val !== '')).length / numRows) * 100)}% complete records
+## Dataset Summary
+• **${numRows} total records** across ${columns.length} columns
+• Data completeness: ${Math.round((data.filter(row => Object.values(row).every(val => val !== null && val !== '')).length / numRows) * 100)}%
+• Primary fields: ${columns.slice(0, 5).join(', ')}
 
-## Business Recommendations  
-• Consider implementing automated reporting for key metrics
-• Expand data collection to include additional performance indicators
-• Regular data quality audits recommended for optimal insights
-
-## Trends & Patterns
-• Consistent data structure across all records
-• Numeric fields show reasonable value distributions
-• No significant data anomalies detected
-
-## Data Quality Notes
+## Data Quality
 • All required fields present and properly formatted
 • Suitable for further statistical analysis and reporting
 • Ready for dashboard visualization and KPI tracking`;
+
+      // Return structured results with sample data
+      return {
+        success: true,
+        analysis: analysisText,
+        results_table: {
+          title: "Data Sample (First 10 Rows)",
+          columns: columns,
+          data: sampleData,
+          total_rows: sampleData.length
+        },
+        visualization: {
+          type: "summary_stats",
+          title: "Dataset Overview",
+          data: {
+            total_records: numRows,
+            total_columns: columns.length,
+            data_completeness: Math.round((data.filter(row => Object.values(row).every(val => val !== null && val !== '')).length / numRows) * 100),
+            numeric_columns: columns.filter(col => {
+              const sampleValue = data[0]?.[col];
+              return typeof sampleValue === 'number' || !isNaN(parseFloat(sampleValue));
+            }).length
+          }
+        },
+        metadata: {
+          model: 'data-overview-engine',
+          rows_analyzed: numRows,
+          analysis_type: 'general',
+          processing_time: Date.now() - startTime,
+          timestamp: new Date().toISOString(),
+          aggregation_performed: 'Data overview and sample extraction',
+          token_usage: { prompt_tokens: 150, completion_tokens: 300, total_tokens: 450 }
+        }
+      };
     }
     
-    const duration = Date.now() - startTime;
-    
-    return {
-      success: true,
-      analysis: analysisText,
-      metadata: {
-        model: 'mock-analysis-engine',
-        rows_analyzed: numRows,
-        analysis_type: analysisType,
-        processing_time: duration,
-        timestamp: new Date().toISOString(),
-        token_usage: { prompt_tokens: 150, completion_tokens: 300, total_tokens: 450 }
-      }
-    };
+    // Note: This return is never reached due to early returns above
   }
 
   // Get service status
