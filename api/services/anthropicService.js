@@ -202,6 +202,18 @@ SPECIFIC ANALYSIS REQUEST: Customer analysis. Focus on customer behavior pattern
     } else if (questionLower.includes('region')) {
       analysisInstructions = `
 SPECIFIC ANALYSIS REQUEST: Regional analysis. Focus on geographic patterns, regional performance differences, and location-based insights.`;
+    } else if (questionLower.includes('segment') || questionLower.includes('category')) {
+      analysisInstructions = `
+SPECIFIC ANALYSIS REQUEST: Segment/Category analysis. Analyze performance across different segments or categories using available grouping data.
+
+IMPORTANT: This dataset contains segment/category data. Please:
+1. Group by segment/category columns and aggregate metrics
+2. Rank segments by total sales, profit, or volume
+3. Identify top-performing segments
+4. Calculate segment contribution percentages
+5. Provide insights about segment performance differences
+
+Focus on delivering segment-specific analysis using groupby operations.`;
     } else {
       analysisInstructions = `
 GENERAL ANALYSIS REQUEST: Provide comprehensive insights based on the available data structure and patterns.`;
@@ -468,7 +480,7 @@ Focus on writing efficient Python code that directly answers the user's question
       }
       
       // Detect product columns
-      if (colLower.includes('product') || colLower.includes('item') || colLower.includes('category')) {
+      if (colLower.includes('product') || colLower.includes('item') || colLower.includes('category') || colLower.includes('segment')) {
         profile.hasProduct = true;
         profile.categoricalColumns.push(col);
       }
@@ -597,57 +609,72 @@ Focus on writing efficient Python code that directly answers the user's question
       });
     }
     
-    // Always suggest questions that work well with current data structure
-    const hasCustomer = columns.some(col => col.toLowerCase().includes('customer'));
-    const hasRegion = columns.some(col => col.toLowerCase().includes('region'));
-    const hasDate = columns.some(col => col.toLowerCase().includes('date'));
-    const hasProduct = columns.some(col => col.toLowerCase().includes('product'));
+    // Always suggest intelligent follow-up questions based on data structure
+    // This ensures users always see the blue suggestion box
     
-    // Add intelligent suggestions based on data capabilities
-    if (refinedQuestions.length < 3) {
-      // Prioritize by data richness
+    // Add general intelligent suggestions based on what data is available
+    if (refinedQuestions.length < 4) {
+      // Generate suggestions based on data structure
       dataProfile.possibleAnalyses.forEach(analysisType => {
         if (refinedQuestions.length >= 4) return;
         
         switch(analysisType) {
           case 'customer_analysis':
-            refinedQuestions.push({
-              question: "Show me customer behavior patterns and trends",
-              reason: `Comprehensive analysis using ${dataProfile.categoricalColumns.filter(c => c.toLowerCase().includes('customer')).join(', ')} data`
-            });
+            if (dataProfile.hasCustomer) {
+              refinedQuestions.push({
+                question: "Which customers drive the most business value?",
+                reason: "Customer value analysis using available customer data"
+              });
+            }
             break;
             
           case 'regional_analysis':
-            const regionCols = dataProfile.categoricalColumns.filter(c => c.toLowerCase().includes('region') || c.toLowerCase().includes('country'));
-            refinedQuestions.push({
-              question: `Compare performance across different ${regionCols[0] || 'regions'}`,
-              reason: "Geographic comparison using location data"
-            });
+            if (dataProfile.hasRegion) {
+              const regionCol = dataProfile.categoricalColumns.find(c => c.toLowerCase().includes('region'));
+              refinedQuestions.push({
+                question: `Which ${regionCol || 'regions'} are performing best?`,
+                reason: "Geographic performance comparison"
+              });
+            }
             break;
             
           case 'product_analysis':
-            const productCols = dataProfile.categoricalColumns.filter(c => c.toLowerCase().includes('product') || c.toLowerCase().includes('category'));
-            refinedQuestions.push({
-              question: `What are the top performing ${productCols[0] || 'products'}?`,
-              reason: "Product performance analysis using catalog data"
-            });
+            if (dataProfile.hasProduct) {
+              const productCol = dataProfile.categoricalColumns.find(c => c.toLowerCase().includes('product') || c.toLowerCase().includes('category'));
+              refinedQuestions.push({
+                question: `What are the top selling ${productCol || 'products'}?`,
+                reason: "Product performance analysis"
+              });
+            }
             break;
             
           case 'temporal_analysis':
-            refinedQuestions.push({
-              question: "What are the trends in our data over time?",
-              reason: "Time-based analysis using date information"
-            });
-            break;
-            
-          case 'segmentation_analysis':
-            refinedQuestions.push({
-              question: `How do ${dataProfile.numericColumns[0]} vary by ${dataProfile.categoricalColumns[0]}?`,
-              reason: "Segmentation analysis comparing categories to metrics"
-            });
+            if (dataProfile.hasDate) {
+              refinedQuestions.push({
+                question: "What are the trends over time?",
+                reason: "Time-based pattern analysis"
+              });
+            }
             break;
         }
       });
+    }
+    
+    // Add some general follow-up questions if we still don't have enough
+    if (refinedQuestions.length < 3) {
+      if (dataProfile.hasFinancial) {
+        refinedQuestions.push({
+          question: "What are the key financial drivers?",
+          reason: "Financial performance analysis"
+        });
+      }
+      
+      if (dataProfile.categoricalColumns.length > 0 && dataProfile.numericColumns.length > 0) {
+        refinedQuestions.push({
+          question: `How does ${dataProfile.numericColumns[0]} vary by ${dataProfile.categoricalColumns[0]}?`,
+          reason: "Segmentation analysis"
+        });
+      }
     }
     
     return refinedQuestions.slice(0, 4); // Return max 4 suggestions
@@ -655,11 +682,14 @@ Focus on writing efficient Python code that directly answers the user's question
 
   // Generate structured results from AI analysis text
   generateStructuredResults(data, userContext, analysisText) {
-    const questionLower = userContext.toLowerCase();
-    const columns = Object.keys(data[0] || {});
-    const hasCustomer = columns.some(col => col.toLowerCase().includes('customer'));
-    const hasProfit = columns.some(col => col.toLowerCase().includes('profit'));
-    const hasSales = columns.some(col => col.toLowerCase().includes('sales'));
+    try {
+      const questionLower = userContext.toLowerCase();
+      const columns = Object.keys(data[0] || {});
+      const hasCustomer = columns.some(col => col.toLowerCase().includes('customer'));
+      const hasProfit = columns.some(col => col.toLowerCase().includes('profit'));
+      const hasSales = columns.some(col => col.toLowerCase().includes('sales'));
+      const hasSegment = columns.some(col => col.toLowerCase().includes('segment'));
+      const hasCategory = columns.some(col => col.toLowerCase().includes('category'));
     
     // If it's a customer profitability analysis and we have profit/sales data
     if ((questionLower.includes('customer') || questionLower.includes('profitable')) && hasCustomer) {
@@ -750,6 +780,76 @@ Focus on writing efficient Python code that directly answers the user's question
       };
     }
     
+    // Segment analysis
+    if ((questionLower.includes('segment') || questionLower.includes('category')) && 
+        (hasSegment || hasCategory)) {
+      const segmentMap = new Map();
+      const segmentCol = columns.find(col => col.toLowerCase().includes('segment')) || 
+                        columns.find(col => col.toLowerCase().includes('category'));
+      
+      data.forEach(row => {
+        const segment = row[segmentCol] || row.SEGMENT || row.Category || row.CATEGORY || 'Unknown';
+        const sales = parseFloat(row.SALES || row.Sales || row.sales || 0);
+        const profit = parseFloat(row.PROFIT || row.Profit || row.profit || 0);
+        const quantity = parseFloat(row.QUANTITY || row.Quantity || row.quantity || 1);
+        
+        if (segmentMap.has(segment)) {
+          const existing = segmentMap.get(segment);
+          segmentMap.set(segment, {
+            segment: segment,
+            total_sales: existing.total_sales + sales,
+            total_profit: existing.total_profit + profit,
+            total_quantity: existing.total_quantity + quantity,
+            order_count: existing.order_count + 1
+          });
+        } else {
+          segmentMap.set(segment, {
+            segment: segment,
+            total_sales: sales,
+            total_profit: profit,
+            total_quantity: quantity,
+            order_count: 1
+          });
+        }
+      });
+      
+      const sortBy = hasSales ? 'total_sales' : hasProfit ? 'total_profit' : 'total_quantity';
+      const segmentResults = Array.from(segmentMap.values())
+        .sort((a, b) => b[sortBy] - a[sortBy])
+        .slice(0, 10)
+        .map((segment, index) => ({
+          rank: index + 1,
+          segment: segment.segment,
+          total_sales: Math.round(segment.total_sales * 100) / 100,
+          total_profit: Math.round(segment.total_profit * 100) / 100,
+          total_quantity: Math.round(segment.total_quantity * 100) / 100,
+          order_count: segment.order_count
+        }));
+      
+      const isStorageQuestion = questionLower.includes('storage');
+      const titleMetric = hasSales ? 'Sales' : hasProfit ? 'Profit' : 'Volume';
+      
+      return {
+        results_table: {
+          title: `Top Segments by ${titleMetric}${isStorageQuestion ? ' (Storage Focus)' : ''}`,
+          columns: ["Rank", "Segment", "Total Sales", "Total Profit", "Total Quantity", "Orders"],
+          data: segmentResults,
+          total_rows: segmentResults.length
+        },
+        visualization: {
+          type: "bar_chart",
+          title: `Segment Performance by ${titleMetric}`,
+          x_axis: "Segment",
+          y_axis: hasSales ? "Total Sales ($)" : hasProfit ? "Total Profit ($)" : "Total Quantity",
+          data: segmentResults.slice(0, 8).map(s => ({
+            label: s.segment,
+            value: s[sortBy],
+            formatted_value: (hasSales || hasProfit) ? `$${s[sortBy].toLocaleString()}` : s[sortBy].toLocaleString()
+          }))
+        }
+      };
+    }
+    
     // Default: return basic data summary
     return {
       results_table: {
@@ -771,6 +871,26 @@ Focus on writing efficient Python code that directly answers the user's question
         }
       }
     };
+    } catch (error) {
+      console.error('Error generating structured results:', error);
+      // Return fallback data structure
+      return {
+        results_table: {
+          title: "Analysis Results",
+          columns: ["Metric", "Value"],
+          data: [
+            { metric: "Total Records", value: data.length },
+            { metric: "Analysis Status", value: "Completed with basic summary" }
+          ],
+          total_rows: 2
+        },
+        visualization: {
+          type: "summary_stats",
+          title: "Data Overview",
+          data: { total_records: data.length }
+        }
+      };
+    }
   }
 
   // Generate analysis by actually executing data operations (like Python would)
