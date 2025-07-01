@@ -1,166 +1,312 @@
 import React, { useState, useEffect, useRef } from 'react';
-import analysisService from '../services/analysisService.js';
+import aiAnalysisService from '../services/aiAnalysisService.js';
+import AIAnalysisResults from './AIAnalysisResults.jsx';
 import ResultsTable from './ResultsTable.jsx';
-import LineChart from './LineChart.jsx';
 import './UnifiedAnalysisView.css';
-import { Tabs, Tab } from './Tabs.jsx';
-import './Tabs.css';
 
-const DataPreview = ({ data }) => {
+const DataPreview = ({ data, onExport }) => {
   if (!data || data.length === 0) {
     return (
       <div className="data-preview-container">
-        <h3 className="preview-title">Data Preview</h3>
+        <h3 className="preview-title">📊 Data Preview</h3>
         <p className="placeholder-text">No data available for preview.</p>
       </div>
     );
   }
 
-  const previewData = data.slice(0, 5);
-  // Ensure there's data to get headers from
+  const previewData = data.slice(0, 10);
   const headers = previewData.length > 0 ? Object.keys(previewData[0]) : [];
 
   return (
     <div className="data-preview-container">
-      <h3 className="preview-title">Data Preview (First 5 Rows)</h3>
+      <div className="preview-header">
+        <h3 className="preview-title">📊 Data Preview ({data.length} rows)</h3>
+        <div className="preview-actions">
+          <button onClick={() => onExport('csv')} className="export-btn">
+            📊 Export CSV
+          </button>
+          <button onClick={() => onExport('json')} className="export-btn">
+            📄 Export JSON
+          </button>
+        </div>
+      </div>
       <ResultsTable data={previewData} headers={headers} />
+      {data.length > 10 && (
+        <p className="preview-note">Showing first 10 rows of {data.length} total rows</p>
+      )}
     </div>
   );
 };
 
 function UnifiedAnalysisView({ initialData, datasetInfo, sessionId, onReset }) {
-  const [analysisHistory, setAnalysisHistory] = useState([]);
+  // AI Analysis State
   const [currentQuestion, setCurrentQuestion] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState(null);
-  const [suggestedQuestions, setSuggestedQuestions] = useState(['What are the top regions by sales?', 'Show me total profit per product.', 'How do sales trend over time?']);
-  const [analysisContext, setAnalysisContext] = useState('original');
-  const resultsEndRef = useRef(null);
+  const [aiServiceStatus, setAiServiceStatus] = useState(null);
+  
+  // Suggested Questions State
+  const [suggestedQuestions, setSuggestedQuestions] = useState([]);
+  const [analysisTypes, setAnalysisTypes] = useState([]);
+  const [selectedAnalysisType, setSelectedAnalysisType] = useState('general');
+  
+  const questionInputRef = useRef(null);
 
+  // Initialize AI service and load suggestions
   useEffect(() => {
-    resultsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [analysisHistory]);
+    const initializeAI = async () => {
+      try {
+        // Check AI service status
+        const status = await aiAnalysisService.getStatus();
+        setAiServiceStatus(status);
+        
+        // Load analysis types
+        const types = await aiAnalysisService.getAnalysisTypes();
+        setAnalysisTypes(types);
+        
+        // Generate suggested questions based on data
+        if (initialData && initialData.length > 0) {
+          const suggestions = aiAnalysisService.generateSuggestedQuestions(initialData);
+          setSuggestedQuestions(suggestions);
+        }
+      } catch (error) {
+        console.error('Failed to initialize AI service:', error);
+        setError('AI service initialization failed');
+      }
+    };
 
-  const handleAskQuestion = async (e, suggestedQuestion = null) => {
-    if (e) e.preventDefault();
-    const questionToAsk = suggestedQuestion || currentQuestion;
-    if (!questionToAsk.trim() || isLoading) return;
+    initializeAI();
+  }, [initialData]);
 
-    const question = questionToAsk;
-    setCurrentQuestion('');
-    setIsLoading(true);
-    setError(null);
-    if(!suggestedQuestion) {
-        setSuggestedQuestions([]);
+  // Handle AI Analysis
+  const handleAnalyzeData = async (question = '', analysisType = 'general') => {
+    if (!initialData || initialData.length === 0) {
+      setError('No data available for analysis');
+      return;
     }
+
+    if (!question.trim() && analysisType === 'general') {
+      setError('Please enter a question or select an analysis type');
+      return;
+    }
+
+    setIsAnalyzing(true);
+    setError(null);
+    setCurrentQuestion('');
 
     try {
-      const context = analysisHistory.map(h => h.question).join('\n');
-      const dataSource = analysisContext === 'original' || analysisHistory.length === 0 ? initialData : analysisHistory[analysisHistory.length - 1].tableData;
-      const result = await analysisService.getAnalysis(question, context, sessionId, dataSource);
-      setAnalysisHistory(prev => [...prev, { question, ...result }]);
-      setSuggestedQuestions(result.followUpQuestions || []);
-    } catch (err) {
-      const errorMessage = err.message || 'An error occurred during analysis.';
-      setError(errorMessage);
+      console.log('🤖 Starting AI analysis:', { question, analysisType, dataRows: initialData.length });
+      
+      const result = await aiAnalysisService.analyzeData(
+        initialData,
+        question || `Perform ${analysisType} analysis`,
+        analysisType,
+        sessionId
+      );
+
+      console.log('✅ AI analysis result:', result);
+      setAnalysisResult(result);
+
+      // Generate new suggestions based on the analysis
+      if (result.success && initialData) {
+        const newSuggestions = aiAnalysisService.generateSuggestedQuestions(initialData);
+        setSuggestedQuestions(newSuggestions);
+      }
+
+    } catch (error) {
+      console.error('❌ AI analysis error:', error);
+      setError(error.message || 'Analysis failed. Please try again.');
     } finally {
-      setIsLoading(false);
+      setIsAnalyzing(false);
     }
+  };
+
+  // Handle question submission
+  const handleSubmitQuestion = async (e) => {
+    e.preventDefault();
+    if (!currentQuestion.trim() || isAnalyzing) return;
+    
+    await handleAnalyzeData(currentQuestion, selectedAnalysisType);
+  };
+
+  // Handle suggested question click
+  const handleSuggestedQuestion = async (question) => {
+    setCurrentQuestion(question);
+    await handleAnalyzeData(question, selectedAnalysisType);
+  };
+
+  // Handle analysis type change
+  const handleAnalysisTypeChange = (typeId) => {
+    setSelectedAnalysisType(typeId);
+    if (currentQuestion.trim()) {
+      // Re-analyze with new type if there's a current question
+      handleAnalyzeData(currentQuestion, typeId);
+    }
+  };
+
+  // Handle data export
+  const handleExportData = async (format) => {
+    try {
+      const timestamp = new Date().toISOString().split('T')[0];
+      const filename = `dataset_${timestamp}`;
+      
+      if (format === 'csv') {
+        aiAnalysisService.exportToCSV(initialData, filename);
+      } else if (format === 'json') {
+        aiAnalysisService.exportToJSON(initialData, filename);
+      }
+    } catch (error) {
+      console.error('Export error:', error);
+      alert('Export failed: ' + error.message);
+    }
+  };
+
+  // Reset analysis
+  const handleNewAnalysis = () => {
+    setAnalysisResult(null);
+    setCurrentQuestion('');
+    setError(null);
+    setSelectedAnalysisType('general');
+    questionInputRef.current?.focus();
   };
 
   return (
     <div className="unified-analysis-view">
-      <div className="results-section">
-        {!isLoading && !error && (
-          <>
-            <DataPreview data={initialData} />
-            {analysisHistory.map((result, index) => (
-              <div key={index} className="result-block">
-                <h2 className="result-question">{result.question}</h2>
-                {result.answer && <p className="result-answer">{result.answer}</p>}
-                <div className="result-content">
-                  <Tabs>
-                    <Tab label="Results">
-                      {result.tableData && result.tableData.length > 0 
-                        ? <ResultsTable data={result.tableData} /> 
-                        : <p>No table data available for this result.</p>}
-                    </Tab>
-                    <Tab label="Visualization">
-                      {result.chartData 
-                        ? <LineChart chartData={result.chartData} /> 
-                        : <p>No visualization available for this result.</p>}
-                    </Tab>
-                  </Tabs>
-                </div>
-              </div>
-            ))}
-          </>
-        )}
-
-        {isLoading && (
-          <div className="loading-shimmer">
-            <p>Analyzing your data...</p>
-          </div>
-        )}
-        <div ref={resultsEndRef} />
-      </div>
-
-      <div className="interaction-area">
-        {suggestedQuestions.length > 0 && !isLoading && (
-          <div className="suggested-questions">
-            {suggestedQuestions.map((q, i) => (
-              <button key={i} onClick={() => handleAskQuestion(null, q)} className="suggestion-chip">
-                {q}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {analysisHistory.length > 0 && !isLoading && (
-          <div className="context-selection">
-            <span className="context-label">Analyze based on:</span>
-            <label>
-              <input
-                type="radio"
-                name="analysisContext"
-                value="original"
-                checked={analysisContext === 'original'}
-                onChange={() => setAnalysisContext('original')}
-              />
-              Original Data
-            </label>
-            <label>
-              <input
-                type="radio"
-                name="analysisContext"
-                value="previous"
-                checked={analysisContext === 'previous'}
-                onChange={() => setAnalysisContext('previous')}
-              />
-              Previous Result
-            </label>
-          </div>
-        )}
-        <form onSubmit={(e) => handleAskQuestion(e)} className="question-form">
-          <input
-            type="text"
-            value={currentQuestion}
-            onChange={(e) => setCurrentQuestion(e.target.value)}
-            placeholder={isLoading ? 'Analyzing...' : 'Ask a follow-up question...'}
-            disabled={isLoading}
-          />
-          <button type="submit" disabled={isLoading || !currentQuestion.trim()}>
-            Ask
-          </button>
-        </form>
-        {error && <p className="error-message">Error: {error}</p>}
-      </div>
-
-      <div className="footer-actions">
-        <button onClick={onReset} className="reset-button">
-          Start New Analysis
+      {/* Header */}
+      <div className="analysis-header">
+        <div className="header-content">
+          <h1 className="header-title">🤖 AI-Powered Data Analysis</h1>
+          <p className="header-subtitle">{datasetInfo}</p>
+          
+          {/* AI Service Status */}
+          {aiServiceStatus && (
+            <div className="ai-status">
+              {aiServiceStatus.success ? (
+                <span className="status-badge status-healthy">
+                  ✅ AI Analysis Ready
+                </span>
+              ) : (
+                <span className="status-badge status-error">
+                  ❌ AI Service Unavailable
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+        
+        <button onClick={onReset} className="reset-btn">
+          🔄 New Dataset
         </button>
       </div>
+
+      {/* Data Preview */}
+      <DataPreview data={initialData} onExport={handleExportData} />
+
+      {/* Analysis Interface */}
+      <div className="analysis-interface">
+        {/* Question Input */}
+        <form onSubmit={handleSubmitQuestion} className="question-form">
+          <div className="form-header">
+            <h3>🔍 Ask a Question About Your Data</h3>
+            <p>Use natural language to explore your data with AI analysis</p>
+          </div>
+          
+          <div className="input-group">
+            <div className="question-input-wrapper">
+              <input
+                ref={questionInputRef}
+                type="text"
+                value={currentQuestion}
+                onChange={(e) => setCurrentQuestion(e.target.value)}
+                placeholder="e.g., Who are the most profitable customers?"
+                className="question-input"
+                disabled={isAnalyzing || !aiServiceStatus?.success}
+              />
+              <button 
+                type="submit" 
+                disabled={!currentQuestion.trim() || isAnalyzing || !aiServiceStatus?.success}
+                className="analyze-btn"
+              >
+                {isAnalyzing ? '⏳ Analyzing...' : '🔍 Analyze'}
+              </button>
+            </div>
+            
+            {/* Analysis Type Selector */}
+            {analysisTypes.length > 0 && (
+              <div className="analysis-type-selector">
+                <label htmlFor="analysis-type">Analysis Type:</label>
+                <select 
+                  id="analysis-type"
+                  value={selectedAnalysisType} 
+                  onChange={(e) => handleAnalysisTypeChange(e.target.value)}
+                  className="analysis-type-dropdown"
+                  disabled={isAnalyzing}
+                >
+                  {analysisTypes.map(type => (
+                    <option key={type.id} value={type.id}>
+                      {type.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+        </form>
+
+        {/* Suggested Questions */}
+        {suggestedQuestions.length > 0 && !isAnalyzing && (
+          <div className="suggested-questions">
+            <h4>💡 Suggested Questions</h4>
+            <div className="suggestions-grid">
+              {suggestedQuestions.map((question, index) => (
+                <button
+                  key={index}
+                  onClick={() => handleSuggestedQuestion(question)}
+                  className="suggestion-chip"
+                  disabled={!aiServiceStatus?.success}
+                >
+                  {question}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Error Display */}
+        {error && (
+          <div className="error-message">
+            <span className="error-icon">❌</span>
+            <span className="error-text">{error}</span>
+            <button onClick={() => setError(null)} className="error-dismiss">×</button>
+          </div>
+        )}
+      </div>
+
+      {/* AI Analysis Results */}
+      <AIAnalysisResults
+        analysisResult={analysisResult}
+        originalData={initialData}
+        question={currentQuestion}
+        onNewAnalysis={handleNewAnalysis}
+        isLoading={isAnalyzing}
+      />
+
+      {/* Service Unavailable Message */}
+      {aiServiceStatus && !aiServiceStatus.success && (
+        <div className="service-unavailable">
+          <div className="unavailable-content">
+            <h3>🚧 AI Analysis Temporarily Unavailable</h3>
+            <p>The AI analysis service is currently unavailable. You can still:</p>
+            <ul>
+              <li>📊 View and export your data</li>
+              <li>📋 Download the dataset in CSV or JSON format</li>
+              <li>🔄 Try refreshing the page</li>
+            </ul>
+            <p className="service-error">Error: {aiServiceStatus.error}</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
