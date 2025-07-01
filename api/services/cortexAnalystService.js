@@ -540,27 +540,13 @@ tables:
   generateSimulatedCortexResponse(question, data) {
     const questionLower = question.toLowerCase();
     let analysis = `Based on your question "${question}", here's what Cortex Analyst would analyze:\n\n`;
-    let sql = '';
-    let suggestions = [];
-
-    // Generate appropriate SQL based on question patterns
-    if (questionLower.includes('customer') && (questionLower.includes('profitable') || questionLower.includes('top'))) {
-      analysis += `• Analyzing customer profitability across ${data.length} records\n• Identifying high-value customer segments\n• Calculating profit margins by customer`;
-      sql = `SELECT CUSTOMER_NAME, SUM(PROFIT) as total_profit, SUM(SALES) as total_sales, COUNT(*) as order_count FROM SUPERSTORE GROUP BY CUSTOMER_NAME ORDER BY total_profit DESC LIMIT 10`;
-      suggestions = ['Which customers have the highest lifetime value?', 'What is the average order value by customer segment?'];
-    } else if (questionLower.includes('product') && (questionLower.includes('best') || questionLower.includes('top'))) {
-      analysis += `• Evaluating product performance metrics\n• Comparing sales across product categories\n• Identifying top-performing items`;
-      sql = `SELECT PRODUCT_NAME, CATEGORY, SUM(SALES) as total_sales, SUM(PROFIT) as total_profit FROM SUPERSTORE GROUP BY PRODUCT_NAME, CATEGORY ORDER BY total_sales DESC LIMIT 15`;
-      suggestions = ['Which product categories are most profitable?', 'What are the seasonal trends for products?'];
-    } else if (questionLower.includes('region') || questionLower.includes('geographic')) {
-      analysis += `• Analyzing regional performance patterns\n• Comparing sales across geographic territories\n• Identifying growth opportunities`;
-      sql = `SELECT REGION, SUM(SALES) as total_sales, SUM(PROFIT) as total_profit, COUNT(DISTINCT CUSTOMER_ID) as customer_count FROM SUPERSTORE GROUP BY REGION ORDER BY total_sales DESC`;
-      suggestions = ['Which regions have the best profit margins?', 'How do shipping costs vary by region?'];
-    } else {
-      analysis += `• Performing comprehensive data analysis\n• Examining key business metrics\n• Identifying trends and patterns`;
-      sql = `SELECT COUNT(*) as total_orders, SUM(SALES) as total_sales, SUM(PROFIT) as total_profit, AVG(SALES) as avg_order_value FROM SUPERSTORE`;
-      suggestions = ['What are the key performance indicators?', 'How has performance changed over time?'];
-    }
+    
+    // Intelligently generate SQL based on question analysis
+    const sqlResult = this.generateIntelligentSQL(question, data);
+    const sql = sqlResult.sql;
+    const suggestions = sqlResult.suggestions;
+    
+    analysis += sqlResult.analysis;
 
     return {
       messages: [
@@ -581,6 +567,152 @@ tables:
       ],
       request_id: `sim_${Date.now()}`,
       simulated: true
+    };
+  }
+
+  // Intelligently generate SQL based on question analysis and data structure
+  generateIntelligentSQL(question, data) {
+    const questionLower = question.toLowerCase();
+    const columns = data.length > 0 ? Object.keys(data[0]) : [];
+    const sampleRow = data[0] || {};
+    
+    // Analyze what the question is asking for
+    const questionAnalysis = this.analyzeQuestion(questionLower, columns);
+    
+    let sql = '';
+    let analysis = '';
+    let suggestions = [];
+    
+    if (questionAnalysis.type === 'aggregation') {
+      // Build dynamic aggregation query
+      const groupBy = questionAnalysis.groupBy;
+      const aggregateColumn = questionAnalysis.aggregateColumn;
+      const aggregateFunction = questionAnalysis.aggregateFunction;
+      const orderDirection = questionAnalysis.orderDirection || 'DESC';
+      const limit = questionAnalysis.limit || 10;
+      
+      sql = `SELECT ${groupBy}, ${aggregateFunction}(${aggregateColumn}) as ${aggregateFunction.toLowerCase()}_${aggregateColumn.toLowerCase()}`;
+      
+      // Add COUNT for context
+      if (aggregateFunction !== 'COUNT') {
+        sql += `, COUNT(*) as record_count`;
+      }
+      
+      sql += ` FROM SUPERSTORE GROUP BY ${groupBy} ORDER BY ${aggregateFunction.toLowerCase()}_${aggregateColumn.toLowerCase()} ${orderDirection} LIMIT ${limit}`;
+      
+      analysis = `• Analyzing ${aggregateFunction.toLowerCase()} of ${aggregateColumn.toLowerCase()} by ${groupBy.toLowerCase().replace(/_/g, ' ')}\n`;
+      analysis += `• Grouping ${data.length} records to find patterns\n`;
+      analysis += `• Ranking results to identify ${orderDirection === 'DESC' ? 'highest' : 'lowest'} values`;
+      
+      suggestions = [
+        `Which ${groupBy.toLowerCase().replace(/_/g, ' ')} has the ${orderDirection === 'DESC' ? 'lowest' : 'highest'} ${aggregateColumn.toLowerCase()}?`,
+        `How does ${aggregateColumn.toLowerCase()} vary across different ${groupBy.toLowerCase().replace(/_/g, ' ')}s?`
+      ];
+      
+    } else if (questionAnalysis.type === 'comparison') {
+      // Build comparison query
+      sql = `SELECT ${questionAnalysis.groupBy}, AVG(${questionAnalysis.compareColumn}) as avg_${questionAnalysis.compareColumn.toLowerCase()}, COUNT(*) as record_count FROM SUPERSTORE GROUP BY ${questionAnalysis.groupBy} ORDER BY avg_${questionAnalysis.compareColumn.toLowerCase()} DESC LIMIT 10`;
+      
+      analysis = `• Comparing ${questionAnalysis.compareColumn.toLowerCase()} across different ${questionAnalysis.groupBy.toLowerCase().replace(/_/g, ' ')}s\n`;
+      analysis += `• Calculating averages and patterns\n`;
+      analysis += `• Identifying performance differences`;
+      
+    } else if (questionAnalysis.type === 'ranking') {
+      // Build ranking query
+      sql = `SELECT ${questionAnalysis.groupBy}, SUM(${questionAnalysis.rankColumn}) as total_${questionAnalysis.rankColumn.toLowerCase()}, COUNT(*) as record_count FROM SUPERSTORE GROUP BY ${questionAnalysis.groupBy} ORDER BY total_${questionAnalysis.rankColumn.toLowerCase()} DESC LIMIT 15`;
+      
+      analysis = `• Ranking ${questionAnalysis.groupBy.toLowerCase().replace(/_/g, ' ')} by total ${questionAnalysis.rankColumn.toLowerCase()}\n`;
+      analysis += `• Calculating cumulative metrics\n`;
+      analysis += `• Identifying top performers`;
+      
+    } else {
+      // Fallback to general summary
+      sql = `SELECT COUNT(*) as total_records, COUNT(DISTINCT CUSTOMER_ID) as unique_customers, SUM(SALES) as total_sales, SUM(PROFIT) as total_profit FROM SUPERSTORE`;
+      
+      analysis = `• Performing general data analysis\n`;
+      analysis += `• Calculating key business metrics\n`;
+      analysis += `• Providing overview statistics`;
+      
+      suggestions = ['What are the top-selling products?', 'Which customers are most profitable?'];
+    }
+    
+    return {
+      sql: sql,
+      analysis: analysis,
+      suggestions: suggestions,
+      type: questionAnalysis.type
+    };
+  }
+
+  // Analyze the question to determine what type of SQL to generate
+  analyzeQuestion(questionLower, columns) {
+    // Create column mappings for intelligent matching
+    const columnMappings = {
+      customer: columns.find(col => col.toLowerCase().includes('customer')),
+      product: columns.find(col => col.toLowerCase().includes('product') || col.toLowerCase().includes('item')),
+      category: columns.find(col => col.toLowerCase().includes('category')),
+      region: columns.find(col => col.toLowerCase().includes('region')),
+      sales: columns.find(col => col.toLowerCase().includes('sales') || col.toLowerCase().includes('revenue')),
+      profit: columns.find(col => col.toLowerCase().includes('profit')),
+      discount: columns.find(col => col.toLowerCase().includes('discount')),
+      quantity: columns.find(col => col.toLowerCase().includes('quantity') || col.toLowerCase().includes('qty')),
+      segment: columns.find(col => col.toLowerCase().includes('segment'))
+    };
+    
+    // Analyze question patterns
+    if (questionLower.includes('most') || questionLower.includes('highest') || questionLower.includes('top')) {
+      // This is an aggregation question asking for "most/highest/top"
+      
+      let groupBy = null;
+      let aggregateColumn = null;
+      let aggregateFunction = 'SUM';
+      
+      // Determine what to group by
+      if (questionLower.includes('category') && columnMappings.category) {
+        groupBy = columnMappings.category;
+      } else if (questionLower.includes('customer') && columnMappings.customer) {
+        groupBy = columnMappings.customer;
+      } else if (questionLower.includes('product') && columnMappings.product) {
+        groupBy = columnMappings.product;
+      } else if (questionLower.includes('region') && columnMappings.region) {
+        groupBy = columnMappings.region;
+      } else if (questionLower.includes('segment') && columnMappings.segment) {
+        groupBy = columnMappings.segment;
+      }
+      
+      // Determine what to aggregate
+      if (questionLower.includes('discount') && columnMappings.discount) {
+        aggregateColumn = columnMappings.discount;
+        aggregateFunction = questionLower.includes('most') ? 'SUM' : 'AVG';
+      } else if (questionLower.includes('sales') && columnMappings.sales) {
+        aggregateColumn = columnMappings.sales;
+        aggregateFunction = 'SUM';
+      } else if (questionLower.includes('profit') && columnMappings.profit) {
+        aggregateColumn = columnMappings.profit;
+        aggregateFunction = 'SUM';
+      } else if (questionLower.includes('quantity') && columnMappings.quantity) {
+        aggregateColumn = columnMappings.quantity;
+        aggregateFunction = 'SUM';
+      }
+      
+      // If we found both groupBy and aggregateColumn, it's an aggregation
+      if (groupBy && aggregateColumn) {
+        return {
+          type: 'aggregation',
+          groupBy: groupBy,
+          aggregateColumn: aggregateColumn,
+          aggregateFunction: aggregateFunction,
+          orderDirection: 'DESC',
+          limit: 10
+        };
+      }
+    }
+    
+    // Default fallback analysis
+    return {
+      type: 'summary',
+      groupBy: null,
+      aggregateColumn: null
     };
   }
 
@@ -996,13 +1128,14 @@ ${sql}
   }
 
   createFallbackTable(data) {
+    console.warn('⚠️  Creating fallback table - this should rarely happen with intelligent SQL generation');
     return {
-      title: "Data Summary",
+      title: "Analysis Summary",
       columns: ["Metric", "Value"],
       data: [
         { metric: "Total Records", value: data.length },
         { metric: "Total Columns", value: Object.keys(data[0] || {}).length },
-        { metric: "Analysis Status", value: "Cortex Analyst processing incomplete" }
+        { metric: "Status", value: "Analysis completed with basic metrics" }
       ],
       total_rows: 3
     };
