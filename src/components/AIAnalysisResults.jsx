@@ -279,12 +279,6 @@ const AIAnalysisResults = ({
             {compactAnalyzing ? '⏳ Analyzing...' : '🔍 Analyze'}
           </button>
         </div>
-        <div className="analysis-type-compact">
-          <label>Analysis Type:</label>
-          <select className="compact-dropdown">
-            <option>General Analysis</option>
-          </select>
-        </div>
       </div>
 
       {/* Current Question Result */}

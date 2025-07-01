@@ -243,25 +243,6 @@ function UnifiedAnalysisView({ initialData, previewData, datasetInfo, sessionId,
                 </button>
               </div>
               
-              {/* Analysis Type Selector */}
-              {analysisTypes.length > 0 && (
-                <div className="analysis-type-selector">
-                  <label htmlFor="analysis-type">Analysis Type:</label>
-                  <select 
-                    id="analysis-type"
-                    value={selectedAnalysisType} 
-                    onChange={(e) => handleAnalysisTypeChange(e.target.value)}
-                    className="analysis-type-dropdown"
-                    disabled={isAnalyzing}
-                  >
-                    {analysisTypes.map(type => (
-                      <option key={type.id} value={type.id}>
-                        {type.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
             </div>
           </form>
 
