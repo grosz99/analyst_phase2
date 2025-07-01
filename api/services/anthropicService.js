@@ -155,6 +155,69 @@ class AnthropicService {
     return sanitizedData;
   }
 
+  // Intelligent data analysis - examine actual values like Julius AI
+  analyzeDataIntelligently(data, userContext) {
+    const columns = Object.keys(data[0] || {});
+    const questionLower = userContext.toLowerCase();
+    
+    // Julius AI-style data examination: look at actual values
+    const dataInsights = {};
+    
+    columns.forEach(col => {
+      const values = data.map(row => row[col]).filter(v => v != null);
+      const uniqueValues = [...new Set(values)];
+      
+      dataInsights[col] = {
+        type: typeof values[0],
+        uniqueCount: uniqueValues.length,
+        sampleValues: uniqueValues.slice(0, 10),
+        isNumerical: values.every(v => !isNaN(parseFloat(v))),
+        isCategorical: uniqueValues.length < 50 && typeof values[0] === 'string'
+      };
+      
+      // Intelligent question-value matching (Julius AI style)
+      const colLower = col.toLowerCase();
+      
+      // Tier/Level analysis
+      if ((questionLower.includes('tier') || questionLower.includes('level')) && 
+          (colLower.includes('tier') || colLower.includes('level') || colLower.includes('grade'))) {
+        dataInsights[col].relevantToQuestion = 'tier_analysis';
+        dataInsights[col].questionType = 'categorical_filter';
+      }
+      
+      // Specific value matching
+      ['silver', 'gold', 'bronze', 'platinum', 'premium', 'standard', 'basic'].forEach(value => {
+        if (questionLower.includes(value) && uniqueValues.some(v => String(v).toLowerCase().includes(value))) {
+          dataInsights[col].relevantToQuestion = value;
+          dataInsights[col].questionType = 'value_filter';
+          dataInsights[col].targetValue = uniqueValues.find(v => String(v).toLowerCase().includes(value));
+        }
+      });
+      
+      // Status/Category analysis  
+      if ((questionLower.includes('status') || questionLower.includes('type') || questionLower.includes('category')) &&
+          dataInsights[col].isCategorical) {
+        dataInsights[col].relevantToQuestion = 'category_analysis';
+        dataInsights[col].questionType = 'categorical_analysis';
+      }
+      
+      // Customer analysis
+      if (questionLower.includes('customer') && colLower.includes('customer')) {
+        dataInsights[col].relevantToQuestion = 'customer_analysis';
+        dataInsights[col].questionType = 'groupby_analysis';
+      }
+      
+      // Time-based analysis
+      if ((questionLower.includes('when') || questionLower.includes('date') || questionLower.includes('time')) &&
+          (colLower.includes('date') || colLower.includes('time') || colLower.includes('created'))) {
+        dataInsights[col].relevantToQuestion = 'temporal_analysis';
+        dataInsights[col].questionType = 'temporal_analysis';
+      }
+    });
+    
+    return dataInsights;
+  }
+
   // Create secure analysis prompt
   createAnalysisPrompt(data, analysisType = 'general', userContext = '') {
     // Sanitize user context
@@ -163,6 +226,9 @@ class AnthropicService {
     const dataPreview = data.slice(0, 5); // Only show first 5 rows in prompt
     const totalRows = data.length;
     const columns = Object.keys(data[0] || {});
+    
+    // Julius AI-style intelligent data examination
+    const dataInsights = this.analyzeDataIntelligently(data, sanitizedContext);
     
     // Create context-aware prompt based on the question
     let analysisInstructions = '';
@@ -219,23 +285,35 @@ Focus on delivering segment-specific analysis using groupby operations.`;
 GENERAL ANALYSIS REQUEST: Provide comprehensive insights based on the available data structure and patterns.`;
     }
 
+    // Find columns relevant to the question
+    const relevantColumns = Object.keys(dataInsights).filter(col => dataInsights[col].relevantToQuestion);
+    const contextualInfo = relevantColumns.length > 0 ? 
+      `\nRELEVANT DATA FOUND: ${relevantColumns.map(col => `${col} contains values like: ${dataInsights[col].sampleValues.slice(0, 5).join(', ')}`).join('; ')}` : '';
+
     const basePrompt = `You are a professional data analyst with Python expertise. The user has loaded a dataset into memory (available as 'df' pandas DataFrame) and wants to analyze it.
 
 Dataset Information:
 - Total Rows: ${totalRows}
 - Columns: ${columns.join(', ')}
-- User Question: "${sanitizedContext}"
+- User Question: "${sanitizedContext}"${contextualInfo}
+
+DATA STRUCTURE INSIGHTS:
+${Object.keys(dataInsights).map(col => {
+  const insight = dataInsights[col];
+  return `${col}: ${insight.isCategorical ? 'Categorical' : insight.isNumerical ? 'Numerical' : 'Text'} (${insight.uniqueCount} unique values)${insight.relevantToQuestion ? ` *** RELEVANT TO QUESTION: Contains "${insight.relevantToQuestion}" values ***` : ''}`;
+}).join('\n')}
 
 ${analysisInstructions}
 
 Sample Data (first 5 rows):
 ${JSON.stringify(dataPreview, null, 2)}
 
-ANALYSIS REQUIREMENTS:
-1. **Write Python code** to analyze the dataset and answer the user's question
-2. **Use pandas operations** like groupby, sum, sort_values, etc.
-3. **Generate insights** based on the computed results
-4. **Return both code and analysis** in your response
+INTELLIGENT ANALYSIS REQUIREMENTS:
+1. **Examine the DATA STRUCTURE INSIGHTS above** - Look for columns marked as "RELEVANT TO QUESTION"
+2. **Use specific values from the data** - Don't make assumptions about what values exist
+3. **Answer the exact question asked** - Focus on the specific values or conditions mentioned
+4. **Write targeted Python code** that filters or groups by the relevant values found
+5. **Provide precise counts and percentages** when asked about specific categories
 
 RESPONSE FORMAT:
 # Analysis: [Question Title]
@@ -245,25 +323,211 @@ RESPONSE FORMAT:
 import pandas as pd
 import numpy as np
 
-# [Your analysis code here]
-# df is already loaded with the dataset
-result = df.groupby('column').agg({'metric': 'sum'}).sort_values('metric', ascending=False)
-print(result.head(10))
+# Intelligent analysis based on actual data values
+# [Write code that uses the specific values found in the relevant columns]
+# Example: df[df['CUSTOMER_TIER'] == 'Silver'].shape[0]
 \`\`\`
 
 ## Key Findings
-[Your business insights here]
+[Specific findings based on actual data values]
 
 ## Recommendations
 [Actionable recommendations based on the analysis]
 
-Focus on writing efficient Python code that directly answers the user's question using the available columns.`;
+Focus on writing Python code that examines the actual values in the dataset to answer the specific question asked.`;
 
     if (basePrompt.length > this.MAX_PROMPT_LENGTH) {
       throw new Error('Analysis prompt too large. Please reduce dataset size or context.');
     }
 
     return basePrompt;
+  }
+
+  // Generate intelligent pandas code based on data insights (Julius AI approach)
+  generateIntelligentPandasCode(data, userContext, dataInsights) {
+    const questionLower = userContext.toLowerCase();
+    const columns = Object.keys(data[0] || {});
+    
+    // Find the most relevant column for the question
+    const relevantCol = Object.keys(dataInsights).find(col => dataInsights[col].relevantToQuestion);
+    
+    if (!relevantCol) return null;
+    
+    const insight = dataInsights[relevantCol];
+    
+    // Generate specific code based on question type and data insights
+    if (insight.questionType === 'value_filter' && insight.targetValue) {
+      return `
+# Intelligent analysis: Looking for "${insight.targetValue}" in ${relevantCol}
+import pandas as pd
+
+# Filter for specific value found in data
+filtered_data = df[df['${relevantCol}'] == '${insight.targetValue}']
+count = len(filtered_data)
+total = len(df)
+percentage = (count / total * 100).round(1)
+
+print(f"Total ${insight.targetValue} records: {count}")
+print(f"Percentage of total: {percentage}%")
+print(f"\\nBreakdown by ${relevantCol}:")
+print(df['${relevantCol}'].value_counts())
+
+# Additional insights
+if count > 0:
+    print(f"\\nSample ${insight.targetValue} records:")
+    print(filtered_data.head())`;
+    }
+    
+    if (insight.questionType === 'categorical_filter' || insight.questionType === 'categorical_analysis') {
+      return `
+# Categorical analysis for ${relevantCol}
+import pandas as pd
+
+# Get value counts and percentages
+value_counts = df['${relevantCol}'].value_counts()
+percentages = df['${relevantCol}'].value_counts(normalize=True) * 100
+
+print("Distribution of ${relevantCol}:")
+for value, count in value_counts.items():
+    pct = percentages[value]
+    print(f"{value}: {count} ({pct:.1f}%)")
+
+# Answer specific question about counts
+total_records = len(df)
+print(f"\\nTotal records analyzed: {total_records}")`;
+    }
+    
+    return null;
+  }
+
+  // Generate optimized pandas code for common questions
+  generateOptimizedPandasCode(data, userContext) {
+    const questionLower = userContext.toLowerCase();
+    const columns = Object.keys(data[0] || {});
+    
+    // First try intelligent analysis
+    const dataInsights = this.analyzeDataIntelligently(data, userContext);
+    const intelligentCode = this.generateIntelligentPandasCode(data, userContext, dataInsights);
+    
+    if (intelligentCode) {
+      return intelligentCode;
+    }
+    
+    // Fallback to template-based approach
+    const customerCol = columns.find(col => col.toLowerCase().includes('customer')) || 
+                       columns.find(col => col.toLowerCase().includes('name')) || 'CUSTOMER_NAME';
+    const segmentCol = columns.find(col => col.toLowerCase().includes('segment')) || 'SEGMENT';
+    const regionCol = columns.find(col => col.toLowerCase().includes('region')) || 'REGION';
+    const productCol = columns.find(col => col.toLowerCase().includes('product')) || 
+                      columns.find(col => col.toLowerCase().includes('category')) || 'PRODUCT_NAME';
+    const salesCol = columns.find(col => col.toLowerCase().includes('sales')) || 'SALES';
+    const profitCol = columns.find(col => col.toLowerCase().includes('profit')) || 'PROFIT';
+    const quantityCol = columns.find(col => col.toLowerCase().includes('quantity')) || 'QUANTITY';
+    
+    console.log('🔍 Detected columns:', { customerCol, segmentCol, regionCol, productCol, salesCol, profitCol, quantityCol });
+    
+    // Common question patterns with dynamic column names
+    const codeTemplates = {
+      'most_profitable_customers': `
+# Most profitable customers analysis
+import pandas as pd
+import numpy as np
+
+# Auto-detect customer column: ${customerCol}
+# Group by customer and sum metrics
+customer_profit = df.groupby('${customerCol}').agg({
+    '${profitCol}': 'sum',
+    '${salesCol}': 'sum',
+    '${quantityCol}': 'sum'
+}).round(2)
+
+# Add order count
+customer_profit['ORDER_COUNT'] = df.groupby('${customerCol}').size()
+
+# Sort by profit and get top 10
+result = customer_profit.sort_values('${profitCol}', ascending=False).head(10)
+result = result.reset_index()
+result['RANK'] = range(1, len(result) + 1)
+print(result[['RANK', '${customerCol}', '${profitCol}', '${salesCol}', 'ORDER_COUNT']])`,
+
+      'segment_orders': `
+# Segment analysis by order count  
+import pandas as pd
+
+# Auto-detect segment column: ${segmentCol}
+# Group by segment and aggregate metrics
+segment_analysis = df.groupby('${segmentCol}').agg({
+    '${salesCol}': 'sum',
+    '${profitCol}': 'sum', 
+    '${quantityCol}': 'sum'
+}).round(2)
+
+# Add order count (most important for this question)
+segment_analysis['ORDER_COUNT'] = df.groupby('${segmentCol}').size()
+
+# Sort by ORDER_COUNT (not sales) since question asks for "most orders"
+result = segment_analysis.sort_values('ORDER_COUNT', ascending=False)
+result = result.reset_index()
+result['RANK'] = range(1, len(result) + 1)
+print(result[['RANK', '${segmentCol}', 'ORDER_COUNT', '${salesCol}', '${profitCol}']])`,
+
+      'region_performance': `
+# Regional performance analysis
+import pandas as pd
+
+# Auto-detect region column: ${regionCol}
+# Group by region and aggregate metrics
+region_performance = df.groupby('${regionCol}').agg({
+    '${salesCol}': 'sum',
+    '${profitCol}': 'sum',
+    '${quantityCol}': 'sum'
+}).round(2)
+
+# Add order count and market share
+region_performance['ORDER_COUNT'] = df.groupby('${regionCol}').size()
+region_performance['SALES_SHARE_PCT'] = (region_performance['${salesCol}'] / region_performance['${salesCol}'].sum() * 100).round(1)
+
+# Sort by sales performance
+result = region_performance.sort_values('${salesCol}', ascending=False)
+result = result.reset_index()
+result['RANK'] = range(1, len(result) + 1)
+print(result[['RANK', '${regionCol}', '${salesCol}', '${profitCol}', 'ORDER_COUNT', 'SALES_SHARE_PCT']])`,
+      
+      'top_products': `
+# Top products analysis
+import pandas as pd
+
+# Auto-detect product column: ${productCol}
+# Group by product and aggregate
+product_performance = df.groupby('${productCol}').agg({
+    '${salesCol}': 'sum',
+    '${profitCol}': 'sum',
+    '${quantityCol}': 'sum'
+}).round(2)
+
+# Add order frequency
+product_performance['ORDER_COUNT'] = df.groupby('${productCol}').size()
+product_performance['AVG_PROFIT_MARGIN'] = (product_performance['${profitCol}'] / product_performance['${salesCol}'] * 100).round(1)
+
+# Sort by sales
+result = product_performance.sort_values('${salesCol}', ascending=False).head(15)
+result = result.reset_index()  
+result['RANK'] = range(1, len(result) + 1)
+print(result[['RANK', '${productCol}', '${salesCol}', '${profitCol}', 'ORDER_COUNT', 'AVG_PROFIT_MARGIN']])`
+    };
+    
+    // Pattern matching for optimized code
+    if (questionLower.includes('profitable') && questionLower.includes('customer')) {
+      return codeTemplates.most_profitable_customers;
+    } else if (questionLower.includes('segment') && questionLower.includes('orders')) {
+      return codeTemplates.segment_orders;
+    } else if (questionLower.includes('region') && (questionLower.includes('best') || questionLower.includes('performing'))) {
+      return codeTemplates.region_performance;
+    } else if ((questionLower.includes('product') || questionLower.includes('category')) && questionLower.includes('top')) {
+      return codeTemplates.top_products;
+    }
+    
+    return null; // No optimized template found
   }
 
   // Main analysis method with security measures
@@ -315,8 +579,22 @@ Focus on writing efficient Python code that directly answers the user's question
       // Generate structured results from the analysis
       const structuredResults = this.generateStructuredResults(sanitizedData, userContext, analysisText);
       
-      // Extract Python code from the response
-      const pythonCode = this.extractPythonCode(analysisText);
+      // Check for optimized pandas code first
+      let pythonCode = this.generateOptimizedPandasCode(sanitizedData, userContext);
+      
+      // If no optimized code available, extract from AI response
+      if (!pythonCode) {
+        const extractedCode = this.extractPythonCode(analysisText);
+        pythonCode = extractedCode;
+      } else {
+        // Format optimized code for consistency
+        pythonCode = {
+          code: pythonCode,
+          blocks: [pythonCode],
+          executable: true,
+          optimized: true
+        };
+      }
       
       // Generate refined question suggestions if data limitations detected
       const refinedQuestions = this.generateRefinedQuestions(sanitizedData, userContext, analysisText);
@@ -695,11 +973,19 @@ Focus on writing efficient Python code that directly answers the user's question
     if ((questionLower.includes('customer') || questionLower.includes('profitable')) && hasCustomer) {
       const customerMap = new Map();
       
+      // Dynamic column detection for customer analysis
+      const customerCol = columns.find(col => col.toLowerCase().includes('customer')) || 
+                         columns.find(col => col.toLowerCase().includes('name')) ||
+                         'CUSTOMER_NAME';
+      const salesCol = columns.find(col => col.toLowerCase().includes('sales')) || 'SALES';
+      const profitCol = columns.find(col => col.toLowerCase().includes('profit')) || 'PROFIT';
+      const quantityCol = columns.find(col => col.toLowerCase().includes('quantity')) || 'QUANTITY';
+      
       data.forEach(row => {
-        const customerName = row.CUSTOMER_NAME || row.Customer || row.customer_name || 'Unknown';
-        const profit = parseFloat(row.PROFIT || row.Profit || row.profit || 0);
-        const sales = parseFloat(row.SALES || row.Sales || row.sales || 0);
-        const quantity = parseFloat(row.QUANTITY || row.Quantity || row.quantity || 1);
+        const customerName = row[customerCol] || 'Unknown';
+        const profit = parseFloat(row[profitCol] || 0);
+        const sales = parseFloat(row[salesCol] || 0);
+        const quantity = parseFloat(row[quantityCol] || 1);
         
         if (customerMap.has(customerName)) {
           const existing = customerMap.get(customerName);
@@ -721,8 +1007,23 @@ Focus on writing efficient Python code that directly answers the user's question
         }
       });
       
-      // Sort by profit if available, otherwise by order count
-      const sortBy = (hasProfit || hasSales) ? 'total_profit' : 'order_count';
+      // Smart sorting based on what the user actually asked for
+      let sortBy = 'total_profit'; // default for customers
+      if (questionLower.includes('most orders') || questionLower.includes('order count') || questionLower.includes('frequent')) {
+        sortBy = 'order_count';
+      } else if (questionLower.includes('profit') || questionLower.includes('profitable')) {
+        sortBy = 'total_profit';
+      } else if (questionLower.includes('sales') || questionLower.includes('revenue')) {
+        sortBy = 'total_sales';
+      } else if (questionLower.includes('quantity') || questionLower.includes('volume')) {
+        sortBy = 'total_quantity';
+      } else if (hasProfit) {
+        sortBy = 'total_profit';
+      } else if (hasSales) {
+        sortBy = 'total_sales';
+      } else {
+        sortBy = 'order_count';
+      }
       const customerResults = Array.from(customerMap.values())
         .sort((a, b) => b[sortBy] - a[sortBy])
         .slice(0, 10)
@@ -784,14 +1085,19 @@ Focus on writing efficient Python code that directly answers the user's question
     if ((questionLower.includes('segment') || questionLower.includes('category')) && 
         (hasSegment || hasCategory)) {
       const segmentMap = new Map();
+      
+      // Dynamic column detection for segment analysis
       const segmentCol = columns.find(col => col.toLowerCase().includes('segment')) || 
-                        columns.find(col => col.toLowerCase().includes('category'));
+                        columns.find(col => col.toLowerCase().includes('category')) || 'SEGMENT';
+      const salesCol = columns.find(col => col.toLowerCase().includes('sales')) || 'SALES';
+      const profitCol = columns.find(col => col.toLowerCase().includes('profit')) || 'PROFIT';
+      const quantityCol = columns.find(col => col.toLowerCase().includes('quantity')) || 'QUANTITY';
       
       data.forEach(row => {
-        const segment = row[segmentCol] || row.SEGMENT || row.Category || row.CATEGORY || 'Unknown';
-        const sales = parseFloat(row.SALES || row.Sales || row.sales || 0);
-        const profit = parseFloat(row.PROFIT || row.Profit || row.profit || 0);
-        const quantity = parseFloat(row.QUANTITY || row.Quantity || row.quantity || 1);
+        const segment = row[segmentCol] || 'Unknown';
+        const sales = parseFloat(row[salesCol] || 0);
+        const profit = parseFloat(row[profitCol] || 0);
+        const quantity = parseFloat(row[quantityCol] || 1);
         
         if (segmentMap.has(segment)) {
           const existing = segmentMap.get(segment);
@@ -813,7 +1119,21 @@ Focus on writing efficient Python code that directly answers the user's question
         }
       });
       
-      const sortBy = hasSales ? 'total_sales' : hasProfit ? 'total_profit' : 'total_quantity';
+      // Smart sorting based on what the user actually asked for
+      let sortBy = 'total_sales'; // default
+      if (questionLower.includes('most orders') || questionLower.includes('order count')) {
+        sortBy = 'order_count';
+      } else if (questionLower.includes('profit') || questionLower.includes('profitable')) {
+        sortBy = 'total_profit';
+      } else if (questionLower.includes('quantity') || questionLower.includes('volume')) {
+        sortBy = 'total_quantity';
+      } else if (hasSales) {
+        sortBy = 'total_sales';
+      } else if (hasProfit) {
+        sortBy = 'total_profit';
+      } else {
+        sortBy = 'total_quantity';
+      }
       const segmentResults = Array.from(segmentMap.values())
         .sort((a, b) => b[sortBy] - a[sortBy])
         .slice(0, 10)
@@ -845,6 +1165,93 @@ Focus on writing efficient Python code that directly answers the user's question
             label: s.segment,
             value: s[sortBy],
             formatted_value: (hasSales || hasProfit) ? `$${s[sortBy].toLocaleString()}` : s[sortBy].toLocaleString()
+          }))
+        }
+      };
+    }
+    
+    // Regional analysis
+    if (questionLower.includes('region') && columns.some(col => col.toLowerCase().includes('region'))) {
+      const regionMap = new Map();
+      
+      // Dynamic column detection for regional analysis
+      const regionCol = columns.find(col => col.toLowerCase().includes('region')) || 'REGION';
+      const salesCol = columns.find(col => col.toLowerCase().includes('sales')) || 'SALES';
+      const profitCol = columns.find(col => col.toLowerCase().includes('profit')) || 'PROFIT';
+      const quantityCol = columns.find(col => col.toLowerCase().includes('quantity')) || 'QUANTITY';
+      
+      data.forEach(row => {
+        const region = row[regionCol] || 'Unknown';
+        const sales = parseFloat(row[salesCol] || 0);
+        const profit = parseFloat(row[profitCol] || 0);
+        const quantity = parseFloat(row[quantityCol] || 1);
+        
+        if (regionMap.has(region)) {
+          const existing = regionMap.get(region);
+          regionMap.set(region, {
+            region: region,
+            total_sales: existing.total_sales + sales,
+            total_profit: existing.total_profit + profit,
+            total_quantity: existing.total_quantity + quantity,
+            order_count: existing.order_count + 1
+          });
+        } else {
+          regionMap.set(region, {
+            region: region,
+            total_sales: sales,
+            total_profit: profit,
+            total_quantity: quantity,
+            order_count: 1
+          });
+        }
+      });
+      
+      // Smart sorting for regions
+      let sortBy = 'total_sales';
+      if (questionLower.includes('most orders') || questionLower.includes('order count')) {
+        sortBy = 'order_count';
+      } else if (questionLower.includes('profit') || questionLower.includes('profitable')) {
+        sortBy = 'total_profit';
+      } else if (questionLower.includes('best') || questionLower.includes('performing')) {
+        sortBy = hasSales ? 'total_sales' : 'total_profit';
+      }
+      
+      const regionResults = Array.from(regionMap.values())
+        .sort((a, b) => b[sortBy] - a[sortBy])
+        .slice(0, 10)
+        .map((region, index) => ({
+          rank: index + 1,
+          region: region.region,
+          total_sales: Math.round(region.total_sales * 100) / 100,
+          total_profit: Math.round(region.total_profit * 100) / 100,
+          total_quantity: Math.round(region.total_quantity * 100) / 100,
+          order_count: region.order_count
+        }));
+      
+      const titleMetric = sortBy === 'order_count' ? 'Orders' : 
+                         sortBy === 'total_profit' ? 'Profit' : 
+                         sortBy === 'total_quantity' ? 'Volume' : 'Sales';
+      
+      return {
+        results_table: {
+          title: `Regional Performance by ${titleMetric}`,
+          columns: ["Rank", "Region", "Total Sales", "Total Profit", "Total Quantity", "Orders"],
+          data: regionResults,
+          total_rows: regionResults.length
+        },
+        visualization: {
+          type: "bar_chart",
+          title: `Top Regions by ${titleMetric}`,
+          x_axis: "Region",
+          y_axis: sortBy === 'order_count' ? "Number of Orders" : 
+                  sortBy === 'total_profit' ? "Total Profit ($)" : 
+                  sortBy === 'total_quantity' ? "Total Quantity" : "Total Sales ($)",
+          data: regionResults.slice(0, 8).map(r => ({
+            label: r.region,
+            value: r[sortBy],
+            formatted_value: (sortBy === 'total_sales' || sortBy === 'total_profit') ? 
+                           `$${r[sortBy].toLocaleString()}` : 
+                           r[sortBy].toLocaleString()
           }))
         }
       };

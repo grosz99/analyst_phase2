@@ -190,8 +190,15 @@ const AIAnalysisResults = ({
         </pre>
         {python_code.executable && (
           <div className="code-info">
-            <span className="code-status">✅ Executable code generated</span>
-            <span className="code-note">This code operates on the cached DataFrame 'df'</span>
+            <span className="code-status">
+              {python_code.optimized ? '⚡ Optimized pre-written code' : '✅ Executable code generated'}
+            </span>
+            <span className="code-note">
+              {python_code.optimized 
+                ? 'This is performance-optimized pandas code for common questions' 
+                : 'This code operates on the cached DataFrame \'df\''
+              }
+            </span>
           </div>
         )}
       </div>
