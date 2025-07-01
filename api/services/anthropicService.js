@@ -169,16 +169,33 @@ class AnthropicService {
     const questionLower = sanitizedContext.toLowerCase();
     
     if (questionLower.includes('profitable') || questionLower.includes('profit')) {
-      analysisInstructions = `
+      const hasProfit = columns.some(col => col.toLowerCase().includes('profit'));
+      const hasSales = columns.some(col => col.toLowerCase().includes('sales'));
+      
+      if (hasProfit || hasSales) {
+        analysisInstructions = `
+SPECIFIC ANALYSIS REQUEST: CUSTOMER PROFITABILITY ANALYSIS
+
+IMPORTANT: This dataset contains ${hasProfit ? 'PROFIT' : 'SALES'} data. Please:
+1. Calculate total profit/sales per customer by aggregating (GROUP BY customer, SUM(profit/sales))
+2. Rank customers by their total profit/sales contribution
+3. Calculate profit margins if both sales and profit are available
+4. Provide actionable insights about the most valuable customers
+5. Show percentage contribution of top customers to total profit/sales
+
+Focus on delivering accurate financial analysis using the available profit/sales data.`;
+      } else {
+        analysisInstructions = `
 SPECIFIC ANALYSIS REQUEST: The user is asking about PROFITABILITY. 
 
-IMPORTANT: I can see this appears to be order/transaction data. If there are no explicit profit/revenue columns, please:
+IMPORTANT: This dataset lacks explicit profit/revenue columns. Please:
 1. Acknowledge that true profitability requires revenue and cost data not present in this dataset
 2. Instead analyze CUSTOMER VALUE using available metrics like order frequency, volume, etc.
 3. Explain what additional data would be needed for true profitability analysis
 4. Focus on customer value indicators rather than claiming to calculate actual profits
 
 Your answer should be honest about data limitations while providing valuable customer insights.`;
+      }
     } else if (questionLower.includes('customer')) {
       analysisInstructions = `
 SPECIFIC ANALYSIS REQUEST: Customer analysis. Focus on customer behavior patterns, frequency, volume, and segmentation based on available data.`;
@@ -223,8 +240,8 @@ Format your response with clear headers. Focus on directly answering the user's 
     try {
       // Security checks
       if (!this.initialized) {
-        // For testing: return mock analysis when API key not available
-        return this.generateMockAnalysis(data, analysisType, userContext);
+        console.error('❌ Anthropic service not initialized - API key missing or invalid');
+        throw new Error('AI analysis service not initialized. Please check API credentials.');
       }
 
       this.checkRateLimit(identifier);
@@ -448,12 +465,18 @@ Format your response with clear headers. Focus on directly answering the user's 
     
     // Analyze actual data structure intelligently
     const dataProfile = this.analyzeDataStructure(data);
+    const hasProfit = columns.some(col => col.toLowerCase().includes('profit'));
+    const hasSales = columns.some(col => col.toLowerCase().includes('sales'));
     
-    // Check if this was a profitability question that failed
+    // Only suggest refinements if the question couldn't be answered properly due to missing data
+    // Check if this was a profitability question that failed due to missing profit data
     if (questionLower.includes('profitable') || questionLower.includes('profit')) {
-      if (analysisText.toLowerCase().includes('cannot determine') || 
+      // If we don't have profit data OR the analysis indicates limitations
+      if (!hasProfit || 
+          analysisText.toLowerCase().includes('cannot determine') || 
           analysisText.toLowerCase().includes('lacks') || 
-          analysisText.toLowerCase().includes('limitation')) {
+          analysisText.toLowerCase().includes('limitation') ||
+          analysisText.toLowerCase().includes('not available')) {
         
         // Generate smart questions based on actual data structure
         if (dataProfile.hasCustomer) {
@@ -485,6 +508,9 @@ Format your response with clear headers. Focus on directly answering the user's 
             reason: "Temporal analysis using date information"
           });
         }
+      } else {
+        // Question was answered successfully with profit data - don't suggest refinements
+        return [];
       }
     }
     
@@ -564,13 +590,17 @@ Format your response with clear headers. Focus on directly answering the user's 
     const questionLower = userContext.toLowerCase();
     const columns = Object.keys(data[0] || {});
     const hasCustomer = columns.some(col => col.toLowerCase().includes('customer'));
+    const hasProfit = columns.some(col => col.toLowerCase().includes('profit'));
+    const hasSales = columns.some(col => col.toLowerCase().includes('sales'));
     
-    // If it's a customer analysis, generate customer data table
+    // If it's a customer profitability analysis and we have profit/sales data
     if ((questionLower.includes('customer') || questionLower.includes('profitable')) && hasCustomer) {
       const customerMap = new Map();
       
       data.forEach(row => {
         const customerName = row.CUSTOMER_NAME || row.Customer || row.customer_name || 'Unknown';
+        const profit = parseFloat(row.PROFIT || row.Profit || row.profit || 0);
+        const sales = parseFloat(row.SALES || row.Sales || row.sales || 0);
         const quantity = parseFloat(row.QUANTITY || row.Quantity || row.quantity || 1);
         
         if (customerMap.has(customerName)) {
@@ -578,53 +608,75 @@ Format your response with clear headers. Focus on directly answering the user's 
           customerMap.set(customerName, {
             customer_name: customerName,
             order_count: existing.order_count + 1,
+            total_profit: existing.total_profit + profit,
+            total_sales: existing.total_sales + sales,
             total_quantity: existing.total_quantity + quantity
           });
         } else {
           customerMap.set(customerName, {
             customer_name: customerName,
             order_count: 1,
+            total_profit: profit,
+            total_sales: sales,
             total_quantity: quantity
           });
         }
       });
       
+      // Sort by profit if available, otherwise by order count
+      const sortBy = (hasProfit || hasSales) ? 'total_profit' : 'order_count';
       const customerResults = Array.from(customerMap.values())
-        .sort((a, b) => b.order_count - a.order_count)
+        .sort((a, b) => b[sortBy] - a[sortBy])
         .slice(0, 10)
         .map((customer, index) => ({
           rank: index + 1,
           customer_name: customer.customer_name,
           order_count: customer.order_count,
+          total_profit: Math.round(customer.total_profit * 100) / 100,
+          total_sales: Math.round(customer.total_sales * 100) / 100,
           total_quantity: Math.round(customer.total_quantity * 100) / 100,
-          avg_quantity: Math.round((customer.total_quantity / customer.order_count) * 100) / 100
+          avg_profit_per_order: Math.round((customer.total_profit / customer.order_count) * 100) / 100
         }));
       
-      // Determine title based on question type
-      const isProfitabilityQuestion = questionLower.includes('profitable') || questionLower.includes('profit');
-      const tableTitle = isProfitabilityQuestion ? 
-        "Customer Value Analysis (Note: Profit data not available)" : 
-        "Customer Activity Analysis";
-      const chartTitle = isProfitabilityQuestion ? 
-        "Top Customers by Order Volume (Proxy for Value)" : 
-        "Top Customers by Order Count";
+      // Determine columns and titles based on available data
+      let columns_list, tableTitle, chartTitle, chartMetric;
+      
+      if (hasProfit && questionLower.includes('profitable')) {
+        columns_list = ["Rank", "Customer Name", "Total Profit", "Total Sales", "Orders", "Avg Profit/Order"];
+        tableTitle = "Most Profitable Customers";
+        chartTitle = "Top Customers by Total Profit";
+        chartMetric = 'total_profit';
+      } else if (hasSales && (questionLower.includes('sales') || questionLower.includes('revenue'))) {
+        columns_list = ["Rank", "Customer Name", "Total Sales", "Orders", "Total Quantity", "Avg Sales/Order"];
+        tableTitle = "Top Customers by Sales";
+        chartTitle = "Top Customers by Total Sales";
+        chartMetric = 'total_sales';
+      } else {
+        columns_list = ["Rank", "Customer Name", "Orders", "Total Quantity", "Avg Quantity/Order"];
+        tableTitle = "Customer Activity Analysis";
+        chartTitle = "Top Customers by Order Count";
+        chartMetric = 'order_count';
+      }
 
       return {
         results_table: {
           title: tableTitle,
-          columns: ["Rank", "Customer Name", "Orders", "Total Quantity", "Avg Quantity/Order"],
+          columns: columns_list,
           data: customerResults,
           total_rows: customerResults.length
         },
         visualization: {
           type: "bar_chart",
           title: chartTitle,
-          x_axis: "Customer Name",
-          y_axis: "Number of Orders",
+          x_axis: "Customer Name", 
+          y_axis: hasProfit && questionLower.includes('profitable') ? "Total Profit ($)" : 
+                   hasSales ? "Total Sales ($)" : "Number of Orders",
           data: customerResults.slice(0, 8).map(c => ({
             label: c.customer_name.length > 15 ? c.customer_name.substring(0, 15) + '...' : c.customer_name,
-            value: c.order_count,
-            formatted_value: `${c.order_count} orders`
+            value: c[chartMetric],
+            formatted_value: hasProfit && questionLower.includes('profitable') ? `$${c.total_profit.toLocaleString()}` :
+                            hasSales && chartMetric === 'total_sales' ? `$${c.total_sales.toLocaleString()}` :
+                            `${c.order_count} orders`
           }))
         }
       };
@@ -673,15 +725,18 @@ Format your response with clear headers. Focus on directly answering the user's 
     
     let analysisText = '';
     
-    // Customer analysis (since we don't have PROFIT/SALES, analyze by customer frequency/volume)
-    if ((questionLower.includes('customer') || questionLower.includes('frequent')) && hasCustomer) {
+    // Customer analysis - prioritize profit data if available
+    if ((questionLower.includes('customer') || questionLower.includes('profitable') || questionLower.includes('frequent')) && hasCustomer) {
       console.log('🔍 Performing customer analysis on columns:', columns);
-      // Perform actual data aggregation - GROUP BY customer, COUNT(*)
+      console.log('🔍 Has profit data:', hasProfit, 'Has sales data:', hasSales);
+      
+      // Perform actual data aggregation - GROUP BY customer
       const customerMap = new Map();
       
       data.forEach(row => {
         const customerName = row.CUSTOMER_NAME || row.Customer || row.customer_name || 'Unknown';
-        // Since no PROFIT/SALES, count orders and look for other numeric fields
+        const profit = parseFloat(row.PROFIT || row.Profit || row.profit || 0);
+        const sales = parseFloat(row.SALES || row.Sales || row.sales || 0);
         const quantity = parseFloat(row.QUANTITY || row.Quantity || row.quantity || 1);
         const discount = parseFloat(row.DISCOUNT || row.Discount || row.discount || 0);
         
@@ -689,6 +744,8 @@ Format your response with clear headers. Focus on directly answering the user's 
           const existing = customerMap.get(customerName);
           customerMap.set(customerName, {
             customer_name: customerName,
+            total_profit: existing.total_profit + profit,
+            total_sales: existing.total_sales + sales,
             total_quantity: existing.total_quantity + quantity,
             total_discount: existing.total_discount + discount,
             order_count: existing.order_count + 1
@@ -696,6 +753,8 @@ Format your response with clear headers. Focus on directly answering the user's 
         } else {
           customerMap.set(customerName, {
             customer_name: customerName,
+            total_profit: profit,
+            total_sales: sales,
             total_quantity: quantity,
             total_discount: discount,
             order_count: 1
@@ -703,24 +762,64 @@ Format your response with clear headers. Focus on directly answering the user's 
         }
       });
       
-      // Convert to array and sort by order count descending
+      // Sort by profit if available and question asks for profitability, otherwise by sales/order count
+      let sortBy = 'order_count';
+      let analysisType = 'customer_activity';
+      let tableTitle = "Top Customers by Order Volume";
+      let chartTitle = "Top 10 Customers by Order Count";
+      let columns_list = ["Rank", "Customer Name", "Orders", "Total Quantity", "Avg Qty/Order", "Total Discount"];
+      
+      if (hasProfit && questionLower.includes('profitable')) {
+        sortBy = 'total_profit';
+        analysisType = 'customer_profitability';
+        tableTitle = "Most Profitable Customers";
+        chartTitle = "Top 10 Customers by Total Profit";
+        columns_list = ["Rank", "Customer Name", "Total Profit", "Total Sales", "Orders", "Avg Profit/Order"];
+      } else if (hasSales && (questionLower.includes('sales') || questionLower.includes('revenue'))) {
+        sortBy = 'total_sales';
+        analysisType = 'customer_sales';
+        tableTitle = "Top Customers by Sales";
+        chartTitle = "Top 10 Customers by Total Sales";
+        columns_list = ["Rank", "Customer Name", "Total Sales", "Orders", "Total Quantity", "Avg Sales/Order"];
+      }
+      
+      // Convert to array and sort appropriately
       const customerResults = Array.from(customerMap.values())
-        .sort((a, b) => b.order_count - a.order_count)
+        .sort((a, b) => b[sortBy] - a[sortBy])
         .slice(0, 20) // Top 20 customers
         .map((customer, index) => ({
           rank: index + 1,
           customer_name: customer.customer_name,
+          total_profit: Math.round(customer.total_profit * 100) / 100,
+          total_sales: Math.round(customer.total_sales * 100) / 100,
           order_count: customer.order_count,
           total_quantity: Math.round(customer.total_quantity * 100) / 100,
+          avg_profit_per_order: Math.round((customer.total_profit / customer.order_count) * 100) / 100,
+          avg_sales_per_order: Math.round((customer.total_sales / customer.order_count) * 100) / 100,
           avg_quantity_per_order: Math.round((customer.total_quantity / customer.order_count) * 100) / 100,
           total_discount: Math.round(customer.total_discount * 100) / 100
         }));
       
-      // Generate summary insights
+      // Generate summary insights based on analysis type
       const topCustomer = customerResults[0];
-      const totalOrders = customerResults.reduce((sum, c) => sum + c.order_count, 0);
+      let analysisText;
       
-      analysisText = `# Customer Activity Analysis
+      if (hasProfit && questionLower.includes('profitable')) {
+        const totalProfit = customerResults.reduce((sum, c) => sum + c.total_profit, 0);
+        analysisText = `# Customer Profitability Analysis
+
+## Key Finding
+**${topCustomer.customer_name}** is your most profitable customer with $${topCustomer.total_profit.toLocaleString()} in total profit.
+
+## Top 5 Most Profitable Customers
+${customerResults.slice(0, 5).map((c, i) => `${i + 1}. ${c.customer_name}: $${c.total_profit.toLocaleString()} profit`).join('\n')}
+
+## Business Impact
+• Top 5 customers generated $${customerResults.slice(0, 5).reduce((sum, c) => sum + c.total_profit, 0).toLocaleString()} in profit (${Math.round((customerResults.slice(0, 5).reduce((sum, c) => sum + c.total_profit, 0) / totalProfit) * 100)}% of total)
+• Average profit per customer: $${Math.round(totalProfit / customerResults.length).toLocaleString()}`;
+      } else {
+        const totalOrders = customerResults.reduce((sum, c) => sum + c.order_count, 0);
+        analysisText = `# Customer Activity Analysis
 
 ## Key Finding
 **${topCustomer.customer_name}** is your most active customer with ${topCustomer.order_count} orders.
@@ -731,35 +830,39 @@ ${customerResults.slice(0, 5).map((c, i) => `${i + 1}. ${c.customer_name}: ${c.o
 ## Business Impact
 • Top 5 customers placed ${customerResults.slice(0, 5).reduce((sum, c) => sum + c.order_count, 0)} orders (${Math.round((customerResults.slice(0, 5).reduce((sum, c) => sum + c.order_count, 0) / totalOrders) * 100)}% of total)
 • Average orders per customer: ${Math.round(totalOrders / customerResults.length)}`;
+      }
       
       // Return structured results with data table and visualization
       return {
         success: true,
         analysis: analysisText,
         results_table: {
-          title: "Top Customers by Order Volume",
-          columns: ["Rank", "Customer Name", "Orders", "Total Quantity", "Avg Qty/Order", "Total Discount"],
+          title: tableTitle,
+          columns: columns_list,
           data: customerResults,
           total_rows: customerResults.length
         },
         visualization: {
           type: "bar_chart",
-          title: "Top 10 Customers by Order Count",
+          title: chartTitle,
           x_axis: "Customer Name",
-          y_axis: "Number of Orders",
+          y_axis: hasProfit && questionLower.includes('profitable') ? "Total Profit ($)" : 
+                   hasSales && sortBy === 'total_sales' ? "Total Sales ($)" : "Number of Orders",
           data: customerResults.slice(0, 10).map(c => ({
             label: c.customer_name.length > 15 ? c.customer_name.substring(0, 15) + '...' : c.customer_name,
-            value: c.order_count,
-            formatted_value: `${c.order_count} orders`
+            value: c[sortBy],
+            formatted_value: hasProfit && questionLower.includes('profitable') ? `$${c.total_profit.toLocaleString()}` :
+                            hasSales && sortBy === 'total_sales' ? `$${c.total_sales.toLocaleString()}` :
+                            `${c.order_count} orders`
           }))
         },
         metadata: {
           model: 'data-aggregation-engine',
           rows_analyzed: numRows,
-          analysis_type: 'customer_activity',
+          analysis_type: analysisType,
           processing_time: Date.now() - startTime,
           timestamp: new Date().toISOString(),
-          aggregation_performed: 'GROUP BY customer_name, COUNT(*), SUM(quantity), SUM(discount)',
+          aggregation_performed: `GROUP BY customer_name, SUM(${sortBy === 'total_profit' ? 'profit' : sortBy === 'total_sales' ? 'sales' : 'quantity'}), COUNT(*)`,
           token_usage: { prompt_tokens: 150, completion_tokens: 300, total_tokens: 450 }
         }
       };
