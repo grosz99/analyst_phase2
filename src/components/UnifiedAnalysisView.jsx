@@ -293,6 +293,7 @@ function UnifiedAnalysisView({ initialData, previewData, datasetInfo, sessionId,
           </div>
         )}
       </div>
+      )}
 
       {/* AI Analysis Results */}
       <AIAnalysisResults
