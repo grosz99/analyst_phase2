@@ -7,7 +7,8 @@ const AIAnalysisResults = ({
   originalData, 
   question, 
   onNewAnalysis,
-  isLoading = false 
+  isLoading = false,
+  showCompactInput = true
 }) => {
   const [activeTab, setActiveTab] = useState('results');
   const [exportLoading, setExportLoading] = useState(false);
@@ -256,7 +257,8 @@ const AIAnalysisResults = ({
   return (
     <div className="analysis-results-container">
       {/* Compact Question Input for Follow-ups */}
-      <div className="compact-question-section">
+      {showCompactInput && (
+        <div className="compact-question-section">
         <div className="question-header">
           <h3>🔍 Ask a Question About Your Data</h3>
           <p>Use natural language to explore your data with AI analysis</p>
@@ -280,6 +282,7 @@ const AIAnalysisResults = ({
           </button>
         </div>
       </div>
+      )}
 
       {/* Current Question Result */}
       <div className="current-result">

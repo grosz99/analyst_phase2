@@ -62,7 +62,7 @@ const DataPreview = ({ previewData, totalRows, onExport }) => {
 function UnifiedAnalysisView({ initialData, previewData, datasetInfo, sessionId, onReset }) {
   // AI Analysis State
   const [currentQuestion, setCurrentQuestion] = useState('');
-  const [analysisResult, setAnalysisResult] = useState(null);
+  const [analysisHistory, setAnalysisHistory] = useState([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState(null);
   const [aiServiceStatus, setAiServiceStatus] = useState(null);
@@ -127,7 +127,16 @@ function UnifiedAnalysisView({ initialData, previewData, datasetInfo, sessionId,
       );
 
       console.log('✅ AI analysis result:', result);
-      setAnalysisResult(result);
+      
+      // Add to conversation history instead of replacing
+      const newAnalysisItem = {
+        id: Date.now(),
+        question: question || `Perform ${analysisType} analysis`,
+        result: result,
+        timestamp: new Date().toISOString()
+      };
+      
+      setAnalysisHistory(prev => [...prev, newAnalysisItem]);
 
       // Generate new suggestions based on the analysis
       if (result.success && initialData) {
@@ -183,16 +192,22 @@ function UnifiedAnalysisView({ initialData, previewData, datasetInfo, sessionId,
     }
   };
 
-  // Reset analysis or handle new analysis from compact input
+  // Handle new analysis from compact input or reset entire conversation
   const handleNewAnalysis = (newResult = null, newQuestion = '') => {
     if (newResult && newQuestion) {
-      // Handle new analysis from compact input
-      setAnalysisResult(newResult);
-      setCurrentQuestion(newQuestion);
+      // Handle new analysis from compact input - add to conversation history
+      const newAnalysisItem = {
+        id: Date.now(),
+        question: newQuestion,
+        result: newResult,
+        timestamp: new Date().toISOString()
+      };
+      setAnalysisHistory(prev => [...prev, newAnalysisItem]);
+      setCurrentQuestion('');
       setError(null);
     } else {
-      // Reset analysis
-      setAnalysisResult(null);
+      // Reset entire conversation
+      setAnalysisHistory([]);
       setCurrentQuestion('');
       setError(null);
       setSelectedAnalysisType('general');
@@ -200,44 +215,62 @@ function UnifiedAnalysisView({ initialData, previewData, datasetInfo, sessionId,
     }
   };
 
+  // Start a completely new analysis (clear conversation)
+  const handleStartNewAnalysis = () => {
+    setAnalysisHistory([]);
+    setCurrentQuestion('');
+    setError(null);
+    setSelectedAnalysisType('general');
+  };
+
   return (
     <div className="unified-analysis-view">
-      {/* Header */}
-      <div className="analysis-header">
-        <div className="header-content">
-          <h1 className="header-title">🤖 AI-Powered Data Analysis</h1>
-          <p className="header-subtitle">{datasetInfo}</p>
-          
-          {/* AI Service Status */}
-          {aiServiceStatus && (
-            <div className="ai-status">
-              {aiServiceStatus.success ? (
-                <span className="status-badge status-healthy">
-                  ✅ AI Analysis Ready
-                </span>
-              ) : (
-                <span className="status-badge status-error">
-                  ❌ AI Service Unavailable
-                </span>
-              )}
-            </div>
-          )}
+      {/* Beacon Header */}
+      <div className="beacon-header">
+        <div className="beacon-logo">
+          <div className="logo-icon">🏗️</div>
+          <h1>Beacon</h1>
         </div>
         
-        <button onClick={onReset} className="reset-btn">
-          🔄 New Dataset
+        {/* 3-Step Process Bar */}
+        <div className="process-steps">
+          <div className="step completed">
+            <div className="step-number">1</div>
+            <div className="step-label">Explore Data Sources</div>
+          </div>
+          <div className="step-divider"></div>
+          <div className="step completed">
+            <div className="step-number">2</div>
+            <div className="step-label">Select Filters</div>
+          </div>
+          <div className="step-divider"></div>
+          <div className="step active">
+            <div className="step-number">3</div>
+            <div className="step-label">Ask Your Question</div>
+          </div>
+        </div>
+        
+        <button onClick={onReset} className="new-dataset-btn">
+          New Dataset
         </button>
       </div>
+      
+      {/* Dataset Info Bar */}
+      <div className="dataset-info-bar">
+        <span className="dataset-status">✅ AI Analysis Ready</span>
+        <span className="dataset-details">{datasetInfo}</span>
+      </div>
 
-      {/* Data Preview */}
-      <DataPreview 
+      <div className="content-area">
+        {/* Data Preview */}
+        <DataPreview 
         previewData={previewData || initialData?.slice(0, 10)} 
         totalRows={initialData?.length} 
         onExport={handleExportData} 
       />
 
       {/* Compact Analysis Interface */}
-      {!analysisResult && (
+      {analysisHistory.length === 0 && (
         <div className="analysis-interface">
           <form onSubmit={handleSubmitQuestion} className="question-form">
             <div className="form-header">
@@ -298,14 +331,43 @@ function UnifiedAnalysisView({ initialData, previewData, datasetInfo, sessionId,
       </div>
       )}
 
-      {/* AI Analysis Results */}
-      <AIAnalysisResults
-        analysisResult={analysisResult}
-        originalData={initialData}
-        question={currentQuestion}
-        onNewAnalysis={handleNewAnalysis}
-        isLoading={isAnalyzing}
-      />
+      {/* Conversation History */}
+      {analysisHistory.length > 0 && (
+        <div className="conversation-container">
+          <div className="conversation-header">
+            <h2>Analysis Conversation</h2>
+            <button onClick={handleStartNewAnalysis} className="new-analysis-btn">
+              Start New Analysis
+            </button>
+          </div>
+          
+          {/* Render each question/answer pair in conversation */}
+          {analysisHistory.map((item, index) => (
+            <div key={item.id} className="conversation-item">
+              <div className="conversation-number">#{index + 1}</div>
+              <AIAnalysisResults
+                analysisResult={item.result}
+                originalData={initialData}
+                question={item.question}
+                onNewAnalysis={handleNewAnalysis}
+                isLoading={false}
+                showCompactInput={index === analysisHistory.length - 1} // Only show input on last item
+              />
+            </div>
+          ))}
+          
+          {/* Loading state for new question */}
+          {isAnalyzing && (
+            <div className="conversation-item">
+              <div className="conversation-number">#{analysisHistory.length + 1}</div>
+              <div className="analysis-loading">
+                <div className="loading-spinner"></div>
+                <p>Analyzing your question...</p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Service Unavailable Message */}
       {aiServiceStatus && !aiServiceStatus.success && (
@@ -322,6 +384,7 @@ function UnifiedAnalysisView({ initialData, previewData, datasetInfo, sessionId,
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }
