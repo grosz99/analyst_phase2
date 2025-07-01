@@ -238,9 +238,14 @@ Important: Base your analysis only on the provided data. Do not make assumptions
         throw new Error('Analysis response failed security validation');
       }
 
+      // Generate structured results from the analysis
+      const structuredResults = this.generateStructuredResults(sanitizedData, userContext, analysisText);
+      
       return {
         success: true,
         analysis: analysisText,
+        results_table: structuredResults.results_table,
+        visualization: structuredResults.visualization,
         metadata: {
           model: 'claude-3-5-sonnet',
           rows_analyzed: sanitizedData.length,
@@ -304,6 +309,91 @@ Important: Base your analysis only on the provided data. Do not make assumptions
         message: 'Anthropic API connectivity issue'
       };
     }
+  }
+
+  // Generate structured results from AI analysis text
+  generateStructuredResults(data, userContext, analysisText) {
+    const questionLower = userContext.toLowerCase();
+    const columns = Object.keys(data[0] || {});
+    const hasCustomer = columns.some(col => col.toLowerCase().includes('customer'));
+    
+    // If it's a customer analysis, generate customer data table
+    if (questionLower.includes('customer') && hasCustomer) {
+      const customerMap = new Map();
+      
+      data.forEach(row => {
+        const customerName = row.CUSTOMER_NAME || row.Customer || row.customer_name || 'Unknown';
+        const quantity = parseFloat(row.QUANTITY || row.Quantity || row.quantity || 1);
+        
+        if (customerMap.has(customerName)) {
+          const existing = customerMap.get(customerName);
+          customerMap.set(customerName, {
+            customer_name: customerName,
+            order_count: existing.order_count + 1,
+            total_quantity: existing.total_quantity + quantity
+          });
+        } else {
+          customerMap.set(customerName, {
+            customer_name: customerName,
+            order_count: 1,
+            total_quantity: quantity
+          });
+        }
+      });
+      
+      const customerResults = Array.from(customerMap.values())
+        .sort((a, b) => b.order_count - a.order_count)
+        .slice(0, 10)
+        .map((customer, index) => ({
+          rank: index + 1,
+          customer_name: customer.customer_name,
+          order_count: customer.order_count,
+          total_quantity: Math.round(customer.total_quantity * 100) / 100,
+          avg_quantity: Math.round((customer.total_quantity / customer.order_count) * 100) / 100
+        }));
+      
+      return {
+        results_table: {
+          title: "Customer Activity Analysis",
+          columns: ["Rank", "Customer Name", "Orders", "Total Quantity", "Avg Quantity/Order"],
+          data: customerResults,
+          total_rows: customerResults.length
+        },
+        visualization: {
+          type: "bar_chart",
+          title: "Top Customers by Order Count",
+          x_axis: "Customer Name",
+          y_axis: "Number of Orders",
+          data: customerResults.slice(0, 8).map(c => ({
+            label: c.customer_name.length > 15 ? c.customer_name.substring(0, 15) + '...' : c.customer_name,
+            value: c.order_count,
+            formatted_value: `${c.order_count} orders`
+          }))
+        }
+      };
+    }
+    
+    // Default: return basic data summary
+    return {
+      results_table: {
+        title: "Data Summary",
+        columns: ["Metric", "Value"],
+        data: [
+          { metric: "Total Records", value: data.length },
+          { metric: "Total Columns", value: columns.length },
+          { metric: "Primary Fields", value: columns.slice(0, 3).join(', ') }
+        ],
+        total_rows: 3
+      },
+      visualization: {
+        type: "summary_stats",
+        title: "Dataset Overview",
+        data: {
+          total_records: data.length,
+          total_columns: columns.length
+        }
+      }
+    };
   }
 
   // Generate analysis by actually executing data operations (like Python would)
