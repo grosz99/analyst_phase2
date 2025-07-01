@@ -626,14 +626,18 @@ tables:
       analysis += `• Identifying top performers`;
       
     } else {
-      // Fallback to general summary
-      sql = `SELECT COUNT(*) as total_records, COUNT(DISTINCT CUSTOMER_ID) as unique_customers, SUM(SALES) as total_sales, SUM(PROFIT) as total_profit FROM SUPERSTORE`;
+      // For unrecognized patterns, try to infer from available columns
+      const hasCategory = columnMappings.category;
+      const hasSales = columnMappings.sales;
       
-      analysis = `• Performing general data analysis\n`;
-      analysis += `• Calculating key business metrics\n`;
-      analysis += `• Providing overview statistics`;
-      
-      suggestions = ['What are the top-selling products?', 'Which customers are most profitable?'];
+      if (hasCategory && hasSales) {
+        // Default to category analysis
+        sql = `SELECT ${columnMappings.category}, SUM(${columnMappings.sales}) as total_sales, COUNT(*) as record_count FROM SUPERSTORE GROUP BY ${columnMappings.category} ORDER BY total_sales DESC LIMIT 10`;
+        analysis = `• Analyzing sales performance by category\n• Grouping ${data.length} records to find patterns\n• Identifying top-performing categories`;
+        suggestions = ['Which categories are most profitable?', 'What products sell best in each category?'];
+      } else {
+        throw new Error('Unable to determine appropriate analysis for this question with available data columns');
+      }
     }
     
     return {
@@ -794,11 +798,11 @@ tables:
         return this.executeSimulatedSQL(sqlComponents, data, question);
       }
       
-      return this.createFallbackTable(data);
+      throw new Error(`Unable to parse SQL query: ${sql}`);
       
     } catch (error) {
       console.error('Error executing SQL:', error);
-      return this.createFallbackTable(data);
+      throw error; // Let the error bubble up instead of fallback
     }
   }
 
@@ -915,7 +919,7 @@ tables:
       
       // Format as table
       if (results.length === 0) {
-        return this.createFallbackTable(data);
+        throw new Error('SQL query executed but returned no results');
       }
       
       const columns = Object.keys(results[0]);
@@ -939,7 +943,7 @@ tables:
       
     } catch (error) {
       console.error('Error executing simulated SQL:', error);
-      return this.createFallbackTable(data);
+      throw error; // Let the error bubble up
     }
   }
 
@@ -1108,38 +1112,6 @@ ${sql}
     };
   }
 
-  // Fallback methods
-  createFallbackResponse(question, data) {
-    return {
-      analysis: `Cortex Analyst attempted to analyze: "${question}". However, the response could not be processed.`,
-      python_code: {
-        code: '# Cortex Analyst analysis could not be completed',
-        blocks: [],
-        executable: false
-      },
-      results_table: this.createFallbackTable(data),
-      visualization: {
-        type: "summary_stats",
-        title: "Analysis Overview",
-        data: { total_records: data.length }
-      },
-      refined_questions: []
-    };
-  }
-
-  createFallbackTable(data) {
-    console.warn('⚠️  Creating fallback table - this should rarely happen with intelligent SQL generation');
-    return {
-      title: "Analysis Summary",
-      columns: ["Metric", "Value"],
-      data: [
-        { metric: "Total Records", value: data.length },
-        { metric: "Total Columns", value: Object.keys(data[0] || {}).length },
-        { metric: "Status", value: "Analysis completed with basic metrics" }
-      ],
-      total_rows: 3
-    };
-  }
 
   // Health check
   async healthCheck() {
