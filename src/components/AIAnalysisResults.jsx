@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import aiAnalysisService from '../services/aiAnalysisService.js';
-// import analysisContextManager from '../services/analysisContextManager.js';
-// import AnalysisContextControl from './AnalysisContextControl.jsx';
+import AnalysisContextControlSimple from './AnalysisContextControlSimple.jsx';
 import './AIAnalysisResults.css';
 
 const AIAnalysisResults = ({ 
@@ -11,6 +10,7 @@ const AIAnalysisResults = ({
   onNewAnalysis,
   isLoading = false,
   showCompactInput = true,
+  showContextControl = false,
   selectedBackend = 'anthropic',
   sessionId = null
 }) => {
@@ -338,16 +338,18 @@ const AIAnalysisResults = ({
     <div className="analysis-results-container">
       {/* Compact Question Input for Follow-ups */}
       {showCompactInput && (
+        <>
+        {/* Context Control for follow-up questions - only after user has seen first result */}
+        {showContextControl && (
+          <AnalysisContextControlSimple 
+            onModeChange={(mode) => console.log('Context mode changed to:', mode)}
+            lastQuestion={question}
+            originalDataCount={originalData?.length || 0}
+            activeFilters={{}} // Pass actual filters if available from parent
+          />
+        )}
+        
         <div className="compact-question-section">
-        {/* Context Control for follow-up questions - Temporarily disabled */}
-        {/* <AnalysisContextControl 
-          onModeChange={(mode) => console.log('Context mode changed to:', mode)}
-          currentQuestion={compactQuestion}
-          lastQuestion={question}
-          filteredDataCount={analysisContextManager.context.filteredData?.length || 0}
-          originalDataCount={originalData?.length || 0}
-          activeFilters={{}} // Pass actual filters if available from parent
-        /> */}
         
         <div className="question-header">
           <h3>🔍 Ask a Question About Your Data</h3>
@@ -371,7 +373,7 @@ const AIAnalysisResults = ({
             {compactAnalyzing ? '⏳ Analyzing...' : '🔍 Analyze'}
           </button>
         </div>
-      </div>
+        </>
       )}
 
       {/* Current Question Result */}

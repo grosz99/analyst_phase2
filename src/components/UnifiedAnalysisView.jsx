@@ -407,13 +407,6 @@ function UnifiedAnalysisView({ initialData, cachedDataset, dataLoadedTimestamp, 
             </button>
           </div>
           
-          {/* Context Control - Only show after first question */}
-          <AnalysisContextControlSimple 
-            onModeChange={(mode) => console.log('Context mode changed to:', mode)}
-            lastQuestion={analysisHistory.length > 0 ? analysisHistory[analysisHistory.length - 1].question : null}
-            originalDataCount={initialData?.length || 0}
-            activeFilters={selectedFilters}
-          />
           
           {/* Render each question/answer pair in conversation */}
           {analysisHistory.map((item, index) => (
@@ -426,6 +419,7 @@ function UnifiedAnalysisView({ initialData, cachedDataset, dataLoadedTimestamp, 
                 onNewAnalysis={handleNewAnalysis}
                 isLoading={false}
                 showCompactInput={index === analysisHistory.length - 1} // Only show input on last item
+                showContextControl={index >= 1 && index === analysisHistory.length - 1} // Only show context control from 2nd question onwards and on last item
                 selectedBackend={selectedBackend}
                 sessionId={sessionId}
               />
