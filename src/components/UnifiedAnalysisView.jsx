@@ -50,9 +50,9 @@ const DataPreview = ({ previewData, totalRows, onExport }) => {
       </div>
       {isExpanded && (
         <div className="preview-content">
-          <ResultsTable data={previewData} headers={headers} />
-          {totalRows > previewData.length && (
-            <p className="preview-note">Showing first {previewData.length} rows of {totalRows} total rows</p>
+          <ResultsTable data={previewData.slice(0, 5)} headers={headers} />
+          {totalRows > 5 && (
+            <p className="preview-note">Showing first 5 rows of {totalRows} total rows</p>
           )}
         </div>
       )}
@@ -267,18 +267,6 @@ function UnifiedAnalysisView({ initialData, cachedDataset, dataLoadedTimestamp, 
 
   return (
     <div className="unified-analysis-view">
-      {/* Analysis Header */}
-      <div className="beacon-header">
-        <div className="beacon-logo">
-          <div className="logo-icon">⚡</div>
-          <h1>AI Data Analysis</h1>
-        </div>
-        
-        
-        <button onClick={onReset} className="new-dataset-btn">
-          New Dataset
-        </button>
-      </div>
       
       {/* Dataset Info Bar */}
       <div className="dataset-info-bar">
