@@ -8,7 +8,9 @@ const AIAnalysisResults = ({
   question, 
   onNewAnalysis,
   isLoading = false,
-  showCompactInput = true
+  showCompactInput = true,
+  selectedBackend = 'anthropic',
+  sessionId = null
 }) => {
   const [activeTab, setActiveTab] = useState('results');
   const [exportLoading, setExportLoading] = useState(false);
@@ -233,7 +235,9 @@ const AIAnalysisResults = ({
       const result = await aiAnalysisService.analyzeData(
         originalData,
         compactQuestion,
-        'general'
+        'general',
+        sessionId,
+        selectedBackend
       );
       
       if (result.success) {
@@ -261,7 +265,9 @@ const AIAnalysisResults = ({
       const result = await aiAnalysisService.analyzeData(
         originalData,
         suggestion,
-        'general'
+        'general',
+        sessionId,
+        selectedBackend
       );
       
       if (result.success) {
@@ -319,6 +325,11 @@ const AIAnalysisResults = ({
       <div className="current-result">
         <div className="analysis-question">
           <h2>{question}</h2>
+          <div className="backend-indicator">
+            <span className={`backend-badge ${selectedBackend}`}>
+              {selectedBackend === 'cortex_analyst' ? '🧠 Cortex Analyst' : '🤖 Anthropic Claude'}
+            </span>
+          </div>
         </div>
 
         {/* AI Response */}

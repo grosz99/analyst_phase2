@@ -426,6 +426,8 @@ function UnifiedAnalysisView({ initialData, cachedDataset, dataLoadedTimestamp, 
                 onNewAnalysis={handleNewAnalysis}
                 isLoading={false}
                 showCompactInput={index === analysisHistory.length - 1} // Only show input on last item
+                selectedBackend={selectedBackend}
+                sessionId={sessionId}
               />
             </div>
           ))}
