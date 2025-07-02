@@ -46,12 +46,39 @@ class CortexAnalystService {
     }
   }
 
+  /**
+   * Reset state before each request to prevent cross-request contamination
+   */
+  resetRequestState() {
+    try {
+      // Reset SQL generator state
+      this.sqlGenerator.resetState();
+      
+      // Clear any response formatter state if needed
+      if (this.responseFormatter.clearState) {
+        this.responseFormatter.clearState();
+      }
+      
+      console.log('🔄 Cortex Analyst request state reset complete');
+    } catch (error) {
+      console.warn('⚠️ Warning: State reset failed:', error.message);
+    }
+  }
+
   // Main analysis method using Cortex Analyst
   async analyzeData(data, question, analysisType = 'general', identifier = 'default') {
     try {
       if (!this.initialized) {
-        throw new Error('Cortex Analyst service not initialized. Please check Snowflake credentials.');
+        console.log('🔄 Cortex service not initialized, attempting re-initialization...');
+        await this.initialize();
+        
+        if (!this.initialized) {
+          throw new Error('Cortex Analyst service not initialized. Please check Snowflake credentials.');
+        }
       }
+
+      // 🔄 CRITICAL: Reset state before each request to prevent cross-request contamination
+      this.resetRequestState();
 
       this.client.checkRateLimit(identifier);
 
@@ -123,6 +150,14 @@ class CortexAnalystService {
         
       } catch (cortexError) {
         console.warn('⚠️ Cortex Analyst API failed, using local SQL generation:', cortexError.message);
+        console.warn('🔍 Cortex failure details:', {
+          error: cortexError.message,
+          question: question,
+          requestId: identifier,
+          initialized: this.initialized,
+          hasCredentials: !!this.client.credentials,
+          hasAuthToken: !!this.client.authToken
+        });
         
         // Fallback to local SQL generation and simulation
         return await this.handleLocalAnalysis(data, question, sqlResult, startTime, analysisType);

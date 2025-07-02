@@ -269,12 +269,22 @@ class CortexClient {
     const recentRequests = requests.filter(time => time > windowStart);
     this.rateLimiter.set(identifier, recentRequests);
     
+    // Clean up old identifiers that haven't been used in 5 minutes to prevent memory leaks
+    const cleanupThreshold = now - 300000; // 5 minutes
+    for (const [id, times] of this.rateLimiter.entries()) {
+      if (times.length === 0 || Math.max(...times) < cleanupThreshold) {
+        this.rateLimiter.delete(id);
+      }
+    }
+    
     if (recentRequests.length >= this.MAX_REQUESTS_PER_MINUTE) {
       throw new Error('Rate limit exceeded for Cortex Analyst. Please wait before making another request.');
     }
     
     // Add current request
     recentRequests.push(now);
+    
+    console.log(`🚦 Rate limit check for ${identifier}: ${recentRequests.length}/${this.MAX_REQUESTS_PER_MINUTE} requests`);
   }
 
   // Health check

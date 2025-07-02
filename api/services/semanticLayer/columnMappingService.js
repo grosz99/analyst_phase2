@@ -278,6 +278,22 @@ class ColumnMappingService {
   }
 
   /**
+   * Clear old cache entries to prevent memory leaks
+   */
+  cleanupCache() {
+    // If cache gets too large (>100 entries), clear half of it
+    if (this.mappingCache.size > 100) {
+      const entries = Array.from(this.mappingCache.entries());
+      const entriesToKeep = entries.slice(entries.length / 2); // Keep newest half
+      this.mappingCache.clear();
+      entriesToKeep.forEach(([key, value]) => {
+        this.mappingCache.set(key, value);
+      });
+      console.log(`🧹 Column mapping cache cleaned up: ${entriesToKeep.length} entries kept`);
+    }
+  }
+
+  /**
    * Add or update a semantic mapping
    * @param {string} logicalColumn - The logical column name
    * @param {Object} mapping - The mapping configuration

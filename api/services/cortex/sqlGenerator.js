@@ -28,6 +28,14 @@ class SqlGenerator {
     };
   }
 
+  /**
+   * Reset generator state to prevent cross-request contamination
+   */
+  resetState() {
+    this.columnMapper.cleanupCache();
+    console.log('🔄 SQL Generator state reset');
+  }
+
   // Main method to generate SQL from natural language question
   generateSqlFromQuestion(question, data) {
     try {
