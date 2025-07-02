@@ -117,38 +117,35 @@ class AnthropicService {
     
     return `You are a data analyst. Analyze this dataset and provide insights for the user's question.
 
-CRITICAL: Only use the existing columns in the DataFrame. Do NOT create new calculated columns or metrics.
+🚨 CRITICAL CONSTRAINT: You can ONLY use these exact column names in your code: ${dataStructure.columns.join(', ')}
 
 DATASET STRUCTURE:
-- ${data.length} total records
-- EXACT COLUMNS AVAILABLE: ${dataStructure.columns.join(', ')}
-- Numeric columns for aggregation: ${dataStructure.numericColumns.join(', ') || 'None'}
-- Categorical columns for grouping: ${dataStructure.categoricalColumns.join(', ') || 'None'}
-- Date columns: ${dataStructure.dateColumns.join(', ') || 'None'}
+- ${data.length} total records  
+- ✅ AVAILABLE COLUMNS: ${dataStructure.columns.join(', ')}
+- ❌ FORBIDDEN: Creating new columns, calculations, or derived metrics
+- Numeric columns: ${dataStructure.numericColumns.join(', ') || 'None'}
+- Categorical columns: ${dataStructure.categoricalColumns.join(', ') || 'None'}
 
-SAMPLE DATA (first 5 rows):
+SAMPLE DATA (showing exact column names):
 ${JSON.stringify(sampleData, null, 2)}
 
 USER QUESTION: "${userContext}"
 
-INSTRUCTIONS:
-1. ONLY use columns that exist in the dataset: ${dataStructure.columns.join(', ')}
-2. For aggregations, use SUM() for financial metrics, COUNT() for counting records
-3. Do NOT calculate averages unless specifically asked
-4. Do NOT create new calculated columns or derived metrics
-5. Group by categorical columns, sum or count the numeric columns
+🔒 MANDATORY RULES:
+1. NEVER create calculated columns like 'DISCOUNT_AMOUNT' - use existing 'DISCOUNT' column directly
+2. NEVER reference columns not in this list: ${dataStructure.columns.join(', ')}
+3. Use existing columns AS-IS: no calculations, no derived metrics
+4. For discount analysis: use the existing 'DISCOUNT' column (percentage), don't calculate amounts
+5. If user asks about something not available, explain what columns you DO have
 
-Python code requirements:
-- Use DataFrame 'df' with exact column names shown above
-- Use df.groupby() for grouping analysis
-- Use .sum() for financial totals, .count() for record counts
-- Use .sort_values() for ranking/top analysis
-- Only reference columns that exist: ${dataStructure.columns.join(', ')}
+✅ CORRECT Python patterns (using ONLY existing columns):
+df.groupby('PRODUCT_NAME')['SALES'].sum().sort_values(ascending=False).head(5)
+df.groupby('PRODUCT_NAME')['DISCOUNT'].mean().sort_values(ascending=False).head(5)  
+df.groupby('CATEGORY')['PROFIT'].sum()
 
-Example good code patterns:
-df.groupby('CATEGORY')['SALES'].sum().sort_values(ascending=False)
-df.groupby('REGION')['PROFIT'].sum()
-df.groupby('SHIP_MODE').size().sort_values(ascending=False)
+❌ FORBIDDEN patterns:
+df['DISCOUNT_AMOUNT'] = df['SALES'] * df['DISCOUNT']  # NO - creates new column
+df['PROFIT_MARGIN'] = df['PROFIT'] / df['SALES']      # NO - creates new column
 
 Provide:
 1. Clear analysis answering the user's question

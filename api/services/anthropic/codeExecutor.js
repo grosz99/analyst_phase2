@@ -4,6 +4,17 @@
  */
 class CodeExecutor {
   
+  // Create error response for invalid code
+  createErrorResponse(message) {
+    return {
+      success: false,
+      error: message,
+      headers: ['Error'],
+      rows: [[message]],
+      totalRows: 1
+    };
+  }
+  
   // Execute AI's Python analysis on cached dataset (the core intelligence)
   executeAnalysisOnCachedData(data, userContext, analysisText, pythonCode) {
     try {
@@ -59,6 +70,34 @@ class CodeExecutor {
   executePandasOperations(df, codeString, userContext) {
     try {
       const questionLower = userContext.toLowerCase();
+      const availableColumns = df.columns;
+      
+      // 🚨 VALIDATION: Check for forbidden calculated columns
+      const forbiddenPatterns = [
+        /df\['DISCOUNT_AMOUNT'\]/g,
+        /df\['PROFIT_MARGIN'\]/g,
+        /df\['.*'\]\s*=\s*df\[/g, // Any assignment like df['new_col'] = df['existing']
+        /\.assign\(/g,
+        /DISCOUNT_AMOUNT/g,
+        /PROFIT_MARGIN/g
+      ];
+      
+      for (const pattern of forbiddenPatterns) {
+        if (pattern.test(codeString)) {
+          console.warn(`🚨 Blocked forbidden pattern: ${pattern} in code: ${codeString.substring(0, 100)}`);
+          return this.createErrorResponse(`Code contains forbidden calculated columns. Use only existing columns: ${availableColumns.join(', ')}`);
+        }
+      }
+      
+      // Validate all column references exist
+      const columnReferences = codeString.match(/df\['(\w+)'\]|df\.(\w+)/g) || [];
+      for (const ref of columnReferences) {
+        const columnName = ref.match(/df\['(\w+)'\]|df\.(\w+)/)[1] || ref.match(/df\['(\w+)'\]|df\.(\w+)/)[2];
+        if (columnName && !availableColumns.includes(columnName)) {
+          console.warn(`🚨 Invalid column reference: ${columnName}. Available: ${availableColumns.join(', ')}`);
+          return this.createErrorResponse(`Column '${columnName}' does not exist. Available columns: ${availableColumns.join(', ')}`);
+        }
+      }
       
       // Parse common pandas patterns from the AI's code
       if (codeString.includes('value_counts()')) {
@@ -175,27 +214,46 @@ class CodeExecutor {
       const result = { [groupColumn]: groupValue };
       
       aggregations.forEach(agg => {
-        const values = groupData.map(row => parseFloat(row[agg.column]) || 0);
-        
-        if (agg.operation === 'sum') {
-          const sum = values.reduce((total, val) => total + val, 0);
-          result[agg.column.toUpperCase()] = Math.round(sum * 100) / 100; // Round to 2 decimals
-        } else if (agg.operation === 'count') {
-          result[`${agg.column}_COUNT`] = groupData.length;
-        } else if (agg.operation === 'mean') {
-          const sum = values.reduce((total, val) => total + val, 0);
-          result[`${agg.column}_AVG`] = Math.round((sum / values.length) * 100) / 100;
+        if (agg.column === 'records') {
+          result.RECORD_COUNT = groupData.length;
+        } else {
+          const values = groupData.map(row => parseFloat(row[agg.column]) || 0);
+          
+          if (agg.operation === 'sum') {
+            const sum = values.reduce((total, val) => total + val, 0);
+            result[agg.column.toUpperCase()] = Math.round(sum * 100) / 100; // Round to 2 decimals
+          } else if (agg.operation === 'count') {
+            result[`${agg.column}_COUNT`] = groupData.length;
+          } else if (agg.operation === 'mean') {
+            const sum = values.reduce((total, val) => total + val, 0);
+            result[`AVG_${agg.column.toUpperCase()}`] = Math.round((sum / values.length) * 100) / 100;
+          }
         }
       });
       
-      // Always include order count for customer analysis
-      result.ORDER_COUNT = groupData.length;
+      // Only include record count if no other aggregations or if specifically requested
+      if (aggregations.length === 0 || aggregations.some(agg => agg.operation === 'count')) {
+        result.RECORD_COUNT = groupData.length;
+      }
       
       return result;
     });
     
     // Sort by the first aggregated column in descending order
-    const sortColumn = aggregations.length > 0 ? aggregations[0].column.toUpperCase() : 'ORDER_COUNT';
+    let sortColumn = 'RECORD_COUNT'; // Default fallback
+    
+    if (aggregations.length > 0) {
+      const firstAgg = aggregations[0];
+      if (firstAgg.operation === 'sum') {
+        sortColumn = firstAgg.column.toUpperCase();
+      } else if (firstAgg.operation === 'mean') {
+        sortColumn = `AVG_${firstAgg.column.toUpperCase()}`;
+      } else if (firstAgg.operation === 'count') {
+        sortColumn = firstAgg.column === 'records' ? 'RECORD_COUNT' : `${firstAgg.column}_COUNT`;
+      }
+    }
+    
+    console.log(`🔄 Sorting results by column: ${sortColumn}`);
     const sortedResults = results.sort((a, b) => (b[sortColumn] || 0) - (a[sortColumn] || 0));
     
     return {
@@ -237,11 +295,40 @@ class CodeExecutor {
       }
     }
     
+    if (codeString.includes('.mean()')) {
+      const meanMatch = codeString.match(/\['(\w+)'\]\.mean\(\)/);
+      if (meanMatch) {
+        aggregations.push({ column: meanMatch[1], operation: 'mean' });
+      }
+    }
+    
     if (codeString.includes('.count()')) {
       aggregations.push({ column: 'records', operation: 'count' });
     }
     
-    return aggregations.length > 0 ? aggregations : [{ column: 'records', operation: 'count' }];
+    // Fallback: if no aggregations found, try to infer from context
+    if (aggregations.length === 0) {
+      console.log('🔍 No aggregations found, attempting to infer from code context');
+      
+      // Look for column references in the code
+      const columnRefs = codeString.match(/\['(\w+)'\]/g);
+      if (columnRefs && columnRefs.length > 0) {
+        const column = columnRefs[columnRefs.length - 1].match(/\['(\w+)'\]/)[1]; // Use last column ref
+        
+        // Infer operation from context
+        if (codeString.includes('discount') || codeString.includes('DISCOUNT')) {
+          aggregations.push({ column: column, operation: 'mean' });
+        } else if (codeString.includes('sales') || codeString.includes('profit') || codeString.includes('SALES') || codeString.includes('PROFIT')) {
+          aggregations.push({ column: column, operation: 'sum' });
+        } else {
+          aggregations.push({ column: column, operation: 'sum' }); // Default to sum
+        }
+      } else {
+        aggregations.push({ column: 'records', operation: 'count' }); // Ultimate fallback
+      }
+    }
+    
+    return aggregations;
   }
 
   // Perform date-based analysis (handles datetime filtering and counting)
