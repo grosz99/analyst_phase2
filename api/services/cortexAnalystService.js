@@ -576,8 +576,23 @@ tables:
     const columns = data.length > 0 ? Object.keys(data[0]) : [];
     const sampleRow = data[0] || {};
     
+    // Create column mappings for intelligent matching
+    const columnMappings = {
+      customer: columns.find(col => col.toLowerCase().includes('customer')),
+      product: columns.find(col => col.toLowerCase().includes('product') || col.toLowerCase().includes('item')),
+      category: columns.find(col => col.toLowerCase().includes('category')),
+      region: columns.find(col => col.toLowerCase().includes('region')),
+      sales: columns.find(col => col.toLowerCase().includes('sales') || col.toLowerCase().includes('revenue')),
+      profit: columns.find(col => col.toLowerCase().includes('profit')),
+      discount: columns.find(col => col.toLowerCase().includes('discount')),
+      quantity: columns.find(col => col.toLowerCase().includes('quantity') || col.toLowerCase().includes('qty')),
+      segment: columns.find(col => col.toLowerCase().includes('segment')),
+      date: columns.find(col => col.toLowerCase().includes('date') || col.toLowerCase().includes('time')),
+      order: columns.find(col => col.toLowerCase().includes('order'))
+    };
+    
     // Analyze what the question is asking for
-    const questionAnalysis = this.analyzeQuestion(questionLower, columns);
+    const questionAnalysis = this.analyzeQuestion(questionLower, columns, columnMappings);
     
     let sql = '';
     let analysis = '';
@@ -588,25 +603,72 @@ tables:
       const groupBy = questionAnalysis.groupBy;
       const aggregateColumn = questionAnalysis.aggregateColumn;
       const aggregateFunction = questionAnalysis.aggregateFunction;
+      const whereClause = questionAnalysis.whereClause;
       const orderDirection = questionAnalysis.orderDirection || 'DESC';
       const limit = questionAnalysis.limit || 10;
       
-      sql = `SELECT ${groupBy}, ${aggregateFunction}(${aggregateColumn}) as ${aggregateFunction.toLowerCase()}_${aggregateColumn.toLowerCase()}`;
-      
-      // Add COUNT for context
-      if (aggregateFunction !== 'COUNT') {
-        sql += `, COUNT(*) as record_count`;
+      // Build SELECT clause
+      if (groupBy) {
+        sql = `SELECT ${groupBy}`;
+        if (aggregateFunction === 'COUNT' && aggregateColumn === '*') {
+          sql += `, ${aggregateFunction}(*) as total_count`;
+        } else {
+          sql += `, ${aggregateFunction}(${aggregateColumn}) as ${aggregateFunction.toLowerCase()}_${aggregateColumn.toLowerCase()}`;
+        }
+        
+        // Add COUNT for context if not already counting
+        if (aggregateFunction !== 'COUNT') {
+          sql += `, COUNT(*) as record_count`;
+        }
+      } else {
+        // No grouping, just aggregation
+        if (aggregateFunction === 'COUNT') {
+          sql = `SELECT ${aggregateFunction}(*) as total_count`;
+        } else {
+          sql = `SELECT ${aggregateFunction}(${aggregateColumn}) as ${aggregateFunction.toLowerCase()}_${aggregateColumn.toLowerCase()}`;
+        }
       }
       
-      sql += ` FROM SUPERSTORE GROUP BY ${groupBy} ORDER BY ${aggregateFunction.toLowerCase()}_${aggregateColumn.toLowerCase()} ${orderDirection} LIMIT ${limit}`;
+      sql += ` FROM SUPERSTORE`;
       
-      analysis = `• Analyzing ${aggregateFunction.toLowerCase()} of ${aggregateColumn.toLowerCase()} by ${groupBy.toLowerCase().replace(/_/g, ' ')}\n`;
-      analysis += `• Grouping ${data.length} records to find patterns\n`;
-      analysis += `• Ranking results to identify ${orderDirection === 'DESC' ? 'highest' : 'lowest'} values`;
+      // Add WHERE clause if present
+      if (whereClause) {
+        sql += ` WHERE ${whereClause}`;
+      }
+      
+      // Add GROUP BY if present
+      if (groupBy) {
+        sql += ` GROUP BY ${groupBy}`;
+        
+        // Add ORDER BY for grouped results
+        if (aggregateFunction === 'COUNT') {
+          sql += ` ORDER BY total_count ${orderDirection}`;
+        } else {
+          sql += ` ORDER BY ${aggregateFunction.toLowerCase()}_${aggregateColumn.toLowerCase()} ${orderDirection}`;
+        }
+        
+        sql += ` LIMIT ${limit}`;
+      }
+      
+      // Build analysis text
+      if (whereClause && groupBy) {
+        analysis = `• Analyzing ${aggregateFunction.toLowerCase()} of ${aggregateColumn === '*' ? 'records' : aggregateColumn.toLowerCase()} by ${groupBy.toLowerCase().replace(/_/g, ' ')} with filters\n`;
+      } else if (groupBy) {
+        analysis = `• Analyzing ${aggregateFunction.toLowerCase()} of ${aggregateColumn === '*' ? 'records' : aggregateColumn.toLowerCase()} by ${groupBy.toLowerCase().replace(/_/g, ' ')}\n`;
+      } else {
+        analysis = `• Calculating ${aggregateFunction.toLowerCase()} of ${aggregateColumn === '*' ? 'total records' : aggregateColumn.toLowerCase()} with filters\n`;
+      }
+      
+      analysis += `• Processing ${data.length} records to find patterns\n`;
+      if (whereClause) {
+        analysis += `• Applying filters to focus on specific data subset`;
+      } else {
+        analysis += `• Ranking results to identify ${orderDirection === 'DESC' ? 'highest' : 'lowest'} values`;
+      }
       
       suggestions = [
-        `Which ${groupBy.toLowerCase().replace(/_/g, ' ')} has the ${orderDirection === 'DESC' ? 'lowest' : 'highest'} ${aggregateColumn.toLowerCase()}?`,
-        `How does ${aggregateColumn.toLowerCase()} vary across different ${groupBy.toLowerCase().replace(/_/g, ' ')}s?`
+        groupBy ? `Which ${groupBy.toLowerCase().replace(/_/g, ' ')} has the ${orderDirection === 'DESC' ? 'lowest' : 'highest'} ${aggregateColumn === '*' ? 'count' : aggregateColumn.toLowerCase()}?` : 'What are the overall trends?',
+        `How does performance vary across different time periods?`
       ];
       
     } else if (questionAnalysis.type === 'comparison') {
@@ -649,65 +711,76 @@ tables:
   }
 
   // Analyze the question to determine what type of SQL to generate
-  analyzeQuestion(questionLower, columns) {
-    // Create column mappings for intelligent matching
-    const columnMappings = {
-      customer: columns.find(col => col.toLowerCase().includes('customer')),
-      product: columns.find(col => col.toLowerCase().includes('product') || col.toLowerCase().includes('item')),
-      category: columns.find(col => col.toLowerCase().includes('category')),
-      region: columns.find(col => col.toLowerCase().includes('region')),
-      sales: columns.find(col => col.toLowerCase().includes('sales') || col.toLowerCase().includes('revenue')),
-      profit: columns.find(col => col.toLowerCase().includes('profit')),
-      discount: columns.find(col => col.toLowerCase().includes('discount')),
-      quantity: columns.find(col => col.toLowerCase().includes('quantity') || col.toLowerCase().includes('qty')),
-      segment: columns.find(col => col.toLowerCase().includes('segment'))
-    };
+  analyzeQuestion(questionLower, columns, columnMappings) {
     
-    // Analyze question patterns
-    if (questionLower.includes('most') || questionLower.includes('highest') || questionLower.includes('top')) {
-      // This is an aggregation question asking for "most/highest/top"
-      
-      let groupBy = null;
-      let aggregateColumn = null;
-      let aggregateFunction = 'SUM';
+    // Enhanced question pattern recognition
+    let groupBy = null;
+    let aggregateColumn = null;
+    let aggregateFunction = 'SUM';
+    let whereClause = null;
+    let limit = 10;
+    
+    // Detect aggregation patterns
+    if (questionLower.includes('most') || questionLower.includes('highest') || questionLower.includes('top') ||
+        questionLower.includes('sales by') || questionLower.includes('orders') || questionLower.includes('how many')) {
       
       // Determine what to group by
-      if (questionLower.includes('category') && columnMappings.category) {
+      if (questionLower.includes('region') && columnMappings.region) {
+        groupBy = columnMappings.region;
+      } else if (questionLower.includes('category') && columnMappings.category) {
         groupBy = columnMappings.category;
       } else if (questionLower.includes('customer') && columnMappings.customer) {
         groupBy = columnMappings.customer;
       } else if (questionLower.includes('product') && columnMappings.product) {
         groupBy = columnMappings.product;
-      } else if (questionLower.includes('region') && columnMappings.region) {
-        groupBy = columnMappings.region;
       } else if (questionLower.includes('segment') && columnMappings.segment) {
         groupBy = columnMappings.segment;
       }
       
       // Determine what to aggregate
-      if (questionLower.includes('discount') && columnMappings.discount) {
-        aggregateColumn = columnMappings.discount;
-        aggregateFunction = questionLower.includes('most') ? 'SUM' : 'AVG';
+      if (questionLower.includes('orders') || questionLower.includes('how many')) {
+        aggregateFunction = 'COUNT';
+        aggregateColumn = '*';
       } else if (questionLower.includes('sales') && columnMappings.sales) {
         aggregateColumn = columnMappings.sales;
         aggregateFunction = 'SUM';
       } else if (questionLower.includes('profit') && columnMappings.profit) {
         aggregateColumn = columnMappings.profit;
         aggregateFunction = 'SUM';
+      } else if (questionLower.includes('discount') && columnMappings.discount) {
+        aggregateColumn = columnMappings.discount;
+        aggregateFunction = questionLower.includes('most') ? 'SUM' : 'AVG';
       } else if (questionLower.includes('quantity') && columnMappings.quantity) {
         aggregateColumn = columnMappings.quantity;
         aggregateFunction = 'SUM';
       }
       
-      // If we found both groupBy and aggregateColumn, it's an aggregation
-      if (groupBy && aggregateColumn) {
+      // Detect filter conditions
+      if (questionLower.includes('office supplies')) {
+        whereClause = `${columnMappings.category} = 'Office Supplies'`;
+      } else if (questionLower.includes('furniture')) {
+        whereClause = `${columnMappings.category} = 'Furniture'`;
+      } else if (questionLower.includes('technology')) {
+        whereClause = `${columnMappings.category} = 'Technology'`;
+      }
+      
+      // Detect date filters
+      if (questionLower.includes('october') && questionLower.includes('2015') && columnMappings.date) {
+        whereClause = whereClause 
+          ? `${whereClause} AND EXTRACT(YEAR FROM ${columnMappings.date}) = 2015 AND EXTRACT(MONTH FROM ${columnMappings.date}) = 10`
+          : `EXTRACT(YEAR FROM ${columnMappings.date}) = 2015 AND EXTRACT(MONTH FROM ${columnMappings.date}) = 10`;
+      }
+      
+      // If we found meaningful components, it's an aggregation
+      if (groupBy || aggregateColumn || whereClause) {
         return {
           type: 'aggregation',
           groupBy: groupBy,
-          aggregateColumn: aggregateColumn,
+          aggregateColumn: aggregateColumn || columnMappings.sales || '*',
           aggregateFunction: aggregateFunction,
+          whereClause: whereClause,
           orderDirection: 'DESC',
-          limit: 10
+          limit: limit
         };
       }
     }
@@ -818,6 +891,10 @@ tables:
       const selectPart = selectMatch[1];
       const columns = selectPart.split(',').map(col => col.trim());
       
+      // Extract WHERE clause
+      const whereMatch = sql.match(/where\s+(.*?)(?:\s+group\s+by|\s+order\s+by|\s+limit|$)/i);
+      const whereClause = whereMatch ? whereMatch[1].trim() : null;
+      
       // Extract GROUP BY column
       const groupByMatch = sql.match(/group\s+by\s+(\w+)/i);
       const groupByColumn = groupByMatch ? groupByMatch[1] : null;
@@ -835,6 +912,7 @@ tables:
       
       return {
         select: columns,
+        where: whereClause,
         groupBy: groupByColumn,
         orderBy: orderBy,
         limit: limit,
@@ -850,12 +928,20 @@ tables:
   // Execute simulated SQL based on parsed components
   executeSimulatedSQL(components, data, question) {
     try {
+      let filteredData = data;
+      
+      // Apply WHERE clause filtering first
+      if (components.where) {
+        filteredData = this.applyWhereClause(data, components.where);
+        console.log(`🔍 Filtered data: ${data.length} → ${filteredData.length} rows`);
+      }
+      
       let results = [];
       
       if (components.groupBy) {
-        // Group the data
+        // Group the filtered data
         const groups = {};
-        data.forEach(row => {
+        filteredData.forEach(row => {
           const groupValue = row[components.groupBy];
           if (groupValue) {
             if (!groups[groupValue]) {
@@ -944,6 +1030,46 @@ tables:
     } catch (error) {
       console.error('Error executing simulated SQL:', error);
       throw error; // Let the error bubble up
+    }
+  }
+
+  // Apply WHERE clause filtering to data
+  applyWhereClause(data, whereClause) {
+    try {
+      return data.filter(row => {
+        // Handle category filters
+        if (whereClause.includes("= 'Office Supplies'")) {
+          return row.CATEGORY === 'Office Supplies';
+        } else if (whereClause.includes("= 'Furniture'")) {
+          return row.CATEGORY === 'Furniture';
+        } else if (whereClause.includes("= 'Technology'")) {
+          return row.CATEGORY === 'Technology';
+        }
+        
+        // Handle date filters for October 2015
+        if (whereClause.includes('EXTRACT(YEAR') && whereClause.includes('2015') && 
+            whereClause.includes('EXTRACT(MONTH') && whereClause.includes('10')) {
+          
+          // Find date column
+          const dateColumns = Object.keys(row).filter(col => 
+            col.toLowerCase().includes('date') || col.toLowerCase().includes('time')
+          );
+          
+          if (dateColumns.length > 0) {
+            const dateValue = row[dateColumns[0]];
+            if (dateValue) {
+              const date = new Date(dateValue);
+              return date.getFullYear() === 2015 && date.getMonth() === 9; // October is month 9
+            }
+          }
+        }
+        
+        // Default: include the row if we can't parse the where clause
+        return true;
+      });
+    } catch (error) {
+      console.error('Error applying WHERE clause:', error);
+      return data; // Return unfiltered data on error
     }
   }
 

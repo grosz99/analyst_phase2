@@ -1795,8 +1795,29 @@ ${productResults.slice(0, 5).map((p, i) => `${i + 1}. ${p.product}: $${p.total_s
         }
       }
       
-      // If we can't parse specific operations, try to infer from the question
-      return this.inferAnalysisFromQuestion(df.data, questionLower);
+      // Enhanced pattern matching for more complex operations
+      
+      // Handle date filtering + counting pattern
+      if (codeString.includes('pd.to_datetime') || codeString.includes('datetime')) {
+        console.log('🗓️ Detected date-based analysis');
+        return this.performDateAnalysis(df.data, codeString, questionLower);
+      }
+      
+      // Handle filtering operations
+      if (codeString.includes('df[') && (codeString.includes('>') || codeString.includes('<') || codeString.includes('=='))) {
+        console.log('🔍 Detected filtering operation');
+        return this.performFilteredAnalysis(df.data, codeString, questionLower);
+      }
+      
+      // Handle len() or count operations
+      if (codeString.includes('len(') || codeString.includes('.count()') || codeString.includes('COUNT(')) {
+        console.log('📊 Detected counting operation');
+        return this.performCountAnalysis(df.data, codeString, questionLower);
+      }
+      
+      // If we still can't parse, try to extract key metrics from the code
+      console.log('⚠️ Complex code pattern, attempting intelligent extraction');
+      return this.extractResultsFromCode(df.data, codeString, questionLower);
       
     } catch (error) {
       console.error('Error executing pandas operations:', error);
@@ -2063,6 +2084,42 @@ ${productResults.slice(0, 5).map((p, i) => `${i + 1}. ${p.product}: $${p.total_s
       };
     }
     
+    if (results.type === 'count') {
+      return {
+        title: results.metric === 'unique_customers' ? "Member/Customer Count Analysis" :
+               results.metric === 'total_orders' ? "Order Count Analysis" : "Count Analysis",
+        columns: ["Metric", "Value", "Details"],
+        data: results.data.map(item => ({
+          metric: item.metric,
+          value: item.value.toLocaleString(),
+          details: item.percentage ? `${item.percentage}%` : 
+                   item.total_records ? `out of ${item.total_records} total records` : 
+                   results.filter || 'all time'
+        })),
+        total_rows: results.data.length
+      };
+    }
+    
+    if (results.type === 'filtered') {
+      const columns = results.data.length > 0 ? Object.keys(results.data[0]) : [];
+      return {
+        title: `Filtered Results (${results.filtered_count} of ${results.original_count} records)`,
+        columns: columns,
+        data: results.data,
+        total_rows: results.data.length
+      };
+    }
+    
+    if (results.type === 'sample') {
+      const columns = results.data.length > 0 ? Object.keys(results.data[0]) : [];
+      return {
+        title: "Data Sample",
+        columns: columns,
+        data: results.data,
+        total_rows: results.data.length
+      };
+    }
+    
     return {
       title: "Analysis Results",
       columns: Object.keys(results.data[0] || {}),
@@ -2113,6 +2170,33 @@ ${productResults.slice(0, 5).map((p, i) => `${i + 1}. ${p.product}: $${p.total_s
       };
     }
     
+    if (results.type === 'count') {
+      return {
+        type: "summary_stats",
+        title: results.metric === 'unique_customers' ? "Member/Customer Analysis" :
+               results.metric === 'total_orders' ? "Order Analysis" : "Count Analysis",
+        data: {
+          primary_metric: results.value,
+          metric_label: results.data[0]?.metric || 'Count',
+          filter_applied: results.filter || 'none',
+          data_source: results.column || 'dataset'
+        }
+      };
+    }
+    
+    if (results.type === 'filtered' || results.type === 'sample') {
+      return {
+        type: "summary_stats",
+        title: results.type === 'filtered' ? "Filtered Data Overview" : "Data Sample Overview",
+        data: {
+          records_shown: results.data.length,
+          total_records: results.original_count || results.data.length,
+          filter_effectiveness: results.original_count ? 
+            Math.round((results.data.length / results.original_count) * 100) : 100
+        }
+      };
+    }
+    
     return {
       type: "summary_stats",
       title: "Analysis Overview",
@@ -2120,6 +2204,273 @@ ${productResults.slice(0, 5).map((p, i) => `${i + 1}. ${p.product}: $${p.total_s
         total_records: results.data.length
       }
     };
+  }
+
+  // Perform date-based analysis (handles datetime filtering and counting)
+  performDateAnalysis(data, codeString, questionLower) {
+    try {
+      console.log('🗓️ Performing date analysis with code:', codeString.substring(0, 200));
+      
+      // Find date columns in the data
+      const columns = Object.keys(data[0] || {});
+      const dateColumns = columns.filter(col => {
+        const lowerCol = col.toLowerCase();
+        return lowerCol.includes('date') || lowerCol.includes('time') || lowerCol.includes('created') || lowerCol.includes('order');
+      });
+      
+      if (dateColumns.length === 0) {
+        console.log('❌ No date columns found for date analysis');
+        return null;
+      }
+      
+      const dateColumn = dateColumns[0];
+      console.log(`🗓️ Using date column: ${dateColumn}`);
+      
+      // Extract year filter from question (e.g., "since 2020", "after 2015", "in 2020")
+      let targetYear = null;
+      const yearMatches = questionLower.match(/(?:since|after|from|in)\s+(\d{4})|(\d{4})/g);
+      if (yearMatches) {
+        const yearMatch = yearMatches[0].match(/(\d{4})/);
+        if (yearMatch) {
+          targetYear = parseInt(yearMatch[1]);
+        }
+      }
+      
+      console.log(`🗓️ Target year filter: ${targetYear}`);
+      
+      // Filter data by date if year is specified
+      let filteredData = data;
+      if (targetYear) {
+        filteredData = data.filter(row => {
+          const dateValue = row[dateColumn];
+          if (!dateValue) return false;
+          
+          // Parse date flexibly
+          const date = new Date(dateValue);
+          if (isNaN(date.getTime())) return false;
+          
+          if (questionLower.includes('since') || questionLower.includes('after') || questionLower.includes('from')) {
+            return date.getFullYear() >= targetYear;
+          } else if (questionLower.includes('in')) {
+            return date.getFullYear() === targetYear;
+          }
+          return date.getFullYear() >= targetYear;
+        });
+      }
+      
+      console.log(`🗓️ Filtered ${data.length} → ${filteredData.length} records`);
+      
+      // Determine what to count based on the question
+      if (questionLower.includes('member') || questionLower.includes('customer') || questionLower.includes('user')) {
+        // Count unique customers/members
+        const customerColumns = columns.filter(col => {
+          const lowerCol = col.toLowerCase();
+          return lowerCol.includes('customer') || lowerCol.includes('member') || lowerCol.includes('user');
+        });
+        
+        if (customerColumns.length > 0) {
+          const customerColumn = customerColumns[0];
+          const uniqueCustomers = [...new Set(filteredData.map(row => row[customerColumn]).filter(Boolean))];
+          
+          return {
+            type: 'count',
+            metric: 'unique_customers',
+            column: customerColumn,
+            value: uniqueCustomers.length,
+            filter: targetYear ? `since ${targetYear}` : 'all time',
+            data: [{
+              metric: `Members joined ${targetYear ? `since ${targetYear}` : 'total'}`,
+              value: uniqueCustomers.length,
+              percentage: targetYear ? Math.round((uniqueCustomers.length / [...new Set(data.map(row => row[customerColumn]).filter(Boolean))].length) * 100) : 100
+            }]
+          };
+        }
+      }
+      
+      // Default: count total records
+      return {
+        type: 'count',
+        metric: 'total_records',
+        value: filteredData.length,
+        filter: targetYear ? `since ${targetYear}` : 'all time',
+        data: [{
+          metric: `Records ${targetYear ? `since ${targetYear}` : 'total'}`,
+          value: filteredData.length,
+          percentage: targetYear ? Math.round((filteredData.length / data.length) * 100) : 100
+        }]
+      };
+      
+    } catch (error) {
+      console.error('Error in date analysis:', error);
+      return null;
+    }
+  }
+
+  // Perform filtered analysis (handles df[] filtering operations)
+  performFilteredAnalysis(data, codeString, questionLower) {
+    try {
+      console.log('🔍 Performing filtered analysis with code:', codeString.substring(0, 200));
+      
+      // Extract filter conditions from the code
+      const filterMatches = codeString.match(/df\[([^\]]+)\]/g);
+      if (!filterMatches) return null;
+      
+      let filteredData = data;
+      
+      // Apply each filter
+      filterMatches.forEach(filterMatch => {
+        const condition = filterMatch.match(/df\[([^\]]+)\]/)[1];
+        console.log(`🔍 Applying filter: ${condition}`);
+        
+        // Parse different filter types
+        if (condition.includes('==')) {
+          const [column, value] = condition.split('==').map(s => s.trim().replace(/['"]/g, ''));
+          filteredData = filteredData.filter(row => row[column] == value);
+        } else if (condition.includes('>')) {
+          const [column, value] = condition.split('>').map(s => s.trim());
+          const numValue = parseFloat(value);
+          filteredData = filteredData.filter(row => parseFloat(row[column]) > numValue);
+        } else if (condition.includes('<')) {
+          const [column, value] = condition.split('<').map(s => s.trim());
+          const numValue = parseFloat(value);
+          filteredData = filteredData.filter(row => parseFloat(row[column]) < numValue);
+        }
+      });
+      
+      console.log(`🔍 Filtered ${data.length} → ${filteredData.length} records`);
+      
+      // Group and aggregate the filtered data if needed
+      if (questionLower.includes('by ') && (questionLower.includes('region') || questionLower.includes('category'))) {
+        const groupColumn = this.findGroupingColumn(filteredData, questionLower);
+        if (groupColumn) {
+          return this.performGroupByAggregation(filteredData, groupColumn, codeString);
+        }
+      }
+      
+      // Return filtered data summary
+      return {
+        type: 'filtered',
+        original_count: data.length,
+        filtered_count: filteredData.length,
+        data: filteredData.slice(0, 20).map((row, index) => ({
+          rank: index + 1,
+          ...row
+        }))
+      };
+      
+    } catch (error) {
+      console.error('Error in filtered analysis:', error);
+      return null;
+    }
+  }
+
+  // Perform count analysis (handles len(), count(), COUNT() operations)
+  performCountAnalysis(data, codeString, questionLower) {
+    try {
+      console.log('📊 Performing count analysis with code:', codeString.substring(0, 200));
+      
+      // Check what type of counting is requested
+      if (questionLower.includes('member') || questionLower.includes('customer')) {
+        // Count unique customers/members
+        const columns = Object.keys(data[0] || {});
+        const customerColumns = columns.filter(col => {
+          const lowerCol = col.toLowerCase();
+          return lowerCol.includes('customer') || lowerCol.includes('member') || lowerCol.includes('user');
+        });
+        
+        if (customerColumns.length > 0) {
+          const customerColumn = customerColumns[0];
+          const uniqueCustomers = [...new Set(data.map(row => row[customerColumn]).filter(Boolean))];
+          
+          return {
+            type: 'count',
+            metric: 'unique_customers',
+            column: customerColumn,
+            value: uniqueCustomers.length,
+            data: [{
+              metric: 'Unique Members/Customers',
+              value: uniqueCustomers.length,
+              total_records: data.length,
+              percentage: Math.round((uniqueCustomers.length / data.length) * 100)
+            }]
+          };
+        }
+      }
+      
+      if (questionLower.includes('order')) {
+        // Count orders
+        return {
+          type: 'count',
+          metric: 'total_orders',
+          value: data.length,
+          data: [{
+            metric: 'Total Orders',
+            value: data.length,
+            percentage: 100
+          }]
+        };
+      }
+      
+      // Default count
+      return {
+        type: 'count',
+        metric: 'total_records',
+        value: data.length,
+        data: [{
+          metric: 'Total Records',
+          value: data.length,
+          percentage: 100
+        }]
+      };
+      
+    } catch (error) {
+      console.error('Error in count analysis:', error);
+      return null;
+    }
+  }
+
+  // Extract results from complex code patterns
+  extractResultsFromCode(data, codeString, questionLower) {
+    try {
+      console.log('⚙️ Extracting results from complex code:', codeString.substring(0, 200));
+      
+      // Try to identify the intent from the code and question
+      
+      // Check for aggregation patterns
+      if (codeString.includes('groupby') || codeString.includes('GROUP BY')) {
+        const groupColumn = this.findGroupingColumn(data, questionLower);
+        if (groupColumn) {
+          return this.performGroupByAggregation(data, groupColumn, codeString);
+        }
+      }
+      
+      // Check for value counting patterns
+      if (codeString.includes('value_counts') || codeString.includes('COUNT(')) {
+        const categoricalColumn = this.findCategoricalColumn(data, questionLower);
+        if (categoricalColumn) {
+          return this.performValueCounts(data, categoricalColumn);
+        }
+      }
+      
+      // Check for filtering + counting
+      if (codeString.includes('len(') && (codeString.includes('[') || codeString.includes('filter'))) {
+        return this.performCountAnalysis(data, codeString, questionLower);
+      }
+      
+      // Fallback: return a sample of the data
+      console.log('⚠️ Using fallback data sample');
+      return {
+        type: 'sample',
+        data: data.slice(0, 10).map((row, index) => ({
+          rank: index + 1,
+          ...row
+        }))
+      };
+      
+    } catch (error) {
+      console.error('Error extracting results from code:', error);
+      return null;
+    }
   }
 
   // Fallback methods for when AI analysis execution fails
