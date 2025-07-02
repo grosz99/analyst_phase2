@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import aiAnalysisService from '../services/aiAnalysisService.js';
-import analysisContextManager from '../services/analysisContextManager.js';
-import AnalysisContextControl from './AnalysisContextControl.jsx';
+// import analysisContextManager from '../services/analysisContextManager.js';
+// import AnalysisContextControl from './AnalysisContextControl.jsx';
 import './AIAnalysisResults.css';
 
 const AIAnalysisResults = ({ 
@@ -112,7 +112,13 @@ const AIAnalysisResults = ({
       return <p className="no-items">No analysis results available</p>;
     }
 
-    const { columns, data } = results_table;
+    const data = results_table.data;
+    // Generate columns from data if not provided
+    const columns = results_table.columns || results_table.headers || Object.keys(data[0] || {});
+
+    if (!columns || columns.length === 0) {
+      return <p className="no-items">No table structure available</p>;
+    }
 
     return (
       <div className="results-table-container">
@@ -333,15 +339,15 @@ const AIAnalysisResults = ({
       {/* Compact Question Input for Follow-ups */}
       {showCompactInput && (
         <div className="compact-question-section">
-        {/* Context Control for follow-up questions */}
-        <AnalysisContextControl 
+        {/* Context Control for follow-up questions - Temporarily disabled */}
+        {/* <AnalysisContextControl 
           onModeChange={(mode) => console.log('Context mode changed to:', mode)}
           currentQuestion={compactQuestion}
           lastQuestion={question}
           filteredDataCount={analysisContextManager.context.filteredData?.length || 0}
           originalDataCount={originalData?.length || 0}
           activeFilters={{}} // Pass actual filters if available from parent
-        />
+        /> */}
         
         <div className="question-header">
           <h3>🔍 Ask a Question About Your Data</h3>

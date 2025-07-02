@@ -225,6 +225,6 @@ class AnalysisContextManager {
   }
 }
 
-// Export singleton instance
+// Export singleton instance  
 const analysisContextManager = new AnalysisContextManager();
-export default analysisContextManager;
+module.exports = analysisContextManager;

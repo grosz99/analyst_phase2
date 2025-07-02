@@ -1,8 +1,10 @@
 class AIAnalysisService {
   constructor() {
-    this.baseURL = process.env.NODE_ENV === 'production' 
-      ? '' // Use relative URLs in production
-      : 'http://localhost:3001';
+    // Use environment variable if available, otherwise fallback to localhost in dev
+    this.baseURL = process.env.REACT_APP_API_URL || 
+      (process.env.NODE_ENV === 'production' 
+        ? '' // Use relative URLs in production
+        : 'http://localhost:3001');
   }
 
   // Get available analysis types
