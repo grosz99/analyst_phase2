@@ -429,6 +429,115 @@ verified_queries:
       GROUP BY EXTRACT(YEAR FROM ORDER_DATE)
       ORDER BY year
 
+  # New verified queries matching the enhanced question patterns
+  - name: count_orders_by_year
+    question: "How many orders did we do in 2015?"
+    sql: |
+      SELECT 
+        COUNT(*) as total_orders
+      FROM SUPERSTOREDB.DATA.SUPERSTORE
+      WHERE EXTRACT(YEAR FROM ORDER_DATE) = 2015
+
+  - name: count_orders_by_month_year
+    question: "How many orders did we do in October 2015?"
+    sql: |
+      SELECT 
+        COUNT(*) as total_orders
+      FROM SUPERSTOREDB.DATA.SUPERSTORE
+      WHERE EXTRACT(YEAR FROM ORDER_DATE) = 2015 
+        AND EXTRACT(MONTH FROM ORDER_DATE) = 10
+
+  - name: highest_sales_region
+    question: "Which region has the highest sales?"
+    sql: |
+      SELECT 
+        REGION,
+        SUM(SALES) as total_sales,
+        COUNT(*) as record_count
+      FROM SUPERSTOREDB.DATA.SUPERSTORE
+      GROUP BY REGION
+      ORDER BY total_sales DESC
+      LIMIT 1
+
+  - name: sales_by_category_filtered
+    question: "Sales by category for office supplies"
+    sql: |
+      SELECT 
+        CATEGORY,
+        SUM(SALES) as total_sales,
+        COUNT(*) as record_count
+      FROM SUPERSTOREDB.DATA.SUPERSTORE
+      WHERE CATEGORY = 'Office Supplies'
+      GROUP BY CATEGORY
+
+  - name: top_customers_by_profit_limited
+    question: "Top 5 customers by profit"
+    sql: |
+      SELECT 
+        CUSTOMER_NAME,
+        SUM(PROFIT) as total_profit,
+        COUNT(*) as record_count
+      FROM SUPERSTOREDB.DATA.SUPERSTORE
+      GROUP BY CUSTOMER_NAME
+      ORDER BY total_profit DESC
+      LIMIT 5
+
+  - name: count_orders_by_segment
+    question: "Count of orders by segment"
+    sql: |
+      SELECT 
+        SEGMENT,
+        COUNT(*) as total_count
+      FROM SUPERSTOREDB.DATA.SUPERSTORE
+      GROUP BY SEGMENT
+      ORDER BY total_count DESC
+
+  - name: highest_profit_category
+    question: "Which category has the highest profit?"
+    sql: |
+      SELECT 
+        CATEGORY,
+        SUM(PROFIT) as total_profit,
+        COUNT(*) as record_count
+      FROM SUPERSTOREDB.DATA.SUPERSTORE
+      GROUP BY CATEGORY
+      ORDER BY total_profit DESC
+      LIMIT 1
+
+  - name: sales_by_region_filtered_year
+    question: "Which region had the highest sales in 2016?"
+    sql: |
+      SELECT 
+        REGION,
+        SUM(SALES) as total_sales,
+        COUNT(*) as record_count
+      FROM SUPERSTOREDB.DATA.SUPERSTORE
+      WHERE EXTRACT(YEAR FROM ORDER_DATE) = 2016
+      GROUP BY REGION
+      ORDER BY total_sales DESC
+      LIMIT 1
+
+  - name: quantity_by_product_category
+    question: "Total quantity sold by product category"
+    sql: |
+      SELECT 
+        CATEGORY,
+        SUM(QUANTITY) as total_quantity,
+        COUNT(*) as record_count
+      FROM SUPERSTOREDB.DATA.SUPERSTORE
+      GROUP BY CATEGORY
+      ORDER BY total_quantity DESC
+
+  - name: orders_by_shipping_mode
+    question: "How many orders by shipping mode?"
+    sql: |
+      SELECT 
+        SHIP_MODE,
+        COUNT(*) as total_count
+      FROM SUPERSTOREDB.DATA.SUPERSTORE
+      GROUP BY SHIP_MODE
+      ORDER BY total_count DESC
+
 # Custom instructions for business context
 custom_instructions:
   - "When calculating profit margins, always use the formula: (profit / sales) * 100"
