@@ -140,7 +140,7 @@ class DatasetService {
             // Use real Snowflake data - full dataset for analysis
             console.log(`Using real Snowflake data: ${result.analysis_data.length} rows for analysis`);
             dataForAnalysis = result.analysis_data;
-            dataForUI = result.sample_data || result.analysis_data.slice(0, 10); // Preview data
+            dataForUI = result.sample_data || result.analysis_data.slice(0, 5); // Preview data
           } else if (result.sample_data && result.sample_data.length > 0) {
             // Fallback to sample data
             console.log('Using sample data');
@@ -150,7 +150,7 @@ class DatasetService {
             // Generate mock data from schema
             console.log('Generating mock data from schema');
             dataForAnalysis = this.generateMockDataFromSchema(result.schema, userSelections.columns);
-            dataForUI = dataForAnalysis.slice(0, 10);
+            dataForUI = dataForAnalysis.slice(0, 5);
           }
           
           return {

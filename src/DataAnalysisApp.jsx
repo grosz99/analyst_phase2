@@ -172,7 +172,7 @@ const DataAnalysisApp = () => {
         }
         
         setProcessedData(result.dataset); // Full dataset for AI analysis
-        setPreviewData(result.previewData || result.dataset?.slice(0, 10)); // Preview data for UI
+        setPreviewData(result.previewData || result.dataset?.slice(0, 5)); // Preview data for UI
         setDatasetInfo(result.info || 'Dataset loaded successfully');
         setSessionId(result.sessionId);
         

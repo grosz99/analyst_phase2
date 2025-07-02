@@ -22,7 +22,7 @@ const DataPreviewStep = ({ dataset, datasetInfo, isLoading }) => {
   }
 
   const headers = Object.keys(dataset[0] || {});
-  const previewRows = dataset.slice(0, 10);
+  const previewRows = dataset.slice(0, 5);
 
   return (
     <div>

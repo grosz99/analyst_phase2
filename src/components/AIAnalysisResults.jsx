@@ -336,46 +336,6 @@ const AIAnalysisResults = ({
 
   return (
     <div className="analysis-results-container">
-      {/* Compact Question Input for Follow-ups */}
-      {showCompactInput && (
-        <>
-        {/* Context Control for follow-up questions - only after user has seen first result */}
-        {showContextControl && (
-          <AnalysisContextControlSimple 
-            onModeChange={(mode) => console.log('Context mode changed to:', mode)}
-            lastQuestion={question}
-            originalDataCount={originalData?.length || 0}
-            activeFilters={{}} // Pass actual filters if available from parent
-          />
-        )}
-        
-        <div className="compact-question-section">
-        
-        <div className="question-header">
-          <h3>🔍 Ask a Question About Your Data</h3>
-          <p>Use natural language to explore your data with AI analysis</p>
-        </div>
-        <div className="compact-input-wrapper">
-          <input
-            type="text"
-            value={compactQuestion}
-            onChange={(e) => setCompactQuestion(e.target.value)}
-            placeholder="e.g., Who are the most profitable customers?"
-            className="compact-question-input"
-            disabled={compactAnalyzing}
-            onKeyPress={(e) => e.key === 'Enter' && handleCompactAnalysis()}
-          />
-          <button 
-            className="compact-analyze-btn"
-            onClick={handleCompactAnalysis}
-            disabled={!compactQuestion.trim() || compactAnalyzing}
-          >
-            {compactAnalyzing ? '⏳ Analyzing...' : '🔍 Analyze'}
-          </button>
-        </div>
-        </div>
-        </>
-      )}
 
       {/* Current Question Result */}
       <div className="current-result">
@@ -461,6 +421,47 @@ const AIAnalysisResults = ({
             </button>
           ))}
         </div>
+      )}
+
+      {/* Compact Question Input for Follow-ups - AFTER user has read the results */}
+      {showCompactInput && (
+        <>
+        {/* Context Control for follow-up questions - only after user has seen first result */}
+        {showContextControl && (
+          <AnalysisContextControlSimple 
+            onModeChange={(mode) => console.log('Context mode changed to:', mode)}
+            lastQuestion={question}
+            originalDataCount={originalData?.length || 0}
+            activeFilters={{}} // Pass actual filters if available from parent
+          />
+        )}
+        
+        <div className="compact-question-section">
+        
+        <div className="question-header">
+          <h3>🔍 Ask a Question About Your Data</h3>
+          <p>Use natural language to explore your data with AI analysis</p>
+        </div>
+        <div className="compact-input-wrapper">
+          <input
+            type="text"
+            value={compactQuestion}
+            onChange={(e) => setCompactQuestion(e.target.value)}
+            placeholder="e.g., Who are the most profitable customers?"
+            className="compact-question-input"
+            disabled={compactAnalyzing}
+            onKeyPress={(e) => e.key === 'Enter' && handleCompactAnalysis()}
+          />
+          <button 
+            className="compact-analyze-btn"
+            onClick={handleCompactAnalysis}
+            disabled={!compactQuestion.trim() || compactAnalyzing}
+          >
+            {compactAnalyzing ? '⏳ Analyzing...' : '🔍 Analyze'}
+          </button>
+        </div>
+        </div>
+        </>
       )}
     </div>
   );
