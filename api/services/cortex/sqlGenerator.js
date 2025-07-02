@@ -122,6 +122,7 @@ class SqlGenerator {
     console.log(`🔍 Analyzing question: "${questionLower}"`);
     console.log(`📊 Available columns: ${columns.join(', ')}`);
     console.log(`🗂️ Column mappings:`, columnMappings);
+    console.log(`🎯 Question hash: ${questionLower.replace(/[^a-z0-9]/g, '').substring(0, 10)}`);
     
     // 1. Detect counting questions (how many, count, number of)
     if (questionLower.includes('how many') || questionLower.includes('count') || 

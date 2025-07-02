@@ -69,7 +69,7 @@ class AnthropicService {
         python_code: pythonCode,
         results_table: executedResults ? 
           this.resultFormatter.formatResultsAsTable(executedResults, sanitizedContext) :
-          this.resultFormatter.createSummaryTable(sanitizedData, "Analysis Summary"),
+          this.generateBasicAnalysisResults(sanitizedData, sanitizedContext),
         visualization: executedResults ?
           this.resultFormatter.createVisualizationFromResults(executedResults, sanitizedContext) :
           this.resultFormatter.createBasicVisualization(sanitizedData, "Data Overview"),
@@ -239,6 +239,112 @@ Generate Python code that works with a DataFrame called 'df' containing this dat
   // Health check method
   async healthCheck() {
     return await this.client.healthCheck();
+  }
+
+  // Generate basic analysis results when code execution fails
+  generateBasicAnalysisResults(data, userContext) {
+    try {
+      const questionLower = userContext.toLowerCase();
+      
+      // Try to provide some actual analysis based on the question
+      if (questionLower.includes('category') && questionLower.includes('discount')) {
+        // For discount by category questions
+        const categoryColumn = this.findColumn(data, ['category', 'product_category', 'type']);
+        const discountColumn = this.findColumn(data, ['discount', 'discount_rate', 'discount_amount']);
+        
+        if (categoryColumn && discountColumn) {
+          const categoryDiscounts = {};
+          data.forEach(row => {
+            const category = row[categoryColumn];
+            const discount = parseFloat(row[discountColumn]) || 0;
+            if (!categoryDiscounts[category]) {
+              categoryDiscounts[category] = { total: 0, count: 0 };
+            }
+            categoryDiscounts[category].total += discount;
+            categoryDiscounts[category].count += 1;
+          });
+          
+          const results = Object.entries(categoryDiscounts)
+            .map(([category, data]) => ({
+              category: category,
+              avg_discount: (data.total / data.count).toFixed(3),
+              total_discount: data.total.toFixed(3),
+              order_count: data.count
+            }))
+            .sort((a, b) => parseFloat(b.avg_discount) - parseFloat(a.avg_discount))
+            .slice(0, 10);
+          
+          return {
+            title: "Discount Analysis by Category",
+            columns: ["Category", "Avg Discount", "Total Discount", "Orders"],
+            data: results.map(r => ({
+              Category: r.category,
+              "Avg Discount": r.avg_discount,
+              "Total Discount": r.total_discount,
+              "Orders": r.order_count
+            })),
+            total_rows: results.length
+          };
+        }
+      }
+      
+      // Generic fallback - try to find interesting patterns
+      const columns = Object.keys(data[0] || {});
+      const categoricalCol = this.findColumn(data, ['category', 'region', 'segment', 'type', 'status']);
+      const numericCol = this.findColumn(data, ['sales', 'revenue', 'profit', 'amount', 'value', 'count']);
+      
+      if (categoricalCol && numericCol) {
+        const groups = {};
+        data.forEach(row => {
+          const group = row[categoricalCol];
+          const value = parseFloat(row[numericCol]) || 0;
+          if (!groups[group]) {
+            groups[group] = { total: 0, count: 0 };
+          }
+          groups[group].total += value;
+          groups[group].count += 1;
+        });
+        
+        const results = Object.entries(groups)
+          .map(([group, data]) => ({
+            [categoricalCol]: group,
+            [`Total ${numericCol}`]: data.total.toFixed(2),
+            [`Avg ${numericCol}`]: (data.total / data.count).toFixed(2),
+            Count: data.count
+          }))
+          .sort((a, b) => parseFloat(b[`Total ${numericCol}`]) - parseFloat(a[`Total ${numericCol}`]))
+          .slice(0, 10);
+        
+        return {
+          title: `Analysis: ${numericCol} by ${categoricalCol}`,
+          columns: Object.keys(results[0] || {}),
+          data: results,
+          total_rows: results.length
+        };
+      }
+      
+      // Final fallback
+      return this.resultFormatter.createSummaryTable(data, "Data Overview");
+      
+    } catch (error) {
+      console.error('Error generating basic analysis:', error);
+      return this.resultFormatter.createSummaryTable(data, "Analysis Summary");
+    }
+  }
+
+  // Helper method to find a column by possible names
+  findColumn(data, possibleNames) {
+    if (!data.length) return null;
+    const columns = Object.keys(data[0]);
+    
+    for (const name of possibleNames) {
+      const found = columns.find(col => 
+        col.toLowerCase().includes(name.toLowerCase()) ||
+        name.toLowerCase().includes(col.toLowerCase())
+      );
+      if (found) return found;
+    }
+    return null;
   }
 
   // Get service status

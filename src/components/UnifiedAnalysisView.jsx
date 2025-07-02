@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import aiAnalysisService from '../services/aiAnalysisService.js';
-// import analysisContextManager from '../services/analysisContextManager.js';
 import AIAnalysisResults from './AIAnalysisResults.jsx';
-// import AnalysisContextControl from './AnalysisContextControl.jsx';
+import AnalysisContextControlSimple from './AnalysisContextControlSimple.jsx';
 import ResultsTable from './ResultsTable.jsx';
 import './UnifiedAnalysisView.css';
 
@@ -319,6 +318,14 @@ function UnifiedAnalysisView({ initialData, cachedDataset, dataLoadedTimestamp, 
         onExport={handleExportData} 
       />
 
+      {/* Context Control - Always visible */}
+      <AnalysisContextControlSimple 
+        onModeChange={(mode) => console.log('Context mode changed to:', mode)}
+        lastQuestion={analysisHistory.length > 0 ? analysisHistory[analysisHistory.length - 1].question : null}
+        originalDataCount={initialData?.length || 0}
+        activeFilters={selectedFilters}
+      />
+
       {/* Compact Analysis Interface */}
       {analysisHistory.length === 0 && (
         <div className="analysis-interface">
@@ -354,16 +361,6 @@ function UnifiedAnalysisView({ initialData, cachedDataset, dataLoadedTimestamp, 
               </div>
             </div>
           )}
-
-          {/* Context Control - Temporarily disabled for debugging */}
-          {/* <AnalysisContextControl 
-            onModeChange={(mode) => console.log('Context mode changed to:', mode)}
-            currentQuestion={currentQuestion}
-            lastQuestion={analysisHistory.length > 0 ? analysisHistory[analysisHistory.length - 1].question : null}
-            filteredDataCount={analysisContextManager.context.filteredData?.length || 0}
-            originalDataCount={initialData?.length || 0}
-            activeFilters={selectedFilters}
-          /> */}
 
           <form onSubmit={handleSubmitQuestion} className="question-form">
             <div className="form-header">

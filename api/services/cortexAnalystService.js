@@ -56,10 +56,12 @@ class CortexAnalystService {
       this.client.checkRateLimit(identifier);
 
       console.log(`🧠 Starting Cortex Analyst analysis: "${question}"`);
+      console.log(`🔍 Question analysis for: "${question}"`);
       const startTime = Date.now();
 
       // Generate SQL from natural language question
       const sqlResult = this.sqlGenerator.generateSqlFromQuestion(question, data);
+      console.log(`📝 Generated SQL result:`, { sql: sqlResult.sql, analysis: sqlResult.analysis });
       
       // Prepare Cortex Analyst API payload
       const payload = {
