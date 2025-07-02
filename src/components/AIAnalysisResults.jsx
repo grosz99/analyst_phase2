@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import aiAnalysisService from '../services/aiAnalysisService.js';
+import analysisContextManager from '../services/analysisContextManager.js';
+import AnalysisContextControl from './AnalysisContextControl.jsx';
 import './AIAnalysisResults.css';
 
 const AIAnalysisResults = ({ 
@@ -331,6 +333,16 @@ const AIAnalysisResults = ({
       {/* Compact Question Input for Follow-ups */}
       {showCompactInput && (
         <div className="compact-question-section">
+        {/* Context Control for follow-up questions */}
+        <AnalysisContextControl 
+          onModeChange={(mode) => console.log('Context mode changed to:', mode)}
+          currentQuestion={compactQuestion}
+          lastQuestion={question}
+          filteredDataCount={analysisContextManager.context.filteredData?.length || 0}
+          originalDataCount={originalData?.length || 0}
+          activeFilters={{}} // Pass actual filters if available from parent
+        />
+        
         <div className="question-header">
           <h3>🔍 Ask a Question About Your Data</h3>
           <p>Use natural language to explore your data with AI analysis</p>

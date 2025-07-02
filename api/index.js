@@ -617,7 +617,7 @@ app.get('/api/ai/backends', (req, res) => {
 // Main AI Analysis Endpoint with Backend Choice
 app.post('/api/ai/analyze', async (req, res) => {
   try {
-    const { data, analysisType, userContext, question, sessionId, backend } = req.body;
+    const { data, analysisType, userContext, question, sessionId, backend, contextPrompt } = req.body;
     const startTime = Date.now();
     
     // Input validation
@@ -658,10 +658,15 @@ app.post('/api/ai/analyze', async (req, res) => {
       );
     } else {
       console.log('🤖 Using Anthropic Claude backend');
+      // Prepare context-enhanced question if context prompt provided
+      const enhancedQuestion = contextPrompt 
+        ? `${contextPrompt}\n\nUSER QUESTION: ${questionText}`
+        : questionText;
+        
       result = await anthropicService.analyzeData(
         data, 
         analysisType || 'general',
-        questionText,
+        enhancedQuestion,
         identifier
       );
     }

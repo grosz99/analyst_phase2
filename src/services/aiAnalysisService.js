@@ -106,17 +106,21 @@ class AIAnalysisService {
   }
 
   // Main AI analysis method
-  async analyzeData(data, question = '', analysisType = 'general', sessionId = null, backend = 'anthropic') {
+  async analyzeData(data, question = '', analysisType = 'general', sessionId = null, backend = 'anthropic', contextPrompt = null) {
     try {
       console.log(`🤖 Starting AI analysis: ${question || analysisType}`);
       console.log(`📊 Data: ${data.length} rows`);
+      if (contextPrompt) {
+        console.log(`📝 Context mode active:`, contextPrompt.split('\n')[0]);
+      }
       
       const payload = {
         data: data,
         analysisType: analysisType,
         userContext: question || `Perform ${analysisType} analysis on this business data`,
         sessionId: sessionId || `session-${Date.now()}`,
-        backend: backend
+        backend: backend,
+        contextPrompt: contextPrompt // Add context prompt to payload
       };
 
       const response = await fetch(`${this.baseURL}/api/ai/analyze`, {

@@ -281,6 +281,8 @@ const DataAnalysisApp = () => {
               previewData={previewData}
               datasetInfo={datasetInfo}
               sessionId={sessionId}
+              selectedFilters={selectedFilters}
+              selectedDataSource={selectedDataSource}
               onReset={handleReset}
             />
           )}

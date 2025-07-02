@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import aiAnalysisService from '../services/aiAnalysisService.js';
+import analysisContextManager from '../services/analysisContextManager.js';
 import AIAnalysisResults from './AIAnalysisResults.jsx';
+import AnalysisContextControl from './AnalysisContextControl.jsx';
 import ResultsTable from './ResultsTable.jsx';
 import './UnifiedAnalysisView.css';
 
@@ -59,7 +61,7 @@ const DataPreview = ({ previewData, totalRows, onExport }) => {
   );
 };
 
-function UnifiedAnalysisView({ initialData, cachedDataset, dataLoadedTimestamp, previewData, datasetInfo, sessionId, onReset }) {
+function UnifiedAnalysisView({ initialData, cachedDataset, dataLoadedTimestamp, previewData, datasetInfo, sessionId, selectedFilters, selectedDataSource, onReset }) {
   // AI Analysis State
   const [currentQuestion, setCurrentQuestion] = useState('');
   const [analysisHistory, setAnalysisHistory] = useState([]);
@@ -125,11 +127,18 @@ function UnifiedAnalysisView({ initialData, cachedDataset, dataLoadedTimestamp, 
     initializeAI();
   }, [initialData]);
 
-  // Handle AI Analysis
+  // Update context manager when filters change
+  useEffect(() => {
+    if (selectedFilters) {
+      analysisContextManager.setDatasetFilters(selectedFilters);
+    }
+  }, [selectedFilters]);
+
+  // Handle AI Analysis with Context Management
   const handleAnalyzeData = async (question = '', analysisType = 'general') => {
-    const dataToAnalyze = cachedDataset || initialData;
+    const baseData = cachedDataset || initialData;
     
-    if (!dataToAnalyze || dataToAnalyze.length === 0) {
+    if (!baseData || baseData.length === 0) {
       setError('No data available for analysis');
       return;
     }
@@ -144,30 +153,53 @@ function UnifiedAnalysisView({ initialData, cachedDataset, dataLoadedTimestamp, 
     setCurrentQuestion('');
 
     try {
+      // Get the appropriate data based on context mode
+      const { data: dataToAnalyze, isFiltered, filterCount } = analysisContextManager.getAnalysisData(baseData);
+      
+      // Build context prompt for AI
+      const contextPrompt = analysisContextManager.buildContextPrompt();
+      
       const loadTime = dataLoadedTimestamp ? new Date(dataLoadedTimestamp) : new Date();
-      console.log(`🤖 Starting AI analysis using cached dataset (loaded ${loadTime.toLocaleTimeString()}):`, { 
+      console.log(`🤖 Starting AI analysis with context management:`, { 
         question, 
-        analysisType, 
+        analysisType,
+        mode: analysisContextManager.context.mode,
         dataRows: dataToAnalyze.length,
+        baseDataRows: baseData.length,
+        isFiltered,
+        filterCount,
         cached: !!cachedDataset 
       });
       
+      // Pass context prompt to AI service
       const result = await aiAnalysisService.analyzeData(
         dataToAnalyze,
         question || `Perform ${analysisType} analysis`,
         analysisType,
         sessionId,
-        selectedBackend
+        selectedBackend,
+        contextPrompt // Add context prompt
       );
 
       console.log('✅ AI analysis result:', result);
       
-      // Add to conversation history instead of replacing
+      // Update context manager with results
+      if (result.success) {
+        analysisContextManager.updateAnalysisContext(
+          question,
+          result,
+          result.filteredData || dataToAnalyze,
+          result.appliedFilters
+        );
+      }
+      
+      // Add to conversation history
       const newAnalysisItem = {
         id: Date.now(),
         question: question || `Perform ${analysisType} analysis`,
         result: result,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        contextMode: analysisContextManager.context.mode
       };
       
       setAnalysisHistory(prev => [...prev, newAnalysisItem]);
@@ -345,6 +377,16 @@ function UnifiedAnalysisView({ initialData, cachedDataset, dataLoadedTimestamp, 
               </div>
             </div>
           )}
+
+          {/* Context Control - Shows for all questions, not just after first */}
+          <AnalysisContextControl 
+            onModeChange={(mode) => console.log('Context mode changed to:', mode)}
+            currentQuestion={currentQuestion}
+            lastQuestion={analysisHistory.length > 0 ? analysisHistory[analysisHistory.length - 1].question : null}
+            filteredDataCount={analysisContextManager.context.filteredData?.length || 0}
+            originalDataCount={initialData?.length || 0}
+            activeFilters={selectedFilters}
+          />
 
           <form onSubmit={handleSubmitQuestion} className="question-form">
             <div className="form-header">
