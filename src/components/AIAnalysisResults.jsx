@@ -284,12 +284,47 @@ const AIAnalysisResults = ({
     }
   };
 
-  // Generate suggested follow-up questions
-  const suggestedQuestions = [
-    "Show me the revenue trend for EMESA.",
-    "Which region had the lowest actuals?", 
-    "Compare the actuals of North America and Asia Pacific."
-  ];
+  // Generate data-aware suggested follow-up questions
+  const generateDataAwareSuggestions = () => {
+    if (!originalData || originalData.length === 0) return [];
+    
+    const columns = Object.keys(originalData[0] || {});
+    const suggestions = [];
+    
+    // Find categorical columns for grouping questions
+    const categoricalCols = columns.filter(col => {
+      const values = originalData.slice(0, 50).map(row => row[col]).filter(v => v != null);
+      const uniqueValues = [...new Set(values)];
+      return uniqueValues.length <= Math.min(15, originalData.length * 0.3) && uniqueValues.length > 1;
+    });
+    
+    // Find numeric columns for analysis questions  
+    const numericCols = columns.filter(col => {
+      const values = originalData.slice(0, 10).map(row => row[col]);
+      return values.some(v => !isNaN(parseFloat(v)) && isFinite(v));
+    });
+    
+    // Generate questions based on actual data structure
+    if (categoricalCols.length > 0 && numericCols.length > 0) {
+      suggestions.push(`Which ${categoricalCols[0].toLowerCase()} has the highest ${numericCols[0].toLowerCase()}?`);
+      suggestions.push(`How does ${numericCols[0].toLowerCase()} compare across different ${categoricalCols[0].toLowerCase()}?`);
+    }
+    
+    if (categoricalCols.length > 0) {
+      suggestions.push(`What is the distribution of ${categoricalCols[0].toLowerCase()}?`);
+    }
+    
+    if (numericCols.length > 0) {
+      suggestions.push(`What are the trends in ${numericCols[0].toLowerCase()}?`);
+    }
+    
+    // Add record count question using actual data size
+    suggestions.push(`What insights can we find across all ${originalData.length} records?`);
+    
+    return suggestions.slice(0, 4);
+  };
+  
+  const suggestedQuestions = generateDataAwareSuggestions();
 
   return (
     <div className="analysis-results-container">

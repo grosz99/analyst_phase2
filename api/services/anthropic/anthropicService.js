@@ -1,6 +1,6 @@
-const AnthropicClient = require('./anthropic/anthropicClient');
-const CodeExecutor = require('./anthropic/codeExecutor');
-const ResultFormatter = require('./anthropic/resultFormatter');
+const AnthropicClient = require('./anthropicClient');
+const CodeExecutor = require('./codeExecutor');
+const ResultFormatter = require('./resultFormatter');
 
 /**
  * Anthropic Service - Main orchestrator for AI analysis

@@ -239,39 +239,155 @@ class AIAnalysisService {
     return points;
   }
 
-  // Generate analysis questions based on data
+  // Generate analysis questions based on ACTUAL data structure and values
   generateSuggestedQuestions(data) {
     if (!data || data.length === 0) return [];
     
     const columns = Object.keys(data[0] || {});
     const questions = [];
     
-    // Look for common business patterns
-    if (columns.some(col => col.toLowerCase().includes('customer'))) {
-      questions.push('Who are our most profitable customers?');
-      questions.push('What are the customer behavior patterns?');
+    // Analyze actual data to generate relevant questions
+    const dataProfile = this.analyzeDataStructure(data);
+    
+    // Questions based on actual categorical columns and their values
+    if (dataProfile.categoricalColumns.length > 0) {
+      const mainCategorical = dataProfile.categoricalColumns[0];
+      const sampleValues = this.getTopValues(data, mainCategorical, 3);
+      
+      if (sampleValues.length > 0) {
+        questions.push(`Which ${mainCategorical.toLowerCase()} has the highest values?`);
+        questions.push(`How do different ${mainCategorical.toLowerCase()} compare?`);
+      }
     }
     
-    if (columns.some(col => col.toLowerCase().includes('product'))) {
-      questions.push('Which products perform best?');
-      questions.push('What are the product category trends?');
+    // Questions based on actual numeric columns  
+    if (dataProfile.numericColumns.length > 0) {
+      const mainNumeric = dataProfile.numericColumns[0];
+      questions.push(`What is the distribution of ${mainNumeric.toLowerCase()}?`);
+      
+      if (dataProfile.categoricalColumns.length > 0) {
+        questions.push(`How does ${mainNumeric.toLowerCase()} vary by ${dataProfile.categoricalColumns[0].toLowerCase()}?`);
+      }
     }
     
-    if (columns.some(col => col.toLowerCase().includes('sales') || col.toLowerCase().includes('revenue'))) {
-      questions.push('What are our sales trends over time?');
-      questions.push('Which regions drive the most revenue?');
+    // Questions based on actual date patterns
+    if (dataProfile.dateColumns.length > 0) {
+      const dateRange = this.getDateRange(data, dataProfile.dateColumns[0]);
+      if (dateRange.years > 1) {
+        questions.push(`What are the trends from ${dateRange.startYear} to ${dateRange.endYear}?`);
+      }
+      questions.push(`How has activity changed over time?`);
     }
     
-    if (columns.some(col => col.toLowerCase().includes('date') || col.toLowerCase().includes('time'))) {
-      questions.push('What are the seasonal patterns?');
-      questions.push('How has performance changed over time?');
+    // Count-based questions using actual data size
+    const recordCount = data.length;
+    if (recordCount > 100) {
+      questions.push(`What patterns exist across all ${recordCount} records?`);
     }
     
-    // Add general questions
-    questions.push('What are the key insights from this data?');
-    questions.push('What recommendations can improve performance?');
+    // Add one generic fallback
+    questions.push('What are the key insights from this dataset?');
     
     return questions.slice(0, 6); // Return top 6 questions
+  }
+  
+  // Analyze actual data structure and values
+  analyzeDataStructure(data) {
+    const sample = data[0] || {};
+    const columns = Object.keys(sample);
+    
+    const profile = {
+      categoricalColumns: [],
+      numericColumns: [],
+      dateColumns: [],
+      textColumns: []
+    };
+    
+    columns.forEach(col => {
+      const values = data.slice(0, 100).map(row => row[col]).filter(v => v != null);
+      const uniqueValues = [...new Set(values)];
+      
+      // Check if it's a date column
+      if (this.isDateColumn(values)) {
+        profile.dateColumns.push(col);
+      }
+      // Check if it's numeric
+      else if (this.isNumericColumn(values)) {
+        profile.numericColumns.push(col);
+      }
+      // Check if it's categorical (reasonable number of unique values)
+      else if (uniqueValues.length <= Math.min(20, data.length * 0.5)) {
+        profile.categoricalColumns.push(col);
+      }
+      // Otherwise it's text
+      else {
+        profile.textColumns.push(col);
+      }
+    });
+    
+    return profile;
+  }
+  
+  // Get top values from a categorical column
+  getTopValues(data, column, limit = 5) {
+    const counts = {};
+    data.forEach(row => {
+      const value = row[column];
+      if (value != null) {
+        counts[value] = (counts[value] || 0) + 1;
+      }
+    });
+    
+    return Object.entries(counts)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, limit)
+      .map(([value]) => value);
+  }
+  
+  // Get date range from data
+  getDateRange(data, dateColumn) {
+    const dates = data.map(row => new Date(row[dateColumn]))
+      .filter(date => !isNaN(date.getTime()));
+    
+    if (dates.length === 0) return { years: 0 };
+    
+    const minDate = new Date(Math.min(...dates));
+    const maxDate = new Date(Math.max(...dates));
+    
+    return {
+      startYear: minDate.getFullYear(),
+      endYear: maxDate.getFullYear(),
+      years: maxDate.getFullYear() - minDate.getFullYear()
+    };
+  }
+  
+  // Check if column contains dates
+  isDateColumn(values) {
+    const sampleSize = Math.min(values.length, 10);
+    let dateCount = 0;
+    
+    for (let i = 0; i < sampleSize; i++) {
+      const date = new Date(values[i]);
+      if (!isNaN(date.getTime())) {
+        dateCount++;
+      }
+    }
+    
+    return dateCount / sampleSize > 0.7; // 70% of values are valid dates
+  }
+  
+  // Check if column contains numbers
+  isNumericColumn(values) {
+    const sampleSize = Math.min(values.length, 10);
+    let numCount = 0;
+    
+    for (let i = 0; i < sampleSize; i++) {
+      if (!isNaN(parseFloat(values[i])) && isFinite(values[i])) {
+        numCount++;
+      }
+    }
+    
+    return numCount / sampleSize > 0.7; // 70% of values are numeric
   }
 
   // Export data to CSV
