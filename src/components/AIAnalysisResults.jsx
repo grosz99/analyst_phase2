@@ -373,6 +373,7 @@ const AIAnalysisResults = ({
             {compactAnalyzing ? '⏳ Analyzing...' : '🔍 Analyze'}
           </button>
         </div>
+        </div>
         </>
       )}
 
