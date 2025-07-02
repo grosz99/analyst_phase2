@@ -274,23 +274,6 @@ function UnifiedAnalysisView({ initialData, cachedDataset, dataLoadedTimestamp, 
           <h1>AI Data Analysis</h1>
         </div>
         
-        {/* 3-Step Process Bar */}
-        <div className="process-steps">
-          <div className="step completed">
-            <div className="step-number">1</div>
-            <div className="step-label">Explore Data Sources</div>
-          </div>
-          <div className="step-divider"></div>
-          <div className="step completed">
-            <div className="step-number">2</div>
-            <div className="step-label">Select Filters</div>
-          </div>
-          <div className="step-divider"></div>
-          <div className="step active">
-            <div className="step-number">3</div>
-            <div className="step-label">Ask Your Question</div>
-          </div>
-        </div>
         
         <button onClick={onReset} className="new-dataset-btn">
           New Dataset
@@ -313,18 +296,11 @@ function UnifiedAnalysisView({ initialData, cachedDataset, dataLoadedTimestamp, 
       <div className="content-area">
         {/* Data Preview */}
         <DataPreview 
-        previewData={previewData || initialData?.slice(0, 10)} 
+        previewData={previewData || initialData?.slice(0, 5)} 
         totalRows={initialData?.length} 
         onExport={handleExportData} 
       />
 
-      {/* Context Control - Always visible */}
-      <AnalysisContextControlSimple 
-        onModeChange={(mode) => console.log('Context mode changed to:', mode)}
-        lastQuestion={analysisHistory.length > 0 ? analysisHistory[analysisHistory.length - 1].question : null}
-        originalDataCount={initialData?.length || 0}
-        activeFilters={selectedFilters}
-      />
 
       {/* Compact Analysis Interface */}
       {analysisHistory.length === 0 && (
@@ -430,6 +406,14 @@ function UnifiedAnalysisView({ initialData, cachedDataset, dataLoadedTimestamp, 
               Start New Analysis
             </button>
           </div>
+          
+          {/* Context Control - Only show after first question */}
+          <AnalysisContextControlSimple 
+            onModeChange={(mode) => console.log('Context mode changed to:', mode)}
+            lastQuestion={analysisHistory.length > 0 ? analysisHistory[analysisHistory.length - 1].question : null}
+            originalDataCount={initialData?.length || 0}
+            activeFilters={selectedFilters}
+          />
           
           {/* Render each question/answer pair in conversation */}
           {analysisHistory.map((item, index) => (

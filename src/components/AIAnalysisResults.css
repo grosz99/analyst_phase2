@@ -338,12 +338,13 @@
 
 .refined-questions {
   display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
+  flex-wrap: wrap;
+  gap: 1rem;
 }
 
 .refined-question-item {
-  width: 100%;
+  flex: 1;
+  min-width: 250px;
 }
 
 .refined-question-btn {
@@ -351,11 +352,15 @@
   background: white;
   border: 2px solid #bbf7d0;
   border-radius: 12px;
-  padding: 1.25rem;
+  padding: 1rem;
   text-align: left;
   cursor: pointer;
   transition: all 0.3s ease;
   box-shadow: 0 2px 8px rgba(16, 185, 129, 0.1);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
 }
 
 .refined-question-btn:hover:not(:disabled) {
@@ -627,5 +632,13 @@
   
   .suggested-questions {
     justify-content: center;
+  }
+  
+  .refined-questions {
+    flex-direction: column;
+  }
+  
+  .refined-question-item {
+    min-width: auto;
   }
 }
