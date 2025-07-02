@@ -292,8 +292,14 @@ class DatasetService {
     }
     
     if (columnLower.includes('category')) {
-      const categories = ['Premium', 'Standard', 'Basic', 'Luxury', 'Budget'];
+      const categories = ['Office Supplies', 'Furniture', 'Technology', 'Premium', 'Standard', 'Basic'];
       return categories[Math.floor(random() * categories.length)];
+    }
+    
+    // CRITICAL: Add ship_mode support to match real Snowflake data
+    if (columnLower.includes('ship') || columnLower.includes('shipping') || columnLower.includes('delivery')) {
+      const shipModes = ['Standard Class', 'Second Class', 'First Class', 'Same Day'];
+      return shipModes[Math.floor(random() * shipModes.length)];
     }
     
     if (columnLower.includes('status')) {
@@ -439,7 +445,12 @@ class DatasetService {
     }
     
     if (fieldLower.includes('category')) {
-      return ['Premium', 'Standard', 'Basic', 'Luxury'];
+      return ['Office Supplies', 'Furniture', 'Technology'];
+    }
+    
+    // CRITICAL: Add ship_mode filter values to match Snowflake data
+    if (fieldLower.includes('ship') || fieldLower.includes('shipping') || fieldLower.includes('delivery')) {
+      return ['Standard Class', 'Second Class', 'First Class', 'Same Day'];
     }
     
     if (fieldLower.includes('status')) {

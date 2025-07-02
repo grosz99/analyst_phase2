@@ -1,6 +1,7 @@
 const AnthropicClient = require('./anthropicClient');
 const CodeExecutor = require('./codeExecutor');
 const ResultFormatter = require('./resultFormatter');
+const ColumnMappingService = require('../semanticLayer/columnMappingService');
 
 /**
  * Anthropic Service - Main orchestrator for AI analysis
@@ -11,6 +12,7 @@ class AnthropicService {
     this.client = new AnthropicClient();
     this.codeExecutor = new CodeExecutor();
     this.resultFormatter = new ResultFormatter();
+    this.columnMapper = new ColumnMappingService();
   }
 
   // Main analysis method - orchestrates the entire workflow
@@ -332,18 +334,33 @@ Generate Python code that works with a DataFrame called 'df' containing this dat
     }
   }
 
-  // Helper method to find a column by possible names
+  // Helper method to find a column using unified semantic layer
   findColumn(data, possibleNames) {
     if (!data.length) return null;
     const columns = Object.keys(data[0]);
     
+    // First try using the unified semantic layer
+    for (const logicalName of possibleNames) {
+      const actualColumn = this.columnMapper.resolveColumn(columns, logicalName);
+      if (actualColumn) {
+        console.log(`✅ Anthropic column resolved via semantic layer: ${logicalName} → ${actualColumn}`);
+        return actualColumn;
+      }
+    }
+    
+    // Legacy fallback method (temporary during migration)
     for (const name of possibleNames) {
       const found = columns.find(col => 
         col.toLowerCase().includes(name.toLowerCase()) ||
         name.toLowerCase().includes(col.toLowerCase())
       );
-      if (found) return found;
+      if (found) {
+        console.log(`🔄 Anthropic legacy column fallback: ${name} → ${found}`);
+        return found;
+      }
     }
+    
+    console.warn(`❌ Anthropic column not found for any of: ${possibleNames.join(', ')}`);
     return null;
   }
 

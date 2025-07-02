@@ -2,9 +2,15 @@
  * SQL Generator - Handles dynamic SQL generation for Cortex Analyst
  * Responsible for: Question analysis, SQL generation, column mapping
  */
+
+const ColumnMappingService = require('../semanticLayer/columnMappingService');
+
 class SqlGenerator {
   constructor() {
-    // Default column mappings for the superstore dataset
+    // Use centralized column mapping service
+    this.columnMapper = new ColumnMappingService();
+    
+    // Legacy fallback mappings (to be removed after full migration)
     this.defaultColumnMappings = {
       customer: 'CUSTOMER_NAME',
       product: 'PRODUCT_NAME', 
@@ -16,7 +22,9 @@ class SqlGenerator {
       quantity: 'QUANTITY',
       segment: 'SEGMENT',
       date: 'ORDER_DATE',
-      order: 'ORDER_ID'
+      order: 'ORDER_ID',
+      ship_mode: 'SHIP_MODE',
+      ship: 'SHIP_MODE'
     };
   }
 
@@ -82,32 +90,36 @@ class SqlGenerator {
     }
   }
 
-  // Map actual database column names to logical concepts
+  // Map actual database column names to logical concepts using unified semantic layer
   mapColumns(columns) {
-    const mappings = {};
+    console.log(`🗂️ Mapping columns using unified semantic layer for: [${columns.join(', ')}]`);
     
+    // Use the centralized column mapping service
+    const logicalColumns = this.columnMapper.getSupportedLogicalColumns();
+    const mappings = this.columnMapper.resolveColumns(columns, logicalColumns);
+    
+    console.log(`✅ Resolved mappings:`, mappings);
+    
+    // Legacy fallback for any unmapped columns (temporary during migration)
+    const legacyMappings = {};
     for (const [concept, defaultName] of Object.entries(this.defaultColumnMappings)) {
-      // First try exact match
-      if (columns.includes(defaultName)) {
-        mappings[concept] = defaultName;
-        continue;
-      }
-      
-      // Then try case-insensitive partial match
-      const found = columns.find(col => 
-        col.toLowerCase().includes(concept.toLowerCase()) ||
-        (concept === 'customer' && col.toLowerCase().includes('customer')) ||
-        (concept === 'product' && (col.toLowerCase().includes('product') || col.toLowerCase().includes('item'))) ||
-        (concept === 'sales' && (col.toLowerCase().includes('sales') || col.toLowerCase().includes('revenue'))) ||
-        (concept === 'date' && (col.toLowerCase().includes('date') || col.toLowerCase().includes('time')))
-      );
-      
-      if (found) {
-        mappings[concept] = found;
+      if (!mappings[concept] && columns.includes(defaultName)) {
+        legacyMappings[concept] = defaultName;
+        console.log(`🔄 Legacy fallback used for: ${concept} → ${defaultName}`);
       }
     }
     
-    return mappings;
+    // Merge mappings (semantic layer takes priority)
+    const finalMappings = { ...legacyMappings, ...mappings };
+    
+    // Log any critical missing columns
+    const criticalColumns = ['sales', 'profit', 'category', 'region', 'ship_mode'];
+    const missing = criticalColumns.filter(col => !finalMappings[col]);
+    if (missing.length > 0) {
+      console.warn(`⚠️ Missing critical columns: ${missing.join(', ')}`);
+    }
+    
+    return finalMappings;
   }
 
   // Analyze the natural language question to understand intent
@@ -122,6 +134,7 @@ class SqlGenerator {
     console.log(`🔍 Analyzing question: "${questionLower}"`);
     console.log(`📊 Available columns: ${columns.join(', ')}`);
     console.log(`🗂️ Column mappings:`, columnMappings);
+    console.log(`🚢 Ship mode mapping: ${columnMappings.ship_mode || 'NOT FOUND'}`);
     console.log(`🎯 Question hash: ${questionLower.replace(/[^a-z0-9]/g, '').substring(0, 10)}`);
     
     // 1. Detect counting questions (how many, count, number of)
@@ -153,8 +166,11 @@ class SqlGenerator {
     else if (questionLower.includes('most') || questionLower.includes('highest') || questionLower.includes('top') ||
              questionLower.includes('best') || questionLower.includes('worst') || questionLower.includes('lowest')) {
       
-      // Determine what to group by based on question keywords
-      if (questionLower.includes('region') && columnMappings.region) {
+      // PRIORITY ORDER: Check ship_mode first since it's been problematic
+      if ((questionLower.includes('ship_mode') || questionLower.includes('ship mode') || questionLower.includes('shipping') || questionLower.includes('ship')) && columnMappings.ship_mode) {
+        groupBy = columnMappings.ship_mode;
+        console.log(`🚢 SHIP_MODE detected! Using column: ${columnMappings.ship_mode}`);
+      } else if (questionLower.includes('region') && columnMappings.region) {
         groupBy = columnMappings.region;
       } else if (questionLower.includes('category') && columnMappings.category) {
         groupBy = columnMappings.category;
@@ -165,10 +181,11 @@ class SqlGenerator {
       } else if (questionLower.includes('segment') && columnMappings.segment) {
         groupBy = columnMappings.segment;
       } else {
-        // Try to infer from available categorical columns
-        const categoricalCols = [columnMappings.category, columnMappings.region, columnMappings.customer, columnMappings.product, columnMappings.segment].filter(Boolean);
+        // Try to infer from available categorical columns - PUT SHIP_MODE FIRST
+        const categoricalCols = [columnMappings.ship_mode, columnMappings.category, columnMappings.region, columnMappings.customer, columnMappings.product, columnMappings.segment].filter(Boolean);
         if (categoricalCols.length > 0) {
           groupBy = categoricalCols[0]; // Use first available categorical column
+          console.log(`📊 Using fallback categorical column: ${groupBy}`);
         }
       }
       
@@ -212,8 +229,11 @@ class SqlGenerator {
       const metric = parts[0].trim();
       const dimension = parts[1].trim();
       
-      // Find the dimension to group by
-      if (dimension.includes('region') && columnMappings.region) {
+      // Find the dimension to group by - PRIORITY ORDER: ship_mode first
+      if ((dimension.includes('ship_mode') || dimension.includes('ship mode') || dimension.includes('shipping') || dimension.includes('ship')) && columnMappings.ship_mode) {
+        groupBy = columnMappings.ship_mode;
+        console.log(`🚢 SHIP_MODE BY query detected! Using column: ${columnMappings.ship_mode}`);
+      } else if (dimension.includes('region') && columnMappings.region) {
         groupBy = columnMappings.region;
       } else if (dimension.includes('category') && columnMappings.category) {
         groupBy = columnMappings.category;
