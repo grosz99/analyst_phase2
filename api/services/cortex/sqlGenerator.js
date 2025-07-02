@@ -144,8 +144,14 @@ class SqlGenerator {
       aggregateFunction = 'COUNT';
       aggregateColumn = '*';
       
-      // Find what to group by for counting
-      if (questionLower.includes('customer') && columnMappings.customer) {
+      // Find what to group by for counting - PRIORITY ORDER: geographic first
+      if ((questionLower.includes('city') || questionLower.includes('cities')) && columnMappings.city) {
+        groupBy = columnMappings.city;
+      } else if ((questionLower.includes('state') || questionLower.includes('states')) && columnMappings.state) {
+        groupBy = columnMappings.state;
+      } else if ((questionLower.includes('country') || questionLower.includes('countries')) && columnMappings.country) {
+        groupBy = columnMappings.country;
+      } else if (questionLower.includes('customer') && columnMappings.customer) {
         groupBy = columnMappings.customer;
       } else if (questionLower.includes('order') && columnMappings.order) {
         groupBy = columnMappings.order;
@@ -166,25 +172,32 @@ class SqlGenerator {
     else if (questionLower.includes('most') || questionLower.includes('highest') || questionLower.includes('top') ||
              questionLower.includes('best') || questionLower.includes('worst') || questionLower.includes('lowest')) {
       
-      // PRIORITY ORDER: Check ship_mode first since it's been problematic
-      if ((questionLower.includes('ship_mode') || questionLower.includes('ship mode') || questionLower.includes('shipping') || questionLower.includes('ship')) && columnMappings.ship_mode) {
-        groupBy = columnMappings.ship_mode;
-        console.log(`🚢 SHIP_MODE detected! Using column: ${columnMappings.ship_mode}`);
-      } else if (questionLower.includes('region') && columnMappings.region) {
-        groupBy = columnMappings.region;
-      } else if (questionLower.includes('category') && columnMappings.category) {
-        groupBy = columnMappings.category;
-      } else if (questionLower.includes('customer') && columnMappings.customer) {
-        groupBy = columnMappings.customer;
-      } else if (questionLower.includes('product') && columnMappings.product) {
-        groupBy = columnMappings.product;
-      } else if (questionLower.includes('segment') && columnMappings.segment) {
-        groupBy = columnMappings.segment;
-      } else {
-        // Try to infer from available categorical columns - PUT SHIP_MODE FIRST
-        const categoricalCols = [columnMappings.ship_mode, columnMappings.category, columnMappings.region, columnMappings.customer, columnMappings.product, columnMappings.segment].filter(Boolean);
+      // Flexible dimension detection based on question keywords
+      const dimensionChecks = [
+        { keywords: ['city', 'cities'], mapping: columnMappings.city, name: 'CITY' },
+        { keywords: ['state', 'states'], mapping: columnMappings.state, name: 'STATE' },
+        { keywords: ['country', 'countries'], mapping: columnMappings.country, name: 'COUNTRY' },
+        { keywords: ['ship_mode', 'ship mode', 'shipping', 'ship'], mapping: columnMappings.ship_mode, name: 'SHIP_MODE' },
+        { keywords: ['region'], mapping: columnMappings.region, name: 'REGION' },
+        { keywords: ['category'], mapping: columnMappings.category, name: 'CATEGORY' },
+        { keywords: ['customer'], mapping: columnMappings.customer, name: 'CUSTOMER' },
+        { keywords: ['product'], mapping: columnMappings.product, name: 'PRODUCT' },
+        { keywords: ['segment'], mapping: columnMappings.segment, name: 'SEGMENT' }
+      ];
+      
+      for (const check of dimensionChecks) {
+        if (check.keywords.some(keyword => questionLower.includes(keyword)) && check.mapping) {
+          groupBy = check.mapping;
+          console.log(`📊 ${check.name} detected! Using column: ${check.mapping}`);
+          break;
+        }
+      }
+      
+      if (!groupBy) {
+        // Fallback to first available categorical column
+        const categoricalCols = [columnMappings.category, columnMappings.region, columnMappings.customer, columnMappings.product, columnMappings.segment, columnMappings.ship_mode, columnMappings.city, columnMappings.state, columnMappings.country].filter(Boolean);
         if (categoricalCols.length > 0) {
-          groupBy = categoricalCols[0]; // Use first available categorical column
+          groupBy = categoricalCols[0];
           console.log(`📊 Using fallback categorical column: ${groupBy}`);
         }
       }
@@ -229,8 +242,17 @@ class SqlGenerator {
       const metric = parts[0].trim();
       const dimension = parts[1].trim();
       
-      // Find the dimension to group by - PRIORITY ORDER: ship_mode first
-      if ((dimension.includes('ship_mode') || dimension.includes('ship mode') || dimension.includes('shipping') || dimension.includes('ship')) && columnMappings.ship_mode) {
+      // Find the dimension to group by - PRIORITY ORDER: geographic first
+      if ((dimension.includes('city') || dimension.includes('cities')) && columnMappings.city) {
+        groupBy = columnMappings.city;
+        console.log(`🏙️ CITY BY query detected! Using column: ${columnMappings.city}`);
+      } else if ((dimension.includes('state') || dimension.includes('states')) && columnMappings.state) {
+        groupBy = columnMappings.state;
+        console.log(`🗺️ STATE BY query detected! Using column: ${columnMappings.state}`);
+      } else if ((dimension.includes('country') || dimension.includes('countries')) && columnMappings.country) {
+        groupBy = columnMappings.country;
+        console.log(`🌍 COUNTRY BY query detected! Using column: ${columnMappings.country}`);
+      } else if ((dimension.includes('ship_mode') || dimension.includes('ship mode') || dimension.includes('shipping') || dimension.includes('ship')) && columnMappings.ship_mode) {
         groupBy = columnMappings.ship_mode;
         console.log(`🚢 SHIP_MODE BY query detected! Using column: ${columnMappings.ship_mode}`);
       } else if (dimension.includes('region') && columnMappings.region) {

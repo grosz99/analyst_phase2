@@ -407,7 +407,7 @@ function UnifiedAnalysisView({ initialData, cachedDataset, dataLoadedTimestamp, 
                 onNewAnalysis={handleNewAnalysis}
                 isLoading={false}
                 showCompactInput={index === analysisHistory.length - 1} // Only show input on last item
-                showContextControl={index >= 1 && index === analysisHistory.length - 1} // Only show context control from 2nd question onwards and on last item
+                showContextControl={analysisHistory.length >= 1 && index === analysisHistory.length - 1} // Show context control after first question is completed
                 selectedBackend={selectedBackend}
                 sessionId={sessionId}
               />

@@ -445,19 +445,32 @@ ${sql}
     let visualizationType = 'table';
     if (categoricalColumns.length > 0 && numericColumns.length > 0) {
       if (data.length <= 10) {
-        visualizationType = 'bar';
+        visualizationType = 'bar_chart'; // Match frontend expectation
       } else {
-        visualizationType = 'line';
+        visualizationType = 'line_chart';
       }
     } else if (numericColumns.length > 1) {
-      visualizationType = 'scatter';
+      visualizationType = 'scatter_plot';
+    }
+    
+    // Format data for bar chart visualization
+    let chartData = [];
+    if (visualizationType === 'bar_chart' && categoricalColumns.length > 0 && numericColumns.length > 0) {
+      const labelColumn = categoricalColumns[0];
+      const valueColumn = numericColumns[0];
+      
+      chartData = data.slice(0, 10).map(row => ({
+        label: String(row[labelColumn]),
+        value: parseFloat(row[valueColumn]) || 0,
+        formatted_value: this.formatNumber(parseFloat(row[valueColumn]) || 0)
+      }));
     }
     
     return {
       type: visualizationType,
       title: this.generateVisualizationTitle(question, data.length),
       description: `${data.length} records analyzed`,
-      data: data.slice(0, 20), // Limit for performance
+      data: chartData.length > 0 ? chartData : data.slice(0, 20), // Use formatted chart data or raw data
       xAxis: categoricalColumns[0] || headers[0],
       yAxis: numericColumns[0] || headers[1],
       config: {
@@ -465,6 +478,23 @@ ${sql}
         maintainAspectRatio: false
       }
     };
+  }
+
+  // Format numbers for display
+  formatNumber(value) {
+    if (value === null || value === undefined || isNaN(value)) return '0';
+    
+    const num = parseFloat(value);
+    
+    if (num >= 1000000) {
+      return (num / 1000000).toFixed(1) + 'M';
+    } else if (num >= 1000) {
+      return (num / 1000).toFixed(1) + 'K';
+    } else if (num >= 1) {
+      return num.toLocaleString();
+    } else {
+      return num.toFixed(2);
+    }
   }
 
   // Generate appropriate visualization title

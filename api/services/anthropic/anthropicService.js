@@ -117,11 +117,13 @@ class AnthropicService {
     
     return `You are a data analyst. Analyze this dataset and provide insights for the user's question.
 
+CRITICAL: Only use the existing columns in the DataFrame. Do NOT create new calculated columns or metrics.
+
 DATASET STRUCTURE:
 - ${data.length} total records
-- Columns: ${dataStructure.columns.join(', ')}
-- Numeric columns: ${dataStructure.numericColumns.join(', ') || 'None'}
-- Categorical columns: ${dataStructure.categoricalColumns.join(', ') || 'None'}
+- EXACT COLUMNS AVAILABLE: ${dataStructure.columns.join(', ')}
+- Numeric columns for aggregation: ${dataStructure.numericColumns.join(', ') || 'None'}
+- Categorical columns for grouping: ${dataStructure.categoricalColumns.join(', ') || 'None'}
 - Date columns: ${dataStructure.dateColumns.join(', ') || 'None'}
 
 SAMPLE DATA (first 5 rows):
@@ -129,14 +131,29 @@ ${JSON.stringify(sampleData, null, 2)}
 
 USER QUESTION: "${userContext}"
 
-Please provide:
-1. A clear analysis answering the user's question
-2. Key insights and findings
-3. Python code using pandas that demonstrates the analysis
+INSTRUCTIONS:
+1. ONLY use columns that exist in the dataset: ${dataStructure.columns.join(', ')}
+2. For aggregations, use SUM() for financial metrics, COUNT() for counting records
+3. Do NOT calculate averages unless specifically asked
+4. Do NOT create new calculated columns or derived metrics
+5. Group by categorical columns, sum or count the numeric columns
 
-Focus on the specific question asked. If the data doesn't contain the exact information needed, explain what's available and provide the best possible analysis with the existing data.
+Python code requirements:
+- Use DataFrame 'df' with exact column names shown above
+- Use df.groupby() for grouping analysis
+- Use .sum() for financial totals, .count() for record counts
+- Use .sort_values() for ranking/top analysis
+- Only reference columns that exist: ${dataStructure.columns.join(', ')}
 
-Generate Python code that works with a DataFrame called 'df' containing this data structure.`;
+Example good code patterns:
+df.groupby('CATEGORY')['SALES'].sum().sort_values(ascending=False)
+df.groupby('REGION')['PROFIT'].sum()
+df.groupby('SHIP_MODE').size().sort_values(ascending=False)
+
+Provide:
+1. Clear analysis answering the user's question
+2. Key insights from the existing data
+3. Python code using only existing columns`;
   }
 
   // Analyze data structure for intelligent prompt building
