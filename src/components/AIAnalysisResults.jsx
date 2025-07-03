@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import aiAnalysisService from '../services/aiAnalysisService.js';
 import AnalysisContextControlSimple from './AnalysisContextControlSimple.jsx';
+import ResultsTable from './ResultsTable';
 import html2canvas from 'html2canvas';
 import PptxGenJS from 'pptxgenjs';
 import './AIAnalysisResults.css';
@@ -229,9 +230,12 @@ const AIAnalysisResults = ({
         });
       }
       
-      // Generate filename with timestamp
+      // Generate unique filename with question context and timestamp
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-      const filename = `Analysis_${timestamp}.pptx`;
+      const questionPrefix = originalQuestion ? 
+        `Q${index + 1}_${originalQuestion.substring(0, 30).replace(/[^a-z0-9]/gi, '_')}` : 
+        'Analysis';
+      const filename = `${questionPrefix}_${timestamp}.pptx`;
       
       // Save PowerPoint file
       await pptx.writeFile({ fileName: filename });
@@ -286,32 +290,25 @@ const AIAnalysisResults = ({
       return <p className="no-items">No table structure available</p>;
     }
 
+    // Convert data to format expected by ResultsTable component
+    const formattedData = data.map(row => {
+      const formattedRow = {};
+      columns.forEach(column => {
+        const value = getRowValue(row, column);
+        formattedRow[column] = formatCellValue(value);
+      });
+      return formattedRow;
+    });
+
+    // Generate unique title for this specific question
+    const questionText = originalQuestion || 'Analysis Results';
+    const tableTitle = `Q${index + 1}: ${questionText.length > 50 ? questionText.substring(0, 50) + '...' : questionText}`;
+
     return (
-      <div className="results-table-container">
-        <table className="results-table">
-          <thead>
-            <tr>
-              {columns.map(column => (
-                <th key={column}>{column}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {data.map((row, index) => (
-              <tr key={index}>
-                {columns.map(column => {
-                  const value = getRowValue(row, column);
-                  return (
-                    <td key={column}>
-                      {formatCellValue(value)}
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <ResultsTable 
+        data={formattedData} 
+        title={tableTitle}
+      />
     );
   };
 
@@ -563,21 +560,36 @@ const AIAnalysisResults = ({
       {/* Refined Question Suggestions */}
       {refined_questions && refined_questions.length > 0 && (
         <div className="refined-questions-section">
-          <h4>💡 Better Questions for Your Data</h4>
-          <p className="refined-subtitle">Based on your data structure, try these questions instead:</p>
+          <h4>Popular Searches from Data Sources</h4>
           <div className="refined-questions">
-            {refined_questions.map((refinedQ, index) => (
-              <div key={index} className="refined-question-item">
-                <button
-                  className="refined-question-btn"
-                  onClick={() => handleSuggestedQuestion(refinedQ.question)}
-                  disabled={compactAnalyzing}
-                >
-                  <div className="refined-question-text">{refinedQ.question}</div>
-                  <div className="refined-question-reason">{refinedQ.reason}</div>
-                </button>
-              </div>
-            ))}
+            {refined_questions.map((refinedQ, index) => {
+              // Determine icon based on question content
+              const getQuestionIcon = (question) => {
+                const q = question.toLowerCase();
+                if (q.includes('trend') || q.includes('time') || q.includes('growth')) return { icon: '📈', class: 'icon-trending' };
+                if (q.includes('customer') || q.includes('client') || q.includes('user')) return { icon: '👥', class: 'icon-users' };
+                if (q.includes('revenue') || q.includes('sales') || q.includes('profit')) return { icon: '📊', class: 'icon-chart' };
+                return { icon: '🗂️', class: 'icon-database' };
+              };
+              
+              const iconInfo = getQuestionIcon(refinedQ.question);
+              
+              return (
+                <div key={index} className="refined-question-item">
+                  <button
+                    className="refined-question-btn"
+                    onClick={() => handleSuggestedQuestion(refinedQ.question)}
+                    disabled={compactAnalyzing}
+                  >
+                    <div className={`question-icon ${iconInfo.class}`}>
+                      {iconInfo.icon}
+                    </div>
+                    <div className="refined-question-text">{refinedQ.question}</div>
+                    <div className="refined-question-reason">{refinedQ.reason}</div>
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
