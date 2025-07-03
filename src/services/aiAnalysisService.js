@@ -430,6 +430,49 @@ class AIAnalysisService {
     this.downloadFile(jsonContent, `${filename}.json`, 'application/json');
   }
 
+  // Get data source recommendation from Anthropic API
+  async getDataSourceRecommendation(query, availableDataSources, semanticModel) {
+    try {
+      console.log(`🔍 Getting AI recommendation for: "${query}"`);
+      
+      const response = await fetch(`${this.baseURL}/api/ai/recommend-datasource`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query,
+          availableDataSources,
+          semanticModel
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success) {
+        console.log('✅ Received AI recommendation:', result.recommendation);
+        return result.recommendation;
+      } else {
+        throw new Error(result.error || 'Failed to get recommendation');
+      }
+    } catch (error) {
+      console.error('Failed to get data source recommendation:', error);
+      // Return fallback recommendation
+      return {
+        recommendedSource: availableDataSources[0] || 'CUSTOMERS',
+        confidence: 'low',
+        reasoning: 'API unavailable, providing fallback recommendation',
+        analysisType: 'general analysis',
+        alternativeSources: availableDataSources.slice(1, 3),
+        keyFeatures: ['General data fields']
+      };
+    }
+  }
+
   // Download file helper
   downloadFile(content, filename, mimeType) {
     const blob = new Blob([content], { type: mimeType });

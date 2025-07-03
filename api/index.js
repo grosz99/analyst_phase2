@@ -615,6 +615,86 @@ app.get('/api/ai/backends', (req, res) => {
 });
 
 // Main AI Analysis Endpoint with Backend Choice
+// Data source recommendation endpoint
+app.post('/api/ai/recommend-datasource', async (req, res) => {
+  try {
+    const { query, availableDataSources, semanticModel } = req.body;
+    const startTime = Date.now();
+    
+    // Input validation
+    if (!query || typeof query !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: 'Query is required and must be a string.',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    if (!availableDataSources || !Array.isArray(availableDataSources)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Available data sources are required.',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    console.log(`🔍 Data source recommendation request: "${query}" from ${availableDataSources.length} sources`);
+    
+    // Create recommendation prompt with semantic layer context
+    const recommendationPrompt = `You are an expert data analyst helping users find the right data source for their analysis needs.
+
+Available Data Sources:
+${availableDataSources.map(source => {
+  const info = semanticModel?.tables?.[source];
+  return `- ${source}: ${info?.description || 'Snowflake table'}
+    Keywords: ${info?.keywords?.join(', ') || 'N/A'}
+    Common analyses: ${info?.questions?.join(', ') || 'N/A'}`;
+}).join('\n')}
+
+User Query: "${query}"
+
+Based on the user's query and the semantic information about each data source, provide a recommendation in this exact JSON format:
+{
+  "recommendedSource": "SOURCE_NAME",
+  "confidence": "high|medium|low",
+  "reasoning": "Brief explanation of why this source is recommended",
+  "analysisType": "Brief description of the type of analysis this enables",
+  "alternativeSources": ["SOURCE_NAME1", "SOURCE_NAME2"],
+  "keyFeatures": ["feature1", "feature2", "feature3"]
+}
+
+Rules:
+1. Choose the BEST single data source that matches the query
+2. Confidence should be "high" if there's a clear match, "medium" if reasonable, "low" if uncertain
+3. Reasoning should explain the match in 1-2 sentences
+4. Analysis type should describe what kind of analysis the user can perform
+5. Alternative sources should list 1-2 other relevant options
+6. Key features should list 3 relevant data points/dimensions from that source
+7. Return ONLY the JSON, no other text`;
+
+    // Call Anthropic API
+    const result = await anthropicService.makeRecommendation(recommendationPrompt);
+    
+    const duration = Date.now() - startTime;
+    
+    res.json({
+      success: true,
+      query: query,
+      recommendation: result,
+      processing_time: duration,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('Data source recommendation error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 app.post('/api/ai/analyze', async (req, res) => {
   try {
     const { data, analysisType, userContext, question, sessionId, backend, contextPrompt } = req.body;
@@ -772,6 +852,7 @@ app.use('/api/*', (req, res) => {
       'GET /api/ai/health',
       'GET /api/ai/status',
       'POST /api/ai/analyze',
+      'POST /api/ai/recommend-datasource',
       'GET /api/ai/analysis-types'
     ],
     timestamp: new Date().toISOString()

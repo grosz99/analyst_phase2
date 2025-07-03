@@ -142,6 +142,28 @@
   text-align: right;
 }
 
+/* Recommendation Text */
+.recommendation-text {
+  margin-top: 12px;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.recommendation-item {
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 4px;
+}
+
+.recommendation-detail {
+  color: #666;
+  padding-left: 16px;
+  margin-bottom: 2px;
+}
+
 /* Source Suggestions */
 .source-suggestions {
   display: flex;

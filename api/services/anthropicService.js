@@ -245,6 +245,52 @@ Generate Python code that works with a DataFrame called 'df' containing this dat
   getStatus() {
     return this.client.getStatus();
   }
+
+  // Data source recommendation method
+  async makeRecommendation(prompt) {
+    try {
+      console.log('🔍 Making data source recommendation with Anthropic...');
+      
+      // Send to Anthropic API
+      const response = await this.client.sendMessage([{
+        role: 'user',
+        content: prompt
+      }]);
+
+      if (!response.content || response.content.length === 0) {
+        throw new Error('Empty response from Anthropic API');
+      }
+
+      const responseText = response.content[0].text;
+      console.log('📝 Received recommendation from Anthropic');
+
+      // Try to parse JSON response
+      try {
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const recommendation = JSON.parse(jsonMatch[0]);
+          return recommendation;
+        } else {
+          throw new Error('No JSON found in response');
+        }
+      } catch (parseError) {
+        console.warn('Failed to parse JSON recommendation:', parseError.message);
+        // Return a fallback response
+        return {
+          recommendedSource: 'CUSTOMERS', // Default recommendation
+          confidence: 'low',
+          reasoning: 'Unable to parse AI response, providing default recommendation',
+          analysisType: 'general analysis',
+          alternativeSources: [],
+          keyFeatures: []
+        };
+      }
+
+    } catch (error) {
+      console.error('Recommendation error:', error);
+      throw error;
+    }
+  }
 }
 
 // Export singleton instance

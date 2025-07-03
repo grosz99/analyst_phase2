@@ -1,46 +1,57 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, MessageCircle, Database, CheckCircle, Search, List } from 'lucide-react';
+import aiAnalysisService from '../services/aiAnalysisService.js';
 import './DataSourceDiscovery.css';
 
-// Semantic model information - in production this would come from the API
+// Semantic model information mapped to actual Snowflake tables
 const SEMANTIC_MODEL = {
   tables: {
-    'Sales Data': {
-      description: 'Comprehensive sales data including orders, customers, products, and financial metrics',
-      keywords: ['sales', 'revenue', 'orders', 'purchase', 'transaction', 'money', 'financial'],
-      dimensions: ['customer', 'product', 'category', 'region', 'segment', 'date', 'location'],
-      metrics: ['sales', 'profit', 'quantity', 'discount', 'margin'],
+    'ORDERS': {
+      description: 'Comprehensive sales and order data including transactions, revenue, and financial metrics',
+      keywords: ['sales', 'revenue', 'orders', 'purchase', 'transaction', 'money', 'financial', 'profit', 'discount'],
+      dimensions: ['order_id', 'order_date', 'ship_date', 'ship_mode', 'customer_id', 'product_id', 'region', 'country', 'city', 'state'],
+      metrics: ['sales', 'profit', 'quantity', 'discount', 'revenue'],
       questions: [
         'sales performance',
         'revenue analysis',
         'order analysis',
         'purchase history',
-        'transaction data'
-      ]
+        'transaction data',
+        'profit margins',
+        'regional performance'
+      ],
+      relatedConcepts: ['performance', 'trends', 'analysis', 'metrics', 'kpi']
     },
-    'Customer Data': {
-      description: 'Customer information including demographics, segments, and location data',
-      keywords: ['customer', 'client', 'buyer', 'consumer', 'demographics', 'segment'],
-      dimensions: ['customer_name', 'customer_id', 'segment', 'location', 'city', 'state'],
-      metrics: ['customer_count', 'unique_customers'],
+    'CUSTOMERS': {
+      description: 'Customer master data including demographics, segments, tiers, and location information',
+      keywords: ['customer', 'client', 'buyer', 'consumer', 'demographics', 'segment', 'tier', 'level', 'vip', 'loyalty'],
+      dimensions: ['customer_id', 'customer_name', 'segment', 'city', 'state', 'postal_code', 'region'],
+      metrics: ['customer_count', 'lifetime_value', 'average_order_value'],
       questions: [
         'customer analysis',
         'customer segments',
         'buyer behavior',
-        'client information'
-      ]
+        'customer tiers',
+        'customer levels',
+        'vip customers',
+        'customer demographics'
+      ],
+      relatedConcepts: ['segmentation', 'demographics', 'behavior', 'loyalty', 'retention']
     },
-    'Product Data': {
-      description: 'Product catalog with categories, sub-categories, and product details',
-      keywords: ['product', 'item', 'category', 'inventory', 'catalog', 'merchandise'],
-      dimensions: ['product_name', 'product_id', 'category', 'sub_category'],
-      metrics: ['product_count', 'categories'],
+    'PRODUCTS': {
+      description: 'Product catalog with categories, subcategories, pricing, and inventory details',
+      keywords: ['product', 'item', 'category', 'inventory', 'catalog', 'merchandise', 'sku', 'price'],
+      dimensions: ['product_id', 'product_name', 'category', 'sub_category', 'manufacturer'],
+      metrics: ['product_count', 'price', 'cost', 'margin'],
       questions: [
         'product performance',
         'category analysis',
         'inventory analysis',
-        'product catalog'
-      ]
+        'product catalog',
+        'pricing analysis',
+        'product profitability'
+      ],
+      relatedConcepts: ['catalog', 'inventory', 'pricing', 'categories', 'assortment']
     }
   }
 };
@@ -84,6 +95,62 @@ const DataSourceDiscovery = ({
       inputRef.current?.focus();
     }
   }, [isProcessing, selectedMode]);
+
+  // Helper function to determine analysis type
+  const getAnalysisType = (query, tableName) => {
+    const queryLower = query.toLowerCase();
+    
+    if (tableName === 'CUSTOMERS') {
+      if (queryLower.includes('tier')) return 'customer tier analysis';
+      if (queryLower.includes('segment')) return 'customer segmentation analysis';
+      if (queryLower.includes('demographic')) return 'demographic analysis';
+      return 'customer analysis';
+    } else if (tableName === 'ORDERS') {
+      if (queryLower.includes('performance')) return 'sales performance analysis';
+      if (queryLower.includes('revenue')) return 'revenue analysis';
+      if (queryLower.includes('trend')) return 'trend analysis';
+      return 'order analysis';
+    } else if (tableName === 'PRODUCTS') {
+      if (queryLower.includes('category')) return 'category performance analysis';
+      if (queryLower.includes('price')) return 'pricing analysis';
+      return 'product analysis';
+    }
+    return 'data analysis';
+  };
+
+  // Helper function to create recommendation explanations
+  const getRecommendationExplanation = (sources, query) => {
+    return sources.map((source, index) => {
+      const semanticInfo = SEMANTIC_MODEL.tables[source.name];
+      let explanation = `${index + 1}. **${source.name}**`;
+      
+      if (source.confidence === 'high') {
+        explanation += ' (Highly Recommended)';
+      } else if (source.confidence === 'medium') {
+        explanation += ' (Recommended)';
+      }
+      
+      explanation += `\n   - ${semanticInfo?.description || 'Snowflake table'}`;
+      
+      // Add specific reasons why this table matches
+      const queryLower = query.toLowerCase();
+      const matchingFeatures = [];
+      
+      if (semanticInfo) {
+        semanticInfo.keywords.forEach(keyword => {
+          if (queryLower.includes(keyword)) {
+            matchingFeatures.push(keyword);
+          }
+        });
+        
+        if (matchingFeatures.length > 0) {
+          explanation += `\n   - Matches: ${matchingFeatures.join(', ')}`;
+        }
+      }
+      
+      return explanation;
+    }).join('\n\n');
+  };
 
   // Enhanced matching using semantic model
   const findMatchingDataSources = (query) => {
@@ -130,13 +197,16 @@ const DataSourceDiscovery = ({
         });
 
         // Special cases for common analysis patterns
-        if (queryLower.includes('profit') && source === 'Sales Data') score += 30;
-        if (queryLower.includes('segment') && source === 'Customer Data') score += 25;
-        if (queryLower.includes('category') && source === 'Product Data') score += 25;
-        if (queryLower.includes('region') && source === 'Sales Data') score += 20;
-        if (queryLower.includes('performance') && source === 'Sales Data') score += 20;
-        if ((queryLower.includes('tier') || queryLower.includes('level')) && source === 'Customer Data') score += 25;
-        if (queryLower.includes('customer') && (source === 'Customer Data' || source === 'Sales Data')) score += 15;
+        if (queryLower.includes('profit') && source === 'ORDERS') score += 30;
+        if (queryLower.includes('segment') && source === 'CUSTOMERS') score += 25;
+        if (queryLower.includes('category') && source === 'PRODUCTS') score += 25;
+        if (queryLower.includes('region') && source === 'ORDERS') score += 20;
+        if (queryLower.includes('performance') && source === 'ORDERS') score += 20;
+        if ((queryLower.includes('tier') || queryLower.includes('level')) && source === 'CUSTOMERS') score += 40;
+        if (queryLower.includes('customer') && source === 'CUSTOMERS') score += 35;
+        if (queryLower.includes('customer') && source === 'ORDERS') score += 15;
+        if (queryLower.includes('vip') && source === 'CUSTOMERS') score += 35;
+        if (queryLower.includes('loyalty') && source === 'CUSTOMERS') score += 30;
       }
 
       if (score > 0) {
@@ -166,11 +236,11 @@ const DataSourceDiscovery = ({
     };
 
     setMessages(prev => [...prev, userMessage]);
+    const currentQuery = inputValue;
     setInputValue('');
     setIsProcessing(true);
 
-    // Simulate processing delay
-    setTimeout(() => {
+    try {
       // Check if we have data sources
       if (!mockDataSources || mockDataSources.length === 0) {
         const botResponse = {
@@ -184,56 +254,85 @@ const DataSourceDiscovery = ({
         return;
       }
       
-      const matchingSources = findMatchingDataSources(inputValue);
+      // Call Anthropic API for intelligent recommendation
+      const aiRecommendation = await aiAnalysisService.getDataSourceRecommendation(
+        currentQuery,
+        mockDataSources,
+        SEMANTIC_MODEL
+      );
       
       let botResponse;
-      if (matchingSources.length === 0) {
-        // If no matches found, show all available data sources
-        const allSources = mockDataSources.map(source => ({
-          name: source,
-          description: SEMANTIC_MODEL.tables[source]?.description || `${source} from Snowflake`,
-          confidence: 'low'
-        }));
+      let sources = [];
+      
+      // Process AI recommendation
+      if (aiRecommendation.confidence === 'high') {
+        // High confidence - auto-select and show strong recommendation
+        botResponse = {
+          id: Date.now() + 1,
+          type: 'bot',
+          content: `Based on your query about "${currentQuery}", I'm confident this is the right data source:`,
+          recommendation: `**${aiRecommendation.recommendedSource}** (Highly Recommended)\n   - ${aiRecommendation.reasoning}\n   - Analysis type: ${aiRecommendation.analysisType}\n   - Key features: ${aiRecommendation.keyFeatures.join(', ')}`,
+          timestamp: new Date(),
+          sources: [{
+            name: aiRecommendation.recommendedSource,
+            description: SEMANTIC_MODEL.tables[aiRecommendation.recommendedSource]?.description || 'Recommended by AI',
+            confidence: 'high'
+          }]
+        };
         
-        botResponse = {
-          id: Date.now() + 1,
-          type: 'bot',
-          content: "I couldn't find any data sources that directly match your query. Here are all available data sources:",
-          timestamp: new Date(),
-          sources: allSources
-        };
-      } else if (matchingSources.length === 1 && matchingSources[0].confidence === 'high') {
-        botResponse = {
-          id: Date.now() + 1,
-          type: 'bot',
-          content: `Based on your query, I'm confident that "${matchingSources[0].name}" is the right data source for your analysis.`,
-          timestamp: new Date(),
-          sources: matchingSources,
-          autoSelect: true
-        };
+        // Auto-select the high confidence recommendation
+        setTimeout(() => handleSelectDataSource(aiRecommendation.recommendedSource), 500);
       } else {
-        const highConfidence = matchingSources.filter(s => s.confidence === 'high');
-        const intro = highConfidence.length > 0 
-          ? `I found ${matchingSources.length} data sources that match your query. Here are my recommendations:`
-          : `Here are the data sources that might help with your analysis:`;
+        // Medium/low confidence - show recommendation with alternatives
+        sources = [
+          {
+            name: aiRecommendation.recommendedSource,
+            description: SEMANTIC_MODEL.tables[aiRecommendation.recommendedSource]?.description || 'Primary recommendation',
+            confidence: aiRecommendation.confidence
+          },
+          ...aiRecommendation.alternativeSources.map(source => ({
+            name: source,
+            description: SEMANTIC_MODEL.tables[source]?.description || `${source} from Snowflake`,
+            confidence: 'medium'
+          }))
+        ];
+        
+        const confidenceText = aiRecommendation.confidence === 'medium' ? 'likely matches' : 'might help with';
         
         botResponse = {
           id: Date.now() + 1,
           type: 'bot',
-          content: intro,
+          content: `Based on your query about "${currentQuery}", here are data sources that ${confidenceText} your analysis:`,
+          recommendation: `**${aiRecommendation.recommendedSource}** (${aiRecommendation.confidence === 'medium' ? 'Recommended' : 'Suggested'})\n   - ${aiRecommendation.reasoning}\n   - Analysis type: ${aiRecommendation.analysisType}\n   - Key features: ${aiRecommendation.keyFeatures.join(', ')}`,
           timestamp: new Date(),
-          sources: matchingSources
+          sources: sources
         };
       }
 
       setMessages(prev => [...prev, botResponse]);
+      
+    } catch (error) {
+      console.error('Error getting AI recommendation:', error);
+      
+      // Fallback to showing all available sources
+      const allSources = mockDataSources.map(source => ({
+        name: source,
+        description: SEMANTIC_MODEL.tables[source]?.description || `${source} from Snowflake`,
+        confidence: 'low'
+      }));
+      
+      const botResponse = {
+        id: Date.now() + 1,
+        type: 'bot',
+        content: "I'm having trouble analyzing your query right now. Here are all available data sources:",
+        timestamp: new Date(),
+        sources: allSources
+      };
+      
+      setMessages(prev => [...prev, botResponse]);
+    } finally {
       setIsProcessing(false);
-
-      // Auto-select if high confidence single match
-      if (matchingSources.length === 1 && matchingSources[0].confidence === 'high') {
-        handleSelectDataSource(matchingSources[0].name);
-      }
-    }, 800);
+    }
   };
 
   const handleSelectDataSource = (source) => {
@@ -314,6 +413,16 @@ const DataSourceDiscovery = ({
                   <div className="message-content">
                     {message.content}
                   </div>
+                  
+                  {message.recommendation && (
+                    <div className="recommendation-text">
+                      {message.recommendation.split('\n').map((line, idx) => (
+                        <div key={idx} className={line.includes('**') ? 'recommendation-item' : 'recommendation-detail'}>
+                          {line.replace(/\*\*/g, '')}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   
                   {message.sources && message.sources.length > 0 && (
                     <div className="source-suggestions">
