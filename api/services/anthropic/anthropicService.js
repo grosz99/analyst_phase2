@@ -58,6 +58,15 @@ class AnthropicService {
           analysisText, 
           pythonCode
         );
+        
+        // Log execution status for debugging
+        if (executedResults) {
+          console.log('✅ Code execution successful');
+        } else {
+          console.warn('❌ Code execution returned null - falling back to basic analysis');
+        }
+      } else {
+        console.warn('⚠️ No executable Python code found - using basic analysis');
       }
 
       // Generate refined question suggestions

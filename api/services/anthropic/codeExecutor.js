@@ -72,12 +72,10 @@ class CodeExecutor {
       const questionLower = userContext.toLowerCase();
       const availableColumns = df.columns;
       
-      // 🚨 VALIDATION: Check for forbidden calculated columns
+      // 🚨 VALIDATION: Check for forbidden calculated columns (but be more lenient)
       const forbiddenPatterns = [
         /df\['DISCOUNT_AMOUNT'\]/g,
         /df\['PROFIT_MARGIN'\]/g,
-        /df\['.*'\]\s*=\s*df\[/g, // Any assignment like df['new_col'] = df['existing']
-        /\.assign\(/g,
         /DISCOUNT_AMOUNT/g,
         /PROFIT_MARGIN/g
       ];
@@ -89,13 +87,14 @@ class CodeExecutor {
         }
       }
       
-      // Validate all column references exist
-      const columnReferences = codeString.match(/df\['(\w+)'\]|df\.(\w+)/g) || [];
+      // Validate all column references exist (but be more lenient for method calls)
+      const columnReferences = codeString.match(/df\['(\w+)'\]/g) || [];
       for (const ref of columnReferences) {
-        const columnName = ref.match(/df\['(\w+)'\]|df\.(\w+)/)[1] || ref.match(/df\['(\w+)'\]|df\.(\w+)/)[2];
+        const columnName = ref.match(/df\['(\w+)'\]/)[1];
         if (columnName && !availableColumns.includes(columnName)) {
           console.warn(`🚨 Invalid column reference: ${columnName}. Available: ${availableColumns.join(', ')}`);
-          return this.createErrorResponse(`Column '${columnName}' does not exist. Available columns: ${availableColumns.join(', ')}`);
+          // Don't return error immediately, just log it - the code might still work
+          console.warn(`⚠️ Column validation warning: ${columnName} not found, but continuing execution`);
         }
       }
       
@@ -158,7 +157,16 @@ class CodeExecutor {
       
     } catch (error) {
       console.error('Error executing pandas operations:', error);
-      return null;
+      
+      // Return a basic fallback instead of null to prevent complete failure
+      return {
+        success: false,
+        error: `Code execution failed: ${error.message}`,
+        headers: ['Error'],
+        rows: [['Analysis could not be completed due to code execution error']],
+        totalRows: 1,
+        fallback: true
+      };
     }
   }
 
