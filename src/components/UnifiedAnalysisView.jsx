@@ -410,6 +410,7 @@ function UnifiedAnalysisView({ initialData, cachedDataset, dataLoadedTimestamp, 
                 showContextControl={analysisHistory.length >= 1 && index === analysisHistory.length - 1} // Show context control after first question is completed
                 selectedBackend={selectedBackend}
                 sessionId={sessionId}
+                index={index}
               />
             </div>
           ))}
