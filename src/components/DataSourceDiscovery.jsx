@@ -53,6 +53,10 @@ const DataSourceDiscovery = ({
   isLoadingDataSources = false 
 }) => {
   const [selectedMode, setSelectedMode] = useState('agent'); // 'agent' or 'list'
+  
+  // Debug: Check if data sources are passed correctly
+  console.log('DataSourceDiscovery received mockDataSources:', mockDataSources);
+  
   const [messages, setMessages] = useState([
     {
       id: 1,
@@ -131,6 +135,8 @@ const DataSourceDiscovery = ({
         if (queryLower.includes('category') && source === 'Product Data') score += 25;
         if (queryLower.includes('region') && source === 'Sales Data') score += 20;
         if (queryLower.includes('performance') && source === 'Sales Data') score += 20;
+        if ((queryLower.includes('tier') || queryLower.includes('level')) && source === 'Customer Data') score += 25;
+        if (queryLower.includes('customer') && (source === 'Customer Data' || source === 'Sales Data')) score += 15;
       }
 
       if (score > 0) {
@@ -165,20 +171,36 @@ const DataSourceDiscovery = ({
 
     // Simulate processing delay
     setTimeout(() => {
+      // Check if we have data sources
+      if (!mockDataSources || mockDataSources.length === 0) {
+        const botResponse = {
+          id: Date.now() + 1,
+          type: 'bot',
+          content: "No data sources are currently available. Please check your connection or try again later.",
+          timestamp: new Date()
+        };
+        setMessages(prev => [...prev, botResponse]);
+        setIsProcessing(false);
+        return;
+      }
+      
       const matchingSources = findMatchingDataSources(inputValue);
       
       let botResponse;
       if (matchingSources.length === 0) {
+        // If no matches found, show all available data sources
+        const allSources = mockDataSources.map(source => ({
+          name: source,
+          description: SEMANTIC_MODEL.tables[source]?.description || `${source} from Snowflake`,
+          confidence: 'low'
+        }));
+        
         botResponse = {
           id: Date.now() + 1,
           type: 'bot',
           content: "I couldn't find any data sources that directly match your query. Here are all available data sources:",
           timestamp: new Date(),
-          sources: mockDataSources.map(source => ({
-            name: source,
-            description: SEMANTIC_MODEL.tables[source]?.description || `${source} from Snowflake`,
-            confidence: 'low'
-          }))
+          sources: allSources
         };
       } else if (matchingSources.length === 1 && matchingSources[0].confidence === 'high') {
         botResponse = {

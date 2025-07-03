@@ -1,7 +1,7 @@
 .data-source-discovery-container {
   display: flex;
   gap: 24px;
-  height: 600px;
+  min-height: 600px;
   width: 100%;
 }
 
@@ -161,6 +161,7 @@
   cursor: pointer;
   transition: all 0.2s;
   text-align: left;
+  width: 100%;
 }
 
 .source-button:hover {
