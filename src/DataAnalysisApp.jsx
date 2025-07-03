@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import datasetService from './services/datasetService.js';
 import Header from './components/Header.jsx';
-import DataSourcesStep from './components/DataSourcesStep.jsx';
+import DataSourceDiscovery from './components/DataSourceDiscovery.jsx';
 // ColumnSelectionStep removed to streamline workflow
 import FiltersStep from './components/FiltersStep.jsx';
 
@@ -255,7 +255,7 @@ const DataAnalysisApp = () => {
       <main className="main-content">
         <div className="step-content-container">
           {currentStep === 1 && (
-            <DataSourcesStep
+            <DataSourceDiscovery
               mockDataSources={availableDataSources}
               selectedDataSource={selectedDataSource}
               setSelectedDataSource={setSelectedDataSource}
