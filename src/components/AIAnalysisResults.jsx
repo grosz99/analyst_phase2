@@ -232,8 +232,8 @@ const AIAnalysisResults = ({
       
       // Generate unique filename with question context and timestamp
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-      const questionPrefix = originalQuestion ? 
-        `Q${index + 1}_${originalQuestion.substring(0, 30).replace(/[^a-z0-9]/gi, '_')}` : 
+      const questionPrefix = question ? 
+        `Q${index + 1}_${question.substring(0, 30).replace(/[^a-z0-9]/gi, '_')}` : 
         'Analysis';
       const filename = `${questionPrefix}_${timestamp}.pptx`;
       
@@ -301,7 +301,7 @@ const AIAnalysisResults = ({
     });
 
     // Generate unique title for this specific question
-    const questionText = originalQuestion || 'Analysis Results';
+    const questionText = question || 'Analysis Results';
     const tableTitle = `Q${index + 1}: ${questionText.length > 50 ? questionText.substring(0, 50) + '...' : questionText}`;
 
     return (
@@ -388,10 +388,10 @@ const AIAnalysisResults = ({
   };
 
   // Generate dynamic AI response text
-  const getResponseText = (question) => {
-    if (!question) return "Here are the analysis results:";
+  const getResponseText = (questionText) => {
+    if (!questionText) return "Here are the analysis results:";
     
-    const lowerQuestion = question.toLowerCase();
+    const lowerQuestion = questionText.toLowerCase();
     if (lowerQuestion.includes('profitable customer')) {
       return "Here are the most profitable customers:";
     } else if (lowerQuestion.includes('region') && lowerQuestion.includes('sales')) {
