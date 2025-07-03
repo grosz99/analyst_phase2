@@ -1,7 +1,6 @@
 import React, { useState, useRef } from 'react';
 import aiAnalysisService from '../services/aiAnalysisService.js';
 import AnalysisContextControlSimple from './AnalysisContextControlSimple.jsx';
-import ResultsTable from './ResultsTable';
 import html2canvas from 'html2canvas';
 import PptxGenJS from 'pptxgenjs';
 import './AIAnalysisResults.css';
@@ -15,8 +14,7 @@ const AIAnalysisResults = ({
   showCompactInput = true,
   showContextControl = false,
   selectedBackend = 'anthropic',
-  sessionId = null,
-  index = 0
+  sessionId = null
 }) => {
   const [activeTab, setActiveTab] = useState('results');
   const [exportLoading, setExportLoading] = useState(false);
@@ -231,10 +229,10 @@ const AIAnalysisResults = ({
         });
       }
       
-      // Generate unique filename with question context and timestamp
+      // Generate filename with question context and timestamp
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
       const questionPrefix = question ? 
-        `Q${index + 1}_${question.substring(0, 30).replace(/[^a-z0-9]/gi, '_')}` : 
+        `${question.substring(0, 30).replace(/[^a-z0-9]/gi, '_')}` : 
         'Analysis';
       const filename = `${questionPrefix}_${timestamp}.pptx`;
       
@@ -291,25 +289,32 @@ const AIAnalysisResults = ({
       return <p className="no-items">No table structure available</p>;
     }
 
-    // Convert data to format expected by ResultsTable component
-    const formattedData = data.map(row => {
-      const formattedRow = {};
-      columns.forEach(column => {
-        const value = getRowValue(row, column);
-        formattedRow[column] = formatCellValue(value);
-      });
-      return formattedRow;
-    });
-
-    // Generate unique title for this specific question
-    const questionText = question || 'Analysis Results';
-    const tableTitle = `Q${index + 1}: ${questionText.length > 50 ? questionText.substring(0, 50) + '...' : questionText}`;
-
     return (
-      <ResultsTable 
-        data={formattedData} 
-        title={tableTitle}
-      />
+      <div className="results-table-container">
+        <table className="results-table">
+          <thead>
+            <tr>
+              {columns.map(column => (
+                <th key={column}>{column}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {data.map((row, index) => (
+              <tr key={index}>
+                {columns.map(column => {
+                  const value = getRowValue(row, column);
+                  return (
+                    <td key={column}>
+                      {formatCellValue(value)}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     );
   };
 
