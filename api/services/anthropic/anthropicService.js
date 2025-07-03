@@ -106,7 +106,9 @@ class AnthropicService {
       if (error.message.includes('Rate limit')) {
         clientError = error.message;
       } else if (error.message.includes('not initialized')) {
-        clientError = 'AI analysis service unavailable.';
+        clientError = 'AI analysis service unavailable. Please set ANTHROPIC_API_KEY in Vercel environment variables.';
+      } else if (error.message.includes('ANTHROPIC_API_KEY')) {
+        clientError = 'Anthropic API key not configured. Please set ANTHROPIC_API_KEY in Vercel Dashboard: Settings → Environment Variables.';
       } else if (error.message.includes('Dataset') || error.message.includes('prompt')) {
         clientError = error.message;
       }

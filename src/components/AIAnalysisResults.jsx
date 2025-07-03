@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import aiAnalysisService from '../services/aiAnalysisService.js';
 import AnalysisContextControlSimple from './AnalysisContextControlSimple.jsx';
+import html2canvas from 'html2canvas';
+import PptxGenJS from 'pptxgenjs';
 import './AIAnalysisResults.css';
 
 const AIAnalysisResults = ({ 
@@ -18,6 +20,7 @@ const AIAnalysisResults = ({
   const [exportLoading, setExportLoading] = useState(false);
   const [compactQuestion, setCompactQuestion] = useState('');
   const [compactAnalyzing, setCompactAnalyzing] = useState(false);
+  const visualizationRef = useRef(null);
 
   if (isLoading) {
     return (
@@ -74,6 +77,169 @@ const AIAnalysisResults = ({
     } catch (error) {
       console.error('Export error:', error);
       alert('Export failed: ' + error.message);
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
+  const exportToPowerPoint = async () => {
+    try {
+      setExportLoading(true);
+      
+      // Create new PowerPoint presentation
+      const pptx = new PptxGenJS();
+      
+      // Add title slide
+      const titleSlide = pptx.addSlide();
+      titleSlide.addText(`Data Analysis: ${question}`, {
+        x: 0.5,
+        y: '40%',
+        w: '90%',
+        h: 1,
+        fontSize: 32,
+        bold: true,
+        align: 'center',
+        color: '059669'
+      });
+      
+      titleSlide.addText(new Date().toLocaleDateString(), {
+        x: 0.5,
+        y: '60%',
+        w: '90%',
+        h: 0.5,
+        fontSize: 18,
+        align: 'center',
+        color: '666666'
+      });
+      
+      // Add visualization slide if available
+      if (visualization && visualization.data && visualizationRef.current) {
+        const vizSlide = pptx.addSlide();
+        
+        // Add title
+        vizSlide.addText(visualization.title || 'Data Visualization', {
+          x: 0.5,
+          y: 0.5,
+          w: '90%',
+          h: 0.5,
+          fontSize: 24,
+          bold: true,
+          color: '059669'
+        });
+        
+        // Capture visualization as image
+        const canvas = await html2canvas(visualizationRef.current, {
+          backgroundColor: '#ffffff',
+          scale: 2
+        });
+        
+        const imgData = canvas.toDataURL('image/png');
+        
+        // Add image to slide
+        vizSlide.addImage({
+          data: imgData,
+          x: 0.5,
+          y: 1.5,
+          w: 9,
+          h: 5
+        });
+      }
+      
+      // Add results summary slide if we have table data
+      if (results_table && results_table.data && results_table.data.length > 0) {
+        const dataSlide = pptx.addSlide();
+        
+        dataSlide.addText('Key Results', {
+          x: 0.5,
+          y: 0.5,
+          w: '90%',
+          h: 0.5,
+          fontSize: 24,
+          bold: true,
+          color: '059669'
+        });
+        
+        // Create table data
+        const tableData = [];
+        const headers = results_table.headers || Object.keys(results_table.data[0]);
+        
+        // Add headers
+        tableData.push(headers.map(h => ({ 
+          text: h, 
+          options: { bold: true, color: 'ffffff', fill: { color: '059669' } } 
+        })));
+        
+        // Add data rows (limit to 10 for PowerPoint)
+        results_table.data.slice(0, 10).forEach(row => {
+          tableData.push(headers.map(h => String(row[h] || '')));
+        });
+        
+        // Add table to slide
+        dataSlide.addTable(tableData, {
+          x: 0.5,
+          y: 1.5,
+          w: 9,
+          h: 5,
+          border: { type: 'solid', color: 'e2e8f0' },
+          fontSize: 12
+        });
+        
+        if (results_table.data.length > 10) {
+          dataSlide.addText(`Showing top 10 of ${results_table.data.length} results`, {
+            x: 0.5,
+            y: 6.8,
+            w: '90%',
+            h: 0.3,
+            fontSize: 10,
+            italic: true,
+            color: '666666'
+          });
+        }
+      }
+      
+      // Add insights slide
+      if (analysis) {
+        const insightsSlide = pptx.addSlide();
+        
+        insightsSlide.addText('Analysis Insights', {
+          x: 0.5,
+          y: 0.5,
+          w: '90%',
+          h: 0.5,
+          fontSize: 24,
+          bold: true,
+          color: '059669'
+        });
+        
+        // Extract key points from analysis text
+        const insights = analysis.split('\n')
+          .filter(line => line.trim().length > 0)
+          .slice(0, 5)
+          .map(line => line.replace(/^[-•*]\s*/, ''));
+        
+        insights.forEach((insight, index) => {
+          insightsSlide.addText(`• ${insight}`, {
+            x: 1,
+            y: 2 + (index * 0.8),
+            w: 8,
+            h: 0.6,
+            fontSize: 14,
+            color: '374151'
+          });
+        });
+      }
+      
+      // Generate filename with timestamp
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+      const filename = `Analysis_${timestamp}.pptx`;
+      
+      // Save PowerPoint file
+      await pptx.writeFile({ fileName: filename });
+      
+      console.log('✅ PowerPoint export successful');
+    } catch (error) {
+      console.error('PowerPoint export error:', error);
+      alert('Failed to export to PowerPoint. Please try again.');
     } finally {
       setExportLoading(false);
     }
@@ -160,7 +326,16 @@ const AIAnalysisResults = ({
 
       return (
         <div className="chart-container">
-          <div className="bar-chart">
+          <div className="visualization-actions">
+            <button 
+              onClick={exportToPowerPoint} 
+              className="export-ppt-btn"
+              disabled={exportLoading}
+            >
+              {exportLoading ? '⏳ Exporting...' : '📊 Download PowerPoint'}
+            </button>
+          </div>
+          <div className="bar-chart" ref={visualizationRef}>
             {data.map((item, index) => (
               <div key={index} className="bar-item">
                 <div className="bar-label">{item.label}</div>

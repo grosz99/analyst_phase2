@@ -36,7 +36,7 @@ app.get('/api/status', async (req, res) => {
     res.json({
       server: 'online',
       database: snowflakeStatus.connected ? 'connected' : 'disconnected',
-      ai: process.env.ANTHROPIC_API_KEY ? 'configured' : 'pending',
+      ai: process.env.ANTHROPIC_API_KEY ? 'configured' : 'missing_api_key',
       cache: `${snowflakeStatus.cache_size} items cached`,
       uptime: process.uptime(),
       memory: process.memoryUsage(),
@@ -703,7 +703,8 @@ app.post('/api/ai/analyze', async (req, res) => {
     console.error('AI analysis endpoint error:', error);
     res.status(500).json({
       success: false,
-      error: 'AI analysis service temporarily unavailable',
+      error: 'AI analysis service temporarily unavailable. Please check API key configuration in Vercel environment variables.',
+      help: 'Set ANTHROPIC_API_KEY in Vercel Dashboard: Settings → Environment Variables',
       timestamp: new Date().toISOString()
     });
   }

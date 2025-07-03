@@ -50,7 +50,10 @@ class AnthropicClient {
       }
       
       if (!apiKey) {
-        console.warn('ANTHROPIC_API_KEY not found in credentials. AI analysis will be disabled.');
+        console.error('❌ ANTHROPIC_API_KEY not found. AI analysis will be disabled.');
+        console.error('Please set ANTHROPIC_API_KEY environment variable in Vercel settings.');
+        console.error('For Vercel deployment: Settings → Environment Variables → Add ANTHROPIC_API_KEY');
+        this.initialized = false;
         return;
       }
 
@@ -176,7 +179,7 @@ class AnthropicClient {
   // Send message to Anthropic API
   async sendMessage(messages, maxTokens = 4000) {
     if (!this.initialized) {
-      throw new Error('Anthropic service not initialized');
+      throw new Error('Anthropic service not initialized. Please check ANTHROPIC_API_KEY is set in environment variables.');
     }
 
     try {
@@ -198,7 +201,7 @@ class AnthropicClient {
     if (!this.initialized) {
       return {
         status: 'unavailable',
-        message: 'Anthropic service not initialized'
+        message: 'Anthropic service not initialized. Missing ANTHROPIC_API_KEY environment variable.'
       };
     }
 

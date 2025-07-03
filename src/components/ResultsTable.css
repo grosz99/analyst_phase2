@@ -8,6 +8,41 @@
   transition: all 0.3s ease;
 }
 
+.table-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 1rem 1.5rem;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-bottom: 1px solid #e2e8f0;
+  border-radius: 12px 12px 0 0;
+  gap: 0.5rem;
+}
+
+.export-excel-btn {
+  background-color: #059669;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s ease;
+}
+
+.export-excel-btn:hover {
+  background-color: #047857;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.export-excel-btn:active {
+  transform: translateY(0);
+}
+
 .results-table-container:hover {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
 }
