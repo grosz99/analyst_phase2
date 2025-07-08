@@ -1,6 +1,5 @@
 import React, { useState, useRef } from 'react';
 import aiAnalysisService from '../services/aiAnalysisService.js';
-import AnalysisContextControlSimple from './AnalysisContextControlSimple.jsx';
 import html2canvas from 'html2canvas';
 import PptxGenJS from 'pptxgenjs';
 import './AIAnalysisResults.css';
@@ -778,15 +777,7 @@ const AIAnalysisResults = ({
       {/* Compact Question Input for Follow-ups - AFTER user has read the results */}
       {showCompactInput && (
         <>
-        {/* Context Control for follow-up questions - only after user has seen first result */}
-        {showContextControl && (
-          <AnalysisContextControlSimple 
-            onModeChange={(mode) => console.log('Context mode changed to:', mode)}
-            lastQuestion={question}
-            originalDataCount={originalData?.length || 0}
-            activeFilters={{}} // Pass actual filters if available from parent
-          />
-        )}
+        {/* Context control removed - now handled by ConversationContainer */}
         
         <div className="compact-question-section">
         

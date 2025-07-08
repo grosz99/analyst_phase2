@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import aiAnalysisService from '../services/aiAnalysisService.js';
 import ConversationManager from './ConversationManager.jsx';
 import ResultsTable from './ResultsTable.jsx';
