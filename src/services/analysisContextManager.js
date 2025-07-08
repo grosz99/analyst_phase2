@@ -1,97 +1,74 @@
 /**
  * Analysis Context Manager
- * Manages the state and context for analytical conversations
+ * Manages the state and context for multiple analytical conversations
  * Helps reduce hallucinations by maintaining clear context boundaries
  */
 class AnalysisContextManager {
   constructor() {
-    this.resetContext();
+    this.conversations = new Map(); // Store contexts per conversation ID
+    this.globalFilters = {}; // Dataset-level filters
   }
 
-  resetContext() {
-    this.context = {
-      mode: 'fresh', // 'fresh' or 'continue'
-      currentFilters: [],
-      analysisThread: [],
-      datasetState: null,
-      filteredData: null,
-      drillPath: [],
-      lastQuestion: null,
-      lastResults: null,
-      lastAnalysisType: null,
-      activeFilters: {}, // Original filters from FiltersStep
-      sessionStartTime: new Date(),
-      questionCount: 0
-    };
-  }
-
-  // Set the analysis mode
-  setMode(mode) {
-    if (mode === 'fresh') {
-      // Clear analysis context but preserve dataset filters
-      this.context = {
-        ...this.context,
-        mode: 'fresh',
+  // Create or get context for a specific conversation
+  getConversationContext(conversationId) {
+    if (!this.conversations.has(conversationId)) {
+      this.conversations.set(conversationId, {
+        id: conversationId,
         analysisThread: [],
-        drillPath: [],
         lastQuestion: null,
         lastResults: null,
-        filteredData: null,
-        questionCount: 0
-      };
-    } else {
-      this.context.mode = mode;
-    }
-  }
-
-  // Update context after an analysis
-  updateAnalysisContext(question, results, data, filters = null) {
-    this.context.questionCount++;
-    this.context.lastQuestion = question;
-    this.context.lastResults = results;
-    
-    // Add to analysis thread if in continue mode
-    if (this.context.mode === 'continue') {
-      this.context.analysisThread.push({
-        question,
-        timestamp: new Date(),
-        resultSummary: this.summarizeResults(results)
+        questionCount: 0,
+        sessionStartTime: new Date()
       });
     }
+    return this.conversations.get(conversationId);
+  }
+
+  // Remove a conversation context
+  removeConversation(conversationId) {
+    this.conversations.delete(conversationId);
+  }
+
+  // Legacy method for backward compatibility
+  resetContext() {
+    this.conversations.clear();
+    this.globalFilters = {};
+  }
+
+  // Update context after an analysis for a specific conversation
+  updateAnalysisContext(conversationId, question, results, data, filters = null) {
+    const context = this.getConversationContext(conversationId);
+    context.questionCount++;
+    context.lastQuestion = question;
+    context.lastResults = results;
     
-    // Update filtered data if provided
-    if (data) {
-      this.context.filteredData = data;
-    }
+    // Add to analysis thread for context
+    context.analysisThread.push({
+      question,
+      timestamp: new Date(),
+      resultSummary: this.summarizeResults(results)
+    });
     
-    // Update active filters if provided
-    if (filters) {
-      this.context.currentFilters = filters;
+    // Keep only last 10 items for performance
+    if (context.analysisThread.length > 10) {
+      context.analysisThread = context.analysisThread.slice(-10);
     }
   }
 
-  // Set filters from the FiltersStep component
+  // Set filters from the FiltersStep component (global dataset filters)
   setDatasetFilters(filters) {
-    this.context.activeFilters = filters;
+    this.globalFilters = filters;
   }
 
-  // Get the appropriate data for analysis based on mode
+  // Get the appropriate data for analysis
   getAnalysisData(originalData) {
-    if (this.context.mode === 'continue' && this.context.filteredData) {
-      return {
-        data: this.context.filteredData,
-        isFiltered: true,
-        filterCount: this.context.currentFilters.length
-      };
-    }
-    
     // Apply dataset filters to original data if present
-    if (this.context.activeFilters && Object.keys(this.context.activeFilters).length > 0) {
-      const filteredData = this.applyDatasetFilters(originalData, this.context.activeFilters);
+    if (this.globalFilters && Object.keys(this.globalFilters).length > 0) {
+      const filteredData = this.applyDatasetFilters(originalData, this.globalFilters);
       return {
         data: filteredData,
         isFiltered: true,
-        filterCount: Object.keys(this.context.activeFilters).length
+        filterCount: Object.keys(this.globalFilters).length
       };
     }
     
@@ -122,25 +99,18 @@ class AnalysisContextManager {
     });
   }
 
-  // Build context prompt for AI
-  buildContextPrompt() {
+  // Build context prompt for AI for a specific conversation
+  buildContextPrompt(conversationId) {
+    const context = this.getConversationContext(conversationId);
     const prompt = [];
     
-    if (this.context.mode === 'continue') {
+    if (context.analysisThread.length > 0) {
       prompt.push('ANALYSIS MODE: Continue Analysis');
-      prompt.push(`User is continuing from previous question: "${this.context.lastQuestion}"`);
+      prompt.push(`User is continuing conversation with ${context.questionCount} previous questions.`);
       
-      if (this.context.filteredData) {
-        prompt.push(`Working with filtered dataset: ${this.context.filteredData.length} records`);
-      }
-      
-      if (this.context.currentFilters.length > 0) {
-        prompt.push(`Active analysis filters: ${this.context.currentFilters.join(', ')}`);
-      }
-      
-      if (this.context.analysisThread.length > 0) {
-        prompt.push(`Previous analysis thread (${this.context.analysisThread.length} questions):`);
-        this.context.analysisThread.slice(-3).forEach((item, idx) => {
+      if (context.analysisThread.length > 0) {
+        prompt.push(`Previous analysis thread (${context.analysisThread.length} questions):`);
+        context.analysisThread.slice(-3).forEach((item, idx) => {
           prompt.push(`  ${idx + 1}. "${item.question}" - ${item.resultSummary}`);
         });
       }
@@ -150,12 +120,12 @@ class AnalysisContextManager {
       prompt.push('ANALYSIS MODE: Fresh Start');
       prompt.push('This is a new analysis question with no previous context.');
       prompt.push('Analyze without assumptions from prior questions.');
-      
-      if (this.context.activeFilters && Object.keys(this.context.activeFilters).length > 0) {
-        const filterDescriptions = Object.entries(this.context.activeFilters)
-          .map(([field, values]) => `${field}: ${Array.isArray(values) ? values.join(', ') : values}`);
-        prompt.push(`Dataset pre-filtered by: ${filterDescriptions.join('; ')}`);
-      }
+    }
+    
+    if (this.globalFilters && Object.keys(this.globalFilters).length > 0) {
+      const filterDescriptions = Object.entries(this.globalFilters)
+        .map(([field, values]) => `${field}: ${Array.isArray(values) ? values.join(', ') : values}`);
+      prompt.push(`Dataset pre-filtered by: ${filterDescriptions.join('; ')}`);
     }
     
     return prompt.join('\n');
@@ -180,48 +150,35 @@ class AnalysisContextManager {
     return summary.join(', ') || 'Analysis completed';
   }
 
-  // Get context summary for UI display
-  getContextSummary() {
+  // Get context summary for UI display for a specific conversation
+  getContextSummary(conversationId) {
+    const context = this.getConversationContext(conversationId);
     return {
-      mode: this.context.mode,
-      questionCount: this.context.questionCount,
-      hasFilters: Object.keys(this.context.activeFilters).length > 0,
-      filterCount: Object.keys(this.context.activeFilters).length,
-      hasAnalysisContext: this.context.analysisThread.length > 0,
-      lastQuestion: this.context.lastQuestion,
-      filteredRecordCount: this.context.filteredData?.length || 0
+      conversationId,
+      questionCount: context.questionCount,
+      hasFilters: Object.keys(this.globalFilters).length > 0,
+      filterCount: Object.keys(this.globalFilters).length,
+      hasAnalysisContext: context.analysisThread.length > 0,
+      lastQuestion: context.lastQuestion,
+      sessionStartTime: context.sessionStartTime
     };
   }
 
-  // Check if we should suggest mode switch
-  shouldSuggestModeSwitch(question) {
-    const questionLower = question.toLowerCase();
-    
-    // Continuation indicators
-    const continuationWords = ['also', 'additionally', 'furthermore', 'what about', 'how about', 
-                               'drill down', 'show me more', 'explore further', 'and'];
-    
-    // Fresh start indicators  
-    const freshWords = ['now show', 'instead', 'different question', 'new analysis', 
-                        'switch to', 'let me ask about', 'change topic'];
-    
-    const hasContinuation = continuationWords.some(word => questionLower.includes(word));
-    const hasFresh = freshWords.some(word => questionLower.includes(word));
-    
-    if (this.context.mode === 'fresh' && hasContinuation && this.context.lastQuestion) {
-      return { suggestMode: 'continue', confidence: 'high' };
-    }
-    
-    if (this.context.mode === 'continue' && hasFresh) {
-      return { suggestMode: 'fresh', confidence: 'high' };
-    }
-    
-    return null;
+  // Get all conversations for management
+  getAllConversations() {
+    return Array.from(this.conversations.values());
   }
 
   // Export context state for debugging
-  exportContext() {
-    return JSON.parse(JSON.stringify(this.context));
+  exportContext(conversationId = null) {
+    if (conversationId) {
+      const context = this.getConversationContext(conversationId);
+      return JSON.parse(JSON.stringify(context));
+    }
+    return {
+      conversations: Array.from(this.conversations.entries()),
+      globalFilters: this.globalFilters
+    };
   }
 }
 
