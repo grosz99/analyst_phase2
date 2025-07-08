@@ -1,4 +1,6 @@
 const snowflake = require('snowflake-sdk');
+const fs = require('fs');
+const path = require('path');
 
 class SnowflakeService {
   constructor() {
@@ -9,7 +11,19 @@ class SnowflakeService {
     this.cacheExpiry = new Map();
     this.cacheTTL = 5 * 60 * 1000; // 5 minutes cache
     
-    // Connection configuration
+    // Connection configuration with RSA key authentication
+    const privateKeyPath = path.join(__dirname, '../../snowflake_rsa_key.pem');
+    this.privateKey = null;
+    
+    try {
+      if (fs.existsSync(privateKeyPath)) {
+        this.privateKey = fs.readFileSync(privateKeyPath, 'utf8');
+        console.log('✅ RSA private key loaded for Snowflake authentication');
+      }
+    } catch (error) {
+      console.warn('⚠️ Could not load RSA private key:', error.message);
+    }
+
     this.config = {
       account: process.env.SNOWFLAKE_ACCOUNT || 'laqwzde-umc37678',
       username: process.env.SNOWFLAKE_USER || 'J99G',
@@ -34,48 +48,48 @@ class SnowflakeService {
     });
   }
 
-  // Test connection quickly
+  // Test connection quickly with fallback authentication methods
   async testConnection() {
     try {
       console.log('Testing Snowflake connection...');
-      const startTime = Date.now();
       
-      const connection = snowflake.createConnection(this.config);
+      // First try with existing config
+      let result = await this.tryConnection(this.config);
+      if (result.success) {
+        return result;
+      }
       
-      return new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          reject(new Error('Connection test timeout (30s)'));
-        }, 30000);
-
-        connection.connect((err, conn) => {
-          clearTimeout(timeout);
-          const duration = Date.now() - startTime;
-          
-          if (err) {
-            console.error('Snowflake connection test failed:', err.message);
-            this.connectionError = err.message;
-            resolve({
-              success: false,
-              error: err.message,
-              duration: duration
-            });
-          } else {
-            console.log(`Snowflake connection test successful (${duration}ms)`);
-            this.isConnected = true;
-            this.connection = conn;
-            this.connectionError = null;
-            
-            resolve({
-              success: true,
-              duration: duration,
-              account: this.config.account,
-              database: this.config.database,
-              schema: this.config.schema,
-              warehouse: this.config.warehouse
-            });
-          }
-        });
-      });
+      console.log('Primary connection failed, trying alternative methods...');
+      
+      // If MFA error and we have RSA key, try JWT auth
+      if (result.error.includes('Multi-factor authentication') && this.privateKey) {
+        console.log('Trying RSA key authentication...');
+        const jwtConfig = {
+          ...this.config,
+          privateKey: this.privateKey,
+          authenticator: 'SNOWFLAKE_JWT'
+        };
+        delete jwtConfig.password;
+        
+        result = await this.tryConnection(jwtConfig);
+        if (result.success) {
+          this.config = jwtConfig; // Update config if successful
+          return result;
+        }
+      }
+      
+      // If all authentication methods fail, provide helpful error message
+      console.error('❌ All Snowflake authentication methods failed');
+      console.error('💡 To fix this, you need to:');
+      console.error('   1. Disable MFA for the user account, OR');
+      console.error('   2. Associate the RSA public key with user J99G in Snowflake');
+      
+      return {
+        success: false,
+        error: `Authentication failed: ${result.error}. Either disable MFA or configure RSA key authentication.`,
+        duration: result.duration,
+        requiresManualFix: true
+      };
     } catch (error) {
       console.error('Snowflake connection test error:', error);
       this.connectionError = error.message;
@@ -85,6 +99,50 @@ class SnowflakeService {
         duration: 0
       };
     }
+  }
+
+  // Helper method to try a specific connection configuration
+  async tryConnection(config) {
+    const startTime = Date.now();
+    const connection = snowflake.createConnection(config);
+    
+    return new Promise((resolve) => {
+      const timeout = setTimeout(() => {
+        resolve({
+          success: false,
+          error: 'Connection timeout (30s)',
+          duration: Date.now() - startTime
+        });
+      }, 30000);
+
+      connection.connect((err, conn) => {
+        clearTimeout(timeout);
+        const duration = Date.now() - startTime;
+        
+        if (err) {
+          console.error('Connection attempt failed:', err.message);
+          resolve({
+            success: false,
+            error: err.message,
+            duration: duration
+          });
+        } else {
+          console.log(`Connection successful (${duration}ms)`);
+          this.isConnected = true;
+          this.connection = conn;
+          this.connectionError = null;
+          
+          resolve({
+            success: true,
+            duration: duration,
+            account: config.account,
+            database: config.database,
+            schema: config.schema,
+            warehouse: config.warehouse
+          });
+        }
+      });
+    });
   }
 
   // Get cached or fresh metadata
