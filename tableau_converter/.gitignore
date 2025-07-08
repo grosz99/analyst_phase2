@@ -1,0 +1,101 @@
+# Environment variables and secrets
+.env
+.env.local
+.env.production
+.env.staging
+snowcred.env*
+*.env
+
+# Credentials and API keys
+*credentials*
+*secrets*
+*api_key*
+*password*
+
+# Temporary files
+temp/
+tmp/
+*.tmp
+*.temp
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Uploaded files
+uploads/
+*.twbx
+*.twb
+*.csv
+*.xlsx
+*.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Cache
+.cache/
+.pytest_cache/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Vercel
+.vercel
+
+# Node modules (if using any JS tools)
+node_modules/
+
+# RTF files (may contain sensitive data)
+*.rtf
