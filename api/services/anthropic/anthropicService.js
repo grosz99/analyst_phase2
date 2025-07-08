@@ -52,21 +52,59 @@ class AnthropicService {
       // Try to execute the AI's analysis on our cached data
       if (pythonCode && pythonCode.executable) {
         console.log('🔬 Attempting to execute AI analysis on cached data...');
-        executedResults = this.codeExecutor.executeAnalysisOnCachedData(
-          sanitizedData, 
-          sanitizedContext, 
-          analysisText, 
-          pythonCode
-        );
+        console.log('🐍 Python code details:', {
+          hasCode: !!pythonCode.code,
+          executable: pythonCode.executable,
+          codeLength: pythonCode.code?.length
+        });
         
-        // Log execution status for debugging
-        if (executedResults) {
-          console.log('✅ Code execution successful');
-        } else {
-          console.warn('❌ Code execution returned null - falling back to basic analysis');
+        try {
+          executedResults = this.codeExecutor.executeAnalysisOnCachedData(
+            sanitizedData, 
+            sanitizedContext, 
+            analysisText, 
+            pythonCode
+          );
+          
+          // Enhanced logging and validation
+          if (executedResults) {
+            console.log('✅ Code execution successful');
+            console.log('📈 Execution result details:', {
+              type: executedResults.type,
+              hasData: !!executedResults.data,
+              dataLength: executedResults.data?.length,
+              hasError: executedResults.success === false
+            });
+            
+            // Check if this is actually an error response
+            if (executedResults.success === false) {
+              console.warn('⚠️ Code execution returned error response:', executedResults.error);
+              // Still use it - error responses are better than null
+            }
+          } else {
+            console.warn('❌ Code execution returned null - falling back to basic analysis');
+            console.warn('🔍 Fallback will be used for results_table generation');
+          }
+        } catch (codeExecutionError) {
+          console.error('❌ Code execution threw an exception:', codeExecutionError);
+          console.error('📍 Stack trace:', codeExecutionError.stack);
+          
+          // Create a structured error result instead of null
+          executedResults = {
+            success: false,
+            error: `Code execution failed: ${codeExecutionError.message}`,
+            type: 'error',
+            data: [],
+            fallback: true
+          };
         }
       } else {
         console.warn('⚠️ No executable Python code found - using basic analysis');
+        console.warn('🐍 Python code status:', {
+          pythonCode: !!pythonCode,
+          executable: pythonCode?.executable,
+          hasCode: !!pythonCode?.code
+        });
       }
 
       // Generate refined question suggestions
@@ -74,16 +112,66 @@ class AnthropicService {
       
       const duration = Date.now() - startTime;
 
+      // Generate results table with enhanced error handling
+      let resultsTable;
+      try {
+        if (executedResults) {
+          console.log('📋 Formatting executed results as table...');
+          resultsTable = this.resultFormatter.formatResultsAsTable(executedResults, sanitizedContext);
+          console.log('📋 Results table generated:', {
+            hasData: !!resultsTable?.data,
+            dataLength: resultsTable?.data?.length,
+            hasHeaders: !!resultsTable?.headers
+          });
+        } else {
+          console.log('📋 Generating basic analysis results fallback...');
+          resultsTable = this.generateBasicAnalysisResults(sanitizedData, sanitizedContext);
+          console.log('📋 Basic results generated:', {
+            hasData: !!resultsTable?.data,
+            dataLength: resultsTable?.data?.length
+          });
+        }
+      } catch (tableError) {
+        console.error('❌ Error generating results table:', tableError);
+        resultsTable = {
+          title: 'Analysis Results',
+          headers: ['Error'],
+          data: [{ Error: `Failed to generate results: ${tableError.message}` }],
+          total_rows: 1,
+          error: true
+        };
+      }
+      
+      // Generate visualization with enhanced error handling
+      let visualization;
+      try {
+        if (executedResults) {
+          console.log('📈 Creating visualization from executed results...');
+          visualization = this.resultFormatter.createVisualizationFromResults(executedResults, sanitizedContext);
+        } else {
+          console.log('📈 Creating basic visualization fallback...');
+          visualization = this.resultFormatter.createBasicVisualization(sanitizedData, "Data Overview");
+        }
+        console.log('📈 Visualization created:', {
+          type: visualization?.type,
+          hasData: !!visualization?.data
+        });
+      } catch (vizError) {
+        console.error('❌ Error generating visualization:', vizError);
+        visualization = {
+          type: 'error',
+          title: 'Visualization Error',
+          data: [],
+          error: `Failed to create visualization: ${vizError.message}`
+        };
+      }
+
       return {
         success: true,
         analysis: analysisText,
         python_code: pythonCode,
-        results_table: executedResults ? 
-          this.resultFormatter.formatResultsAsTable(executedResults, sanitizedContext) :
-          this.generateBasicAnalysisResults(sanitizedData, sanitizedContext),
-        visualization: executedResults ?
-          this.resultFormatter.createVisualizationFromResults(executedResults, sanitizedContext) :
-          this.resultFormatter.createBasicVisualization(sanitizedData, "Data Overview"),
+        results_table: resultsTable,
+        visualization: visualization,
         refined_questions: refinedQuestions,
         metadata: {
           model: 'claude-3-5-sonnet',
@@ -93,12 +181,22 @@ class AnthropicService {
           timestamp: new Date().toISOString(),
           token_usage: response.usage,
           cached_analysis: true,
-          executed_real_analysis: !!executedResults
+          executed_real_analysis: !!executedResults,
+          code_execution_status: executedResults ? 'success' : 'fallback',
+          execution_errors: executedResults?.success === false ? executedResults.error : null
         }
       };
 
     } catch (error) {
-      console.error('AI analysis error:', error.message);
+      console.error('❌ AI analysis error:', error.message);
+      console.error('📍 Error stack:', error.stack);
+      console.error('📍 Error details:', {
+        name: error.name,
+        message: error.message,
+        analysisType,
+        dataRows: sanitizedData?.length,
+        contextLength: sanitizedContext?.length
+      });
       
       // Don't expose internal details to client
       let clientError = 'AI analysis failed. Please try again.';
@@ -111,12 +209,19 @@ class AnthropicService {
         clientError = 'Anthropic API key not configured. Please set ANTHROPIC_API_KEY in Vercel Dashboard: Settings → Environment Variables.';
       } else if (error.message.includes('Dataset') || error.message.includes('prompt')) {
         clientError = error.message;
+      } else if (error.message.includes('timeout')) {
+        clientError = 'Analysis timed out. Please try with a smaller dataset or simpler question.';
       }
 
       return {
         success: false,
         error: clientError,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        debug_info: {
+          error_type: error.name,
+          processing_time: Date.now() - startTime,
+          data_size: sanitizedData?.length || 0
+        }
       };
     }
   }
@@ -265,19 +370,37 @@ Provide:
 
   // Health check method
   async healthCheck() {
-    return await this.client.healthCheck();
+    try {
+      console.log('📊 Running Anthropic service health check...');
+      const healthResult = await this.client.healthCheck();
+      console.log('✅ Health check result:', healthResult);
+      return healthResult;
+    } catch (error) {
+      console.error('❌ Health check failed:', error);
+      return {
+        healthy: false,
+        error: error.message,
+        timestamp: new Date().toISOString()
+      };
+    }
   }
 
   // Generate basic analysis results when code execution fails
   generateBasicAnalysisResults(data, userContext) {
     try {
+      console.log('📋 Generating basic analysis results fallback...');
+      console.log('📊 Data summary:', { rows: data.length, columns: Object.keys(data[0] || {}).length });
+      
       const questionLower = userContext.toLowerCase();
       
       // Try to provide some actual analysis based on the question
       if (questionLower.includes('category') && questionLower.includes('discount')) {
+        console.log('🔍 Detected category + discount question');
         // For discount by category questions
         const categoryColumn = this.findColumn(data, ['category', 'product_category', 'type']);
         const discountColumn = this.findColumn(data, ['discount', 'discount_rate', 'discount_amount']);
+        
+        console.log('📊 Found columns:', { categoryColumn, discountColumn });
         
         if (categoryColumn && discountColumn) {
           const categoryDiscounts = {};
@@ -301,9 +424,10 @@ Provide:
             .sort((a, b) => parseFloat(b.avg_discount) - parseFloat(a.avg_discount))
             .slice(0, 10);
           
+          console.log('✅ Successfully generated category discount analysis');
           return {
             title: "Discount Analysis by Category",
-            columns: ["Category", "Avg Discount", "Total Discount", "Orders"],
+            headers: ["Category", "Avg Discount", "Total Discount", "Orders"],
             data: results.map(r => ({
               Category: r.category,
               "Avg Discount": r.avg_discount,
@@ -316,9 +440,12 @@ Provide:
       }
       
       // Generic fallback - try to find interesting patterns
+      console.log('🔍 Attempting generic pattern analysis...');
       const columns = Object.keys(data[0] || {});
       const categoricalCol = this.findColumn(data, ['category', 'region', 'segment', 'type', 'status']);
       const numericCol = this.findColumn(data, ['sales', 'revenue', 'profit', 'amount', 'value', 'count']);
+      
+      console.log('📊 Generic pattern columns:', { categoricalCol, numericCol });
       
       if (categoricalCol && numericCol) {
         const groups = {};
@@ -342,51 +469,89 @@ Provide:
           .sort((a, b) => parseFloat(b[`Total ${numericCol}`]) - parseFloat(a[`Total ${numericCol}`]))
           .slice(0, 10);
         
+        console.log('✅ Successfully generated generic pattern analysis');
         return {
           title: `Analysis: ${numericCol} by ${categoricalCol}`,
-          columns: Object.keys(results[0] || {}),
+          headers: Object.keys(results[0] || {}),
           data: results,
           total_rows: results.length
         };
       }
       
       // Final fallback
-      return this.resultFormatter.createSummaryTable(data, "Data Overview");
+      console.log('🔄 Using final fallback - summary table');
+      const summaryTable = this.resultFormatter.createSummaryTable(data, "Data Overview");
+      console.log('✅ Summary table created:', {
+        hasData: !!summaryTable?.data,
+        dataLength: summaryTable?.data?.length
+      });
+      return summaryTable;
       
     } catch (error) {
-      console.error('Error generating basic analysis:', error);
-      return this.resultFormatter.createSummaryTable(data, "Analysis Summary");
+      console.error('❌ Error generating basic analysis:', error);
+      console.error('📍 Error stack:', error.stack);
+      
+      // Ultimate fallback
+      try {
+        const fallbackTable = this.resultFormatter.createSummaryTable(data, "Analysis Summary");
+        console.log('✅ Fallback summary table created');
+        return fallbackTable;
+      } catch (fallbackError) {
+        console.error('❌ Even fallback failed:', fallbackError);
+        return {
+          title: 'Error',
+          headers: ['Error'],
+          data: [{ Error: `Analysis failed: ${error.message}` }],
+          total_rows: 1,
+          error: true
+        };
+      }
     }
   }
 
   // Helper method to find a column using unified semantic layer
   findColumn(data, possibleNames) {
-    if (!data.length) return null;
-    const columns = Object.keys(data[0]);
-    
-    // First try using the unified semantic layer
-    for (const logicalName of possibleNames) {
-      const actualColumn = this.columnMapper.resolveColumn(columns, logicalName);
-      if (actualColumn) {
-        console.log(`✅ Anthropic column resolved via semantic layer: ${logicalName} → ${actualColumn}`);
-        return actualColumn;
+    try {
+      if (!data || !data.length) {
+        console.warn('⚠️ No data provided to findColumn');
+        return null;
       }
-    }
-    
-    // Legacy fallback method (temporary during migration)
-    for (const name of possibleNames) {
-      const found = columns.find(col => 
-        col.toLowerCase().includes(name.toLowerCase()) ||
-        name.toLowerCase().includes(col.toLowerCase())
-      );
-      if (found) {
-        console.log(`🔄 Anthropic legacy column fallback: ${name} → ${found}`);
-        return found;
+      
+      const columns = Object.keys(data[0]);
+      console.log('🔍 Searching for columns:', possibleNames, 'in available columns:', columns);
+      
+      // First try using the unified semantic layer
+      for (const logicalName of possibleNames) {
+        try {
+          const actualColumn = this.columnMapper.resolveColumn(columns, logicalName);
+          if (actualColumn) {
+            console.log(`✅ Anthropic column resolved via semantic layer: ${logicalName} → ${actualColumn}`);
+            return actualColumn;
+          }
+        } catch (semanticError) {
+          console.warn(`⚠️ Semantic layer error for ${logicalName}:`, semanticError.message);
+        }
       }
+      
+      // Legacy fallback method (temporary during migration)
+      for (const name of possibleNames) {
+        const found = columns.find(col => 
+          col.toLowerCase().includes(name.toLowerCase()) ||
+          name.toLowerCase().includes(col.toLowerCase())
+        );
+        if (found) {
+          console.log(`🔄 Anthropic legacy column fallback: ${name} → ${found}`);
+          return found;
+        }
+      }
+      
+      console.warn(`❌ Anthropic column not found for any of: ${possibleNames.join(', ')}`);
+      return null;
+      
+    } catch (error) {
+      console.error('❌ Error in findColumn:', error);
+      return null;
     }
-    
-    console.warn(`❌ Anthropic column not found for any of: ${possibleNames.join(', ')}`);
-    return null;
   }
 
   // Get service status

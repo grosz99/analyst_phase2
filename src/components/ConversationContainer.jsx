@@ -20,10 +20,24 @@ const ConversationContainer = ({
   const [suggestedQuestions, setSuggestedQuestions] = useState([]);
   const containerRef = useRef(null);
   const inputRef = useRef(null);
+  
+  console.log('🔄 ConversationContainer render:', {
+    conversationId,
+    hasInitialData: !!initialData,
+    initialDataRows: initialData?.length,
+    hasCachedDataset: !!cachedDataset,
+    cachedDatasetRows: cachedDataset?.length,
+    sessionId,
+    selectedBackend,
+    hasAiAnalysisService: !!aiAnalysisService,
+    isActive,
+    messagesCount: messages?.length || 0
+  });
 
   // Auto-focus on input when active
   useEffect(() => {
     if (isActive && !isCollapsed && inputRef.current) {
+      console.log('🎯 Auto-focusing input for active conversation');
       inputRef.current.focus();
     }
   }, [isActive, isCollapsed]);
@@ -31,8 +45,15 @@ const ConversationContainer = ({
   // Generate suggested questions when conversation is created
   useEffect(() => {
     if (messages.length === 0 && initialData && initialData.length > 0) {
-      const suggestions = aiAnalysisService.generateSuggestedQuestions(initialData);
-      setSuggestedQuestions(suggestions);
+      console.log('💡 Generating suggested questions for conversation');
+      try {
+        const suggestions = aiAnalysisService.generateSuggestedQuestions(initialData);
+        console.log('✅ Generated suggestions:', suggestions);
+        setSuggestedQuestions(suggestions);
+      } catch (error) {
+        console.error('❌ Error generating suggestions:', error);
+        setSuggestedQuestions([]);
+      }
     }
   }, [initialData, messages.length, aiAnalysisService]);
 
@@ -40,6 +61,7 @@ const ConversationContainer = ({
   useEffect(() => {
     const handleSuggestedQuestion = (event) => {
       if (isActive) {
+        console.log('🎯 External suggested question received:', event.detail);
         setCurrentQuestion(event.detail);
         if (inputRef.current) {
           inputRef.current.focus();
@@ -54,15 +76,30 @@ const ConversationContainer = ({
   // Scroll to bottom when new messages arrive
   useEffect(() => {
     if (containerRef.current && !isCollapsed) {
+      console.log('📜 Scrolling to bottom, messages count:', messages.length);
       containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
   }, [messages, isCollapsed]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!currentQuestion.trim() || isAnalyzing) return;
+    if (!currentQuestion.trim() || isAnalyzing) {
+      console.warn('⚠️ Cannot submit:', {
+        hasQuestion: !!currentQuestion.trim(),
+        isAnalyzing
+      });
+      return;
+    }
 
     const question = currentQuestion.trim();
+    console.log('📝 Starting analysis for question:', question);
+    console.log('📊 Data to analyze:', {
+      hasCachedDataset: !!cachedDataset,
+      hasInitialData: !!initialData,
+      cachedDataRows: cachedDataset?.length,
+      initialDataRows: initialData?.length
+    });
+    
     setCurrentQuestion('');
     setIsAnalyzing(true);
 
@@ -78,6 +115,12 @@ const ConversationContainer = ({
     try {
       const dataToAnalyze = cachedDataset || initialData;
       
+      console.log('🔍 Analyzing with data:', {
+        rows: dataToAnalyze?.length,
+        columns: dataToAnalyze?.length ? Object.keys(dataToAnalyze[0]).length : 0,
+        firstRowSample: dataToAnalyze?.[0]
+      });
+      
       // Build context from previous messages
       const conversationContext = messages
         .filter(m => m.type === 'user' || m.type === 'assistant')
@@ -88,6 +131,8 @@ const ConversationContainer = ({
       const contextPrompt = messages.length > 0 
         ? `Previous conversation:\n${conversationContext}\n\nCurrent question: ${question}`
         : null;
+        
+      console.log('🎯 Context prompt:', contextPrompt ? contextPrompt.substring(0, 200) + '...' : 'No context');
 
       const result = await aiAnalysisService.analyzeData(
         dataToAnalyze,
@@ -97,6 +142,18 @@ const ConversationContainer = ({
         selectedBackend,
         contextPrompt
       );
+      
+      console.log('📊 Analysis result received:', {
+        success: result?.success,
+        hasAnalysis: !!result?.analysis,
+        hasResultsTable: !!result?.results_table,
+        resultsTableData: result?.results_table?.data?.length,
+        hasVisualization: !!result?.visualization,
+        visualizationData: result?.visualization?.data?.length,
+        hasPythonCode: !!result?.python_code,
+        hasRefinedQuestions: !!result?.refined_questions,
+        error: result?.error
+      });
 
       // Add assistant response
       const assistantMessage = {
@@ -106,10 +163,24 @@ const ConversationContainer = ({
         result: result,
         timestamp: new Date().toISOString()
       };
+      
+      console.log('💬 Creating assistant message:', {
+        messageId: assistantMessage.id,
+        question: assistantMessage.question,
+        resultSuccess: assistantMessage.result?.success,
+        resultKeys: Object.keys(assistantMessage.result || {})
+      });
+      
       setMessages(prev => [...prev, assistantMessage]);
 
     } catch (error) {
-      console.error('Analysis error:', error);
+      console.error('❌ Analysis error:', error);
+      console.error('📋 Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
+      
       const errorMessage = {
         id: Date.now() + 1,
         type: 'error',
@@ -130,6 +201,7 @@ const ConversationContainer = ({
   };
 
   const handleSuggestedQuestionClick = (question) => {
+    console.log('💡 Suggested question clicked:', question);
     setCurrentQuestion(question);
     if (inputRef.current) {
       inputRef.current.focus();
@@ -193,7 +265,8 @@ const ConversationContainer = ({
                           onClick={() => handleSuggestedQuestionClick(question)}
                           disabled={isAnalyzing}
                         >
-                          {question}
+                          <span className="question-number">{index + 1}.</span>
+                          <span className="question-text">{question}</span>
                         </button>
                       ))}
                     </div>
@@ -215,6 +288,21 @@ const ConversationContainer = ({
                   <div className="assistant-message">
                     <span className="message-icon">🤖</span>
                     <div className="message-content">
+                      {/* Debug logging for props being passed to AIAnalysisResults */}
+                      {(() => {
+                        console.log('🔍 ConversationContainer passing to AIAnalysisResults:', {
+                          messageId: message.id,
+                          question: message.question,
+                          analysisResult: message.result,
+                          resultSuccess: message.result?.success,
+                          resultKeys: Object.keys(message.result || {}),
+                          hasOriginalData: !!initialData,
+                          originalDataRows: initialData?.length,
+                          selectedBackend,
+                          sessionId
+                        });
+                        return null;
+                      })()}
                       <AIAnalysisResults
                         analysisResult={message.result}
                         originalData={initialData}

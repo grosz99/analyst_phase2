@@ -6,36 +6,65 @@ class ResultFormatter {
 
   // Format analysis results as a proper table structure
   formatResultsAsTable(results, userContext) {
+    console.log('📊 ResultFormatter.formatResultsAsTable called:', {
+      hasResults: !!results,
+      resultsType: results?.type,
+      hasData: !!results?.data,
+      dataLength: results?.data?.length,
+      userContext: userContext?.substring(0, 100) + '...'
+    });
+    
     if (!results || !results.data) {
+      console.warn('⚠️ No results or data provided, returning fallback table');
       return {
         title: "Analysis Results",
-        columns: ["Metric", "Value"],
-        data: [{ metric: "No Results", value: "Analysis could not be completed" }],
+        headers: ["Metric", "Value"],
+        data: [{ Metric: "No Results", Value: "Analysis could not be completed" }],
         total_rows: 1
       };
     }
     
     if (results.type === 'value_counts') {
-      return {
+      console.log('📊 Formatting value_counts results:', {
+        column: results.column,
+        dataLength: results.data.length
+      });
+      
+      const formattedTable = {
         title: `${results.column.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} Distribution`,
-        columns: ["Rank", results.column.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()), "Count", "Percentage"],
+        headers: ["Rank", results.column.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()), "Count", "Percentage"],
         data: results.data.map((item, index) => ({
-          rank: index + 1,
+          Rank: index + 1,
           [results.column]: item[results.column],
-          count: item.count,
-          percentage: `${item.percentage}%`
+          Count: item.count,
+          Percentage: `${item.percentage}%`
         })),
         total_rows: results.data.length
       };
+      
+      console.log('✅ value_counts table formatted successfully:', {
+        title: formattedTable.title,
+        headers: formattedTable.headers,
+        rowCount: formattedTable.data.length
+      });
+      
+      return formattedTable;
     }
     
     if (results.type === 'groupby') {
+      console.log('📊 Formatting groupby results:', {
+        groupColumn: results.groupColumn,
+        dataLength: results.data.length,
+        aggregations: results.aggregations
+      });
+      
       const firstResult = results.data[0];
       if (!firstResult) {
+        console.warn('⚠️ No data in groupby results, returning empty table');
         return {
           title: "No Results Found",
-          columns: ["Message"],
-          data: [{ message: "No data available for groupby analysis" }],
+          headers: ["Message"],
+          data: [{ Message: "No data available for groupby analysis" }],
           total_rows: 0
         };
       }
@@ -128,7 +157,16 @@ class ResultFormatter {
 
   // Create visualization from analysis results
   createVisualizationFromResults(results, userContext) {
+    console.log('📈 ResultFormatter.createVisualizationFromResults called:', {
+      hasResults: !!results,
+      resultsType: results?.type,
+      hasData: !!results?.data,
+      dataLength: results?.data?.length,
+      userContext: userContext?.substring(0, 50) + '...'
+    });
+    
     if (!results || !results.data || results.data.length === 0) {
+      console.warn('⚠️ No results or data for visualization, returning no_data response');
       return {
         type: "no_data",
         title: "No Visualization Available",
@@ -137,7 +175,8 @@ class ResultFormatter {
     }
     
     if (results.type === 'value_counts') {
-      return {
+      console.log('📊 Creating value_counts visualization');
+      const visualization = {
         type: "bar_chart",
         title: `${results.column.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())} Distribution`,
         x_axis: results.column.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
@@ -148,6 +187,13 @@ class ResultFormatter {
           formatted_value: `${item.count} (${item.percentage}%)`
         }))
       };
+      
+      console.log('✅ value_counts visualization created:', {
+        type: visualization.type,
+        dataPoints: visualization.data.length
+      });
+      
+      return visualization;
     }
     
     if (results.type === 'groupby') {

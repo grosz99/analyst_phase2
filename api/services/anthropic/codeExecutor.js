@@ -18,28 +18,56 @@ class CodeExecutor {
   // Execute AI's Python analysis on cached dataset (the core intelligence)
   executeAnalysisOnCachedData(data, userContext, analysisText, pythonCode) {
     try {
-      if (!pythonCode?.code) {
-        return null;
+      console.log('🔬 Starting AI analysis on cached dataset...');
+      console.log('📊 Data summary:', { rows: data?.length, columns: data?.length ? Object.keys(data[0]).length : 0 });
+      console.log('🔤 User context:', userContext);
+      console.log('🐍 Python code input:', pythonCode);
+      
+      // Enhanced validation with detailed error messages
+      if (!data || !Array.isArray(data) || data.length === 0) {
+        console.error('❌ Invalid data provided to code executor');
+        return this.createErrorResponse('No valid data provided for analysis');
+      }
+      
+      if (!pythonCode || (!pythonCode.code && !pythonCode)) {
+        console.error('❌ No Python code provided for execution');
+        return this.createErrorResponse('No Python code provided for analysis');
+      }
+      
+      if (!userContext || typeof userContext !== 'string') {
+        console.error('❌ Invalid user context provided');
+        return this.createErrorResponse('Invalid analysis context provided');
       }
 
-      console.log('🔬 Executing AI analysis on cached dataset...');
-      
       // Parse the Python code to understand what analysis the AI wants to perform
-      const codeString = typeof pythonCode.code === 'string' ? pythonCode.code : pythonCode.code.toString();
+      const codeString = typeof pythonCode.code === 'string' ? pythonCode.code : 
+                        typeof pythonCode === 'string' ? pythonCode : 
+                        pythonCode.code?.toString() || pythonCode.toString();
+      
+      console.log('🔍 Parsed code string:', codeString.substring(0, 200) + '...');
       
       // Create a safe execution environment that mimics pandas operations
       const df = this.createDataFrameProxy(data);
+      console.log('📊 DataFrame proxy created with columns:', df.columns);
+      
       const results = this.executePandasOperations(df, codeString, userContext);
       
       if (results) {
         console.log('✅ Successfully executed AI analysis on cached data');
+        console.log('📈 Results summary:', { type: results.type, dataLength: results.data?.length });
         return results;
       }
       
-      return null;
+      // If we get here, executePandasOperations returned null/undefined
+      console.warn('⚠️ pandas operations returned null, creating fallback response');
+      return this.createErrorResponse('Analysis completed but no results could be extracted from the code');
+      
     } catch (error) {
-      console.error('Failed to execute AI analysis on cached data:', error);
-      return null;
+      console.error('❌ Failed to execute AI analysis on cached data:', error);
+      console.error('📍 Error stack:', error.stack);
+      
+      // Return structured error instead of null
+      return this.createErrorResponse(`Code execution failed: ${error.message}`);
     }
   }
 
@@ -69,8 +97,13 @@ class CodeExecutor {
   // Execute pandas-like operations based on AI's Python code
   executePandasOperations(df, codeString, userContext) {
     try {
+      console.log('🔬 Starting pandas operations execution...');
+      
       const questionLower = userContext.toLowerCase();
       const availableColumns = df.columns;
+      
+      console.log('📊 Available columns:', availableColumns);
+      console.log('🔍 Code to analyze:', codeString);
       
       // 🚨 VALIDATION: Check for forbidden calculated columns (but be more lenient)
       const forbiddenPatterns = [
@@ -89,6 +122,8 @@ class CodeExecutor {
       
       // Validate all column references exist (but be more lenient for method calls)
       const columnReferences = codeString.match(/df\['(\w+)'\]/g) || [];
+      console.log('🔍 Found column references:', columnReferences);
+      
       for (const ref of columnReferences) {
         const columnName = ref.match(/df\['(\w+)'\]/)[1];
         if (columnName && !availableColumns.includes(columnName)) {
@@ -153,20 +188,28 @@ class CodeExecutor {
       
       // If we still can't parse, try to extract key metrics from the code
       console.log('⚠️ Complex code pattern, attempting intelligent extraction');
-      return this.extractResultsFromCode(df.data, codeString, questionLower);
+      const extractedResults = this.extractResultsFromCode(df.data, codeString, questionLower);
+      
+      if (extractedResults) {
+        console.log('✅ Successfully extracted results from complex code');
+        return extractedResults;
+      }
+      
+      // Ultimate fallback - return a basic data summary
+      console.log('🔄 Using ultimate fallback - basic data summary');
+      return this.createBasicDataSummary(df.data, questionLower);
       
     } catch (error) {
-      console.error('Error executing pandas operations:', error);
+      console.error('❌ Error executing pandas operations:', error);
+      console.error('📍 Error details:', {
+        message: error.message,
+        stack: error.stack,
+        codeString: codeString.substring(0, 200),
+        userContext: questionLower
+      });
       
-      // Return a basic fallback instead of null to prevent complete failure
-      return {
-        success: false,
-        error: `Code execution failed: ${error.message}`,
-        headers: ['Error'],
-        rows: [['Analysis could not be completed due to code execution error']],
-        totalRows: 1,
-        fallback: true
-      };
+      // Return a structured error response instead of null
+      return this.createErrorResponse(`Code execution failed: ${error.message}`);
     }
   }
 
@@ -353,7 +396,7 @@ class CodeExecutor {
       
       if (dateColumns.length === 0) {
         console.log('❌ No date columns found for date analysis');
-        return null;
+        return this.createErrorResponse('No date columns found in the data for temporal analysis');
       }
       
       const dateColumn = dateColumns[0];
@@ -434,8 +477,9 @@ class CodeExecutor {
       };
       
     } catch (error) {
-      console.error('Error in date analysis:', error);
-      return null;
+      console.error('❌ Error in date analysis:', error);
+      console.error('📍 Error stack:', error.stack);
+      return this.createErrorResponse(`Date analysis failed: ${error.message}`);
     }
   }
 
@@ -492,8 +536,9 @@ class CodeExecutor {
       };
       
     } catch (error) {
-      console.error('Error in filtered analysis:', error);
-      return null;
+      console.error('❌ Error in filtered analysis:', error);
+      console.error('📍 Error stack:', error.stack);
+      return this.createErrorResponse(`Filtered analysis failed: ${error.message}`);
     }
   }
 
@@ -557,8 +602,9 @@ class CodeExecutor {
       };
       
     } catch (error) {
-      console.error('Error in count analysis:', error);
-      return null;
+      console.error('❌ Error in count analysis:', error);
+      console.error('📍 Error stack:', error.stack);
+      return this.createErrorResponse(`Count analysis failed: ${error.message}`);
     }
   }
 
@@ -571,23 +617,31 @@ class CodeExecutor {
       
       // Check for aggregation patterns
       if (codeString.includes('groupby') || codeString.includes('GROUP BY')) {
+        console.log('🔍 Detected groupby pattern');
         const groupColumn = this.findGroupingColumn(data, questionLower);
         if (groupColumn) {
-          return this.performGroupByAggregation(data, groupColumn, codeString);
+          console.log(`📊 Found grouping column: ${groupColumn}`);
+          const result = this.performGroupByAggregation(data, groupColumn, codeString);
+          if (result) return result;
         }
       }
       
       // Check for value counting patterns
       if (codeString.includes('value_counts') || codeString.includes('COUNT(')) {
+        console.log('🔍 Detected value_counts pattern');
         const categoricalColumn = this.findCategoricalColumn(data, questionLower);
         if (categoricalColumn) {
-          return this.performValueCounts(data, categoricalColumn);
+          console.log(`📊 Found categorical column: ${categoricalColumn}`);
+          const result = this.performValueCounts(data, categoricalColumn);
+          if (result) return result;
         }
       }
       
       // Check for filtering + counting
       if (codeString.includes('len(') && (codeString.includes('[') || codeString.includes('filter'))) {
-        return this.performCountAnalysis(data, codeString, questionLower);
+        console.log('🔍 Detected filtering + counting pattern');
+        const result = this.performCountAnalysis(data, codeString, questionLower);
+        if (result) return result;
       }
       
       // Fallback: return a sample of the data
@@ -601,8 +655,11 @@ class CodeExecutor {
       };
       
     } catch (error) {
-      console.error('Error extracting results from code:', error);
-      return null;
+      console.error('❌ Error extracting results from code:', error);
+      console.error('📍 Error stack:', error.stack);
+      
+      // Return structured error instead of null
+      return this.createErrorResponse(`Failed to extract results: ${error.message}`);
     }
   }
 
@@ -641,6 +698,39 @@ class CodeExecutor {
     }
     
     return null;
+  }
+  
+  // Create a basic data summary when all else fails
+  createBasicDataSummary(data, questionLower) {
+    try {
+      console.log('📊 Creating basic data summary fallback');
+      
+      if (!data || data.length === 0) {
+        return this.createErrorResponse('No data available for analysis');
+      }
+      
+      const columns = Object.keys(data[0] || {});
+      const sampleSize = Math.min(10, data.length);
+      
+      return {
+        type: 'summary',
+        title: 'Data Summary',
+        data: data.slice(0, sampleSize).map((row, index) => ({
+          rank: index + 1,
+          ...row
+        })),
+        metadata: {
+          total_rows: data.length,
+          columns: columns,
+          sample_size: sampleSize,
+          message: `Showing ${sampleSize} of ${data.length} records`
+        }
+      };
+      
+    } catch (error) {
+      console.error('❌ Error creating basic data summary:', error);
+      return this.createErrorResponse(`Failed to create data summary: ${error.message}`);
+    }
   }
 }
 

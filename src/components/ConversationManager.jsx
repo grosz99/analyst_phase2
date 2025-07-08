@@ -114,15 +114,6 @@ const ConversationManager = ({
         )}
       </div>
 
-      {datasetInfo && (
-        <div className="dataset-info">
-          <h4>Dataset Information:</h4>
-          <p>{datasetInfo.rows} rows × {datasetInfo.columns} columns</p>
-          {selectedFilters && Object.keys(selectedFilters).length > 0 && (
-            <p>Filters applied: {Object.keys(selectedFilters).length}</p>
-          )}
-        </div>
-      )}
     </div>
   );
 };

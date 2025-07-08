@@ -35,15 +35,25 @@ const AIAnalysisResults = ({
   }
 
   if (!analysisResult) {
+    console.warn('⚠️ No analysisResult provided to AIAnalysisResults');
     return null; // Don't render anything if no results - the question input will be shown above
   }
 
   if (!analysisResult.success) {
+    console.error('❌ Analysis failed:', analysisResult.error);
     return (
       <div className="ai-analysis-error">
         <div className="error-content">
           <h3>❌ Analysis Error</h3>
-          <p>{analysisResult.error}</p>
+          <p>{analysisResult.error || 'Unknown error occurred'}</p>
+          {analysisResult.debug_info && (
+            <div className="debug-info">
+              <details>
+                <summary>Debug Information</summary>
+                <pre>{JSON.stringify(analysisResult.debug_info, null, 2)}</pre>
+              </details>
+            </div>
+          )}
           <button onClick={onNewAnalysis} className="retry-button">
             Try Again
           </button>
@@ -52,13 +62,70 @@ const AIAnalysisResults = ({
     );
   }
 
-  const { analysis, python_code, metadata, results_table, visualization, refined_questions } = analysisResult;
+  // Enhanced validation and debugging
+  const validateAnalysisResult = (result) => {
+    console.log('🔍 Validating analysis result:', result);
+    
+    if (!result || typeof result !== 'object') {
+      console.error('❌ Invalid analysis result: not an object');
+      return false;
+    }
+    
+    // Check for required fields
+    const requiredFields = ['analysis', 'metadata'];
+    const missingFields = requiredFields.filter(field => !result[field]);
+    
+    if (missingFields.length > 0) {
+      console.warn('⚠️ Missing required fields:', missingFields);
+    }
+    
+    // Validate results_table structure
+    if (result.results_table) {
+      if (!result.results_table.data || !Array.isArray(result.results_table.data)) {
+        console.warn('⚠️ Invalid results_table: missing or invalid data array');
+      }
+      if (result.results_table.data && result.results_table.data.length === 0) {
+        console.warn('⚠️ Results table has empty data array');
+      }
+    }
+    
+    // Validate visualization structure
+    if (result.visualization) {
+      if (!result.visualization.type) {
+        console.warn('⚠️ Invalid visualization: missing type');
+      }
+      if (!result.visualization.data || !Array.isArray(result.visualization.data)) {
+        console.warn('⚠️ Invalid visualization: missing or invalid data array');
+      }
+    }
+    
+    return true;
+  };
   
-  console.log('🔍 Debug AIAnalysisResults props:', { 
-    analysisResult, 
+  // Validate the analysis result
+  const isValid = validateAnalysisResult(analysisResult);
+  
+  // Extract with safe defaults
+  const {
+    analysis = 'No analysis text available',
+    python_code = null,
+    metadata = {},
+    results_table = null,
+    visualization = null,
+    refined_questions = []
+  } = analysisResult || {};
+  
+  console.log('🔍 Debug AIAnalysisResults extracted data:', { 
+    hasAnalysis: !!analysis,
+    hasPythonCode: !!python_code,
+    hasMetadata: !!metadata,
     hasResultsTable: !!results_table,
+    resultsTableData: results_table?.data?.length || 0,
     hasVisualization: !!visualization,
-    question 
+    visualizationData: visualization?.data?.length || 0,
+    refinedQuestionsCount: refined_questions?.length || 0,
+    question,
+    isValid
   });
 
   const handleExportResults = async (format) => {
@@ -319,13 +386,67 @@ const AIAnalysisResults = ({
   };
 
   const renderVisualization = () => {
-    if (!visualization || !visualization.data) {
+    console.log('🔍 Debug renderVisualization:', {
+      visualization,
+      hasData: !!visualization?.data,
+      dataLength: visualization?.data?.length,
+      type: visualization?.type,
+      hasError: !!visualization?.error
+    });
+    
+    if (!visualization) {
+      console.warn('⚠️ No visualization object provided');
       return <p className="no-items">No visualization data available</p>;
+    }
+    
+    if (visualization.error) {
+      console.error('❌ Visualization contains error:', visualization.error);
+      return (
+        <div className="visualization-error">
+          <p className="error-text">❌ {visualization.error}</p>
+          <p className="error-help">Try asking a different question or check your data format.</p>
+        </div>
+      );
+    }
+    
+    if (!visualization.data) {
+      console.warn('⚠️ No visualization.data provided');
+      return <p className="no-items">No visualization data available</p>;
+    }
+    
+    if (!Array.isArray(visualization.data)) {
+      console.error('❌ visualization.data is not an array:', typeof visualization.data);
+      return <p className="no-items">Invalid visualization data format</p>;
+    }
+    
+    if (visualization.data.length === 0) {
+      console.warn('⚠️ visualization.data is empty');
+      return <p className="no-items">No data to visualize</p>;
     }
 
     if (visualization.type === 'bar_chart') {
       const { title, data } = visualization;
-      const maxValue = Math.max(...data.map(d => d.value));
+      
+      // Validate data structure
+      const isValidData = data.every(item => 
+        item && typeof item === 'object' && 
+        (item.value !== undefined || item.formatted_value !== undefined)
+      );
+      
+      if (!isValidData) {
+        console.error('❌ Invalid bar chart data structure');
+        return <p className="no-items">Invalid chart data received</p>;
+      }
+      
+      let maxValue;
+      try {
+        maxValue = Math.max(...data.map(d => d.value || 0));
+      } catch (error) {
+        console.error('❌ Error calculating max value:', error);
+        maxValue = 1; // fallback
+      }
+      
+      console.log('✅ Rendering bar chart with', data.length, 'items, max value:', maxValue);
 
       return (
         <div className="chart-container">
@@ -339,33 +460,65 @@ const AIAnalysisResults = ({
             </button>
           </div>
           <div className="bar-chart" ref={visualizationRef}>
-            {data.map((item, index) => (
-              <div key={index} className="bar-item">
-                <div className="bar-label">{item.label}</div>
-                <div className="bar-container">
-                  <div 
-                    className="bar-fill" 
-                    style={{ 
-                      width: `${(item.value / maxValue) * 100}%`,
-                      backgroundColor: `hsl(${200 + (index * 30) % 160}, 70%, 50%)`
-                    }}
-                  ></div>
+            {data.map((item, index) => {
+              if (!item || typeof item !== 'object') {
+                console.warn(`⚠️ Invalid item at index ${index}:`, item);
+                return null;
+              }
+              
+              const value = item.value || 0;
+              const label = item.label || `Item ${index + 1}`;
+              const formattedValue = item.formatted_value || value;
+              
+              return (
+                <div key={index} className="bar-item">
+                  <div className="bar-label">{label}</div>
+                  <div className="bar-container">
+                    <div 
+                      className="bar-fill" 
+                      style={{ 
+                        width: `${maxValue > 0 ? (value / maxValue) * 100 : 0}%`,
+                        backgroundColor: `hsl(${200 + (index * 30) % 160}, 70%, 50%)`
+                      }}
+                    ></div>
+                  </div>
+                  <div className="bar-value">{formattedValue}</div>
                 </div>
-                <div className="bar-value">{item.formatted_value || item.value}</div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       );
     }
 
-    return <p className="no-items">Visualization type not supported</p>;
+    console.warn('⚠️ Unsupported visualization type:', visualization.type);
+    return <p className="no-items">Visualization type "{visualization.type}" not supported</p>;
   };
 
   const renderPythonCode = () => {
+    console.log('🔍 Debug renderPythonCode:', {
+      python_code,
+      hasCode: !!python_code?.code,
+      isExecutable: python_code?.executable,
+      codeType: typeof python_code
+    });
+    
     if (!python_code) {
+      console.warn('⚠️ No python_code provided');
       return <p className="no-items">No Python code generated</p>;
     }
+    
+    // Handle both object and string formats
+    const codeString = python_code.code || python_code;
+    
+    if (!codeString || (typeof codeString !== 'string' && typeof codeString !== 'object')) {
+      console.warn('⚠️ Invalid python code format:', typeof codeString);
+      return <p className="no-items">Invalid Python code format</p>;
+    }
+    
+    const displayCode = typeof codeString === 'string' ? codeString : JSON.stringify(codeString, null, 2);
+    
+    console.log('✅ Rendering Python code, length:', displayCode.length);
 
     return (
       <div className="python-code-container">
@@ -374,7 +527,7 @@ const AIAnalysisResults = ({
           <p className="code-subtitle">AI-generated code to analyze your cached dataset</p>
         </div>
         <pre className="python-code">
-          <code>{python_code.code || python_code}</code>
+          <code>{displayCode}</code>
         </pre>
         {python_code.executable && (
           <div className="code-info">
@@ -387,6 +540,12 @@ const AIAnalysisResults = ({
                 : 'This code operates on the cached DataFrame \'df\''
               }
             </span>
+          </div>
+        )}
+        {python_code.executable === false && (
+          <div className="code-warning">
+            <span className="code-status">⚠️ Non-executable code</span>
+            <span className="code-note">This code could not be executed automatically</span>
           </div>
         )}
       </div>
