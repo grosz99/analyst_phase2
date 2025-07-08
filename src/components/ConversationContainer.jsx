@@ -17,6 +17,7 @@ const ConversationContainer = ({
   const [currentQuestion, setCurrentQuestion] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [suggestedQuestions, setSuggestedQuestions] = useState([]);
   const containerRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -27,7 +28,15 @@ const ConversationContainer = ({
     }
   }, [isActive, isCollapsed]);
 
-  // Listen for suggested questions
+  // Generate suggested questions when conversation is created
+  useEffect(() => {
+    if (messages.length === 0 && initialData && initialData.length > 0) {
+      const suggestions = aiAnalysisService.generateSuggestedQuestions(initialData);
+      setSuggestedQuestions(suggestions);
+    }
+  }, [initialData, messages.length, aiAnalysisService]);
+
+  // Listen for suggested questions (from external sources)
   useEffect(() => {
     const handleSuggestedQuestion = (event) => {
       if (isActive) {
@@ -120,6 +129,13 @@ const ConversationContainer = ({
     }
   };
 
+  const handleSuggestedQuestionClick = (question) => {
+    setCurrentQuestion(question);
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  };
+
   const getConversationTitle = () => {
     if (messages.length === 0) return 'New Conversation';
     const firstUserMessage = messages.find(m => m.type === 'user');
@@ -164,6 +180,25 @@ const ConversationContainer = ({
             {messages.length === 0 && (
               <div className="empty-conversation">
                 <p>Start a new conversation by asking a question about your data.</p>
+                
+                {/* Suggested Questions */}
+                {suggestedQuestions.length > 0 && (
+                  <div className="suggested-questions-container">
+                    <h4>💡 Suggested Questions:</h4>
+                    <div className="suggested-questions-grid">
+                      {suggestedQuestions.map((question, index) => (
+                        <button
+                          key={index}
+                          className="suggested-question-btn"
+                          onClick={() => handleSuggestedQuestionClick(question)}
+                          disabled={isAnalyzing}
+                        >
+                          {question}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
             

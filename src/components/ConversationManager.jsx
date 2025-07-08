@@ -13,7 +13,6 @@ const ConversationManager = ({
 }) => {
   const [conversations, setConversations] = useState([]);
   const [activeConversationId, setActiveConversationId] = useState(null);
-  const [suggestedQuestions, setSuggestedQuestions] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
 
   // Initialize with first conversation if we have data
@@ -23,13 +22,7 @@ const ConversationManager = ({
     }
   }, [initialData, cachedDataset]);
 
-  // Generate suggested questions when data changes
-  useEffect(() => {
-    if (initialData && initialData.length > 0) {
-      const suggestions = aiAnalysisService.generateSuggestedQuestions(initialData);
-      setSuggestedQuestions(suggestions);
-    }
-  }, [initialData]);
+  // No longer needed - suggested questions are handled per conversation
 
   const createNewConversation = () => {
     const newConversation = {
@@ -57,17 +50,7 @@ const ConversationManager = ({
     }
   };
 
-  const handleSuggestedQuestion = (question) => {
-    // If no active conversation, create one
-    if (!activeConversationId) {
-      createNewConversation();
-    }
-    
-    // The question will be handled by the active conversation
-    // We'll pass this through props to the active conversation
-    const event = new CustomEvent('suggestedQuestion', { detail: question });
-    window.dispatchEvent(event);
-  };
+  // No longer needed - suggested questions are handled within each conversation
 
   const getDataToAnalyze = () => {
     return cachedDataset || initialData;
@@ -105,22 +88,7 @@ const ConversationManager = ({
         </button>
       </div>
 
-      {suggestedQuestions.length > 0 && (
-        <div className="suggested-questions">
-          <h3>Suggested Questions:</h3>
-          <div className="questions-grid">
-            {suggestedQuestions.map((question, index) => (
-              <button
-                key={index}
-                className="suggested-question-btn"
-                onClick={() => handleSuggestedQuestion(question)}
-              >
-                {question}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Suggested questions are now handled within each conversation container */}
 
       <div className="conversations-container">
         {conversations.length === 0 ? (
