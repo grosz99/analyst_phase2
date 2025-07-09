@@ -48,6 +48,18 @@
   color: #374151;
 }
 
+.conversation-number {
+  background-color: #3b82f6;
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 12px;
+  margin-right: 12px;
+  min-width: 32px;
+  text-align: center;
+}
+
 .conversation-title {
   flex: 1;
   margin: 0;

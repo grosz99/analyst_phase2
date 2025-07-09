@@ -4,6 +4,7 @@ import './ConversationContainer.css';
 
 const ConversationContainer = ({ 
   conversationId,
+  conversationIndex,
   initialData,
   cachedDataset,
   sessionId,
@@ -231,6 +232,7 @@ const ConversationContainer = ({
         >
           {isCollapsed ? '▶' : '▼'}
         </button>
+        <div className="conversation-number">#{conversationIndex}</div>
         <h3 className="conversation-title">{getConversationTitle()}</h3>
         <span className="message-count">{messages.length} messages</span>
         <button 

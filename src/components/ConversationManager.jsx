@@ -97,10 +97,11 @@ const ConversationManager = ({
             <p>Click "New Conversation" to begin analyzing your data.</p>
           </div>
         ) : (
-          conversations.map((conversation) => (
+          conversations.map((conversation, index) => (
             <ConversationContainer
               key={conversation.id}
               conversationId={conversation.id}
+              conversationIndex={index + 1}
               initialData={initialData}
               cachedDataset={cachedDataset}
               sessionId={sessionId}
