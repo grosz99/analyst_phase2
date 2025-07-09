@@ -48,16 +48,19 @@
   color: #374151;
 }
 
-.conversation-number {
+.question-number-badge {
   background-color: #3b82f6;
   color: white;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
-  padding: 4px 8px;
-  border-radius: 12px;
+  padding: 4px 10px;
+  border-radius: 16px;
   margin-right: 12px;
-  min-width: 32px;
+  min-width: 36px;
   text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .conversation-title {
@@ -190,6 +193,7 @@
 .error-message {
   display: flex;
   gap: 12px;
+  align-items: flex-start;
 }
 
 .message-icon {

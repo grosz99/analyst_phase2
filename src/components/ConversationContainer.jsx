@@ -4,7 +4,6 @@ import './ConversationContainer.css';
 
 const ConversationContainer = ({ 
   conversationId,
-  conversationIndex,
   initialData,
   cachedDataset,
   sessionId,
@@ -232,7 +231,6 @@ const ConversationContainer = ({
         >
           {isCollapsed ? '▶' : '▼'}
         </button>
-        <div className="conversation-number">#{conversationIndex}</div>
         <h3 className="conversation-title">{getConversationTitle()}</h3>
         <span className="message-count">{messages.length} messages</span>
         <button 
@@ -277,18 +275,24 @@ const ConversationContainer = ({
               </div>
             )}
             
-            {messages.map((message) => (
-              <div key={message.id} className={`message message-${message.type}`}>
-                {message.type === 'user' && (
-                  <div className="user-message">
-                    <span className="message-icon">👤</span>
-                    <div className="message-content">{message.content}</div>
-                  </div>
-                )}
-                
-                {message.type === 'assistant' && (
-                  <div className="assistant-message">
-                    <span className="message-icon">🤖</span>
+            {messages.map((message, index) => {
+              // Count how many user messages came before this one
+              const questionNumber = messages.slice(0, index + 1).filter(m => m.type === 'user').length;
+              
+              return (
+                <div key={message.id} className={`message message-${message.type}`}>
+                  {message.type === 'user' && (
+                    <div className="user-message">
+                      <div className="question-number-badge">#{questionNumber}</div>
+                      <span className="message-icon">👤</span>
+                      <div className="message-content">{message.content}</div>
+                    </div>
+                  )}
+                  
+                  {message.type === 'assistant' && (
+                    <div className="assistant-message">
+                      <div className="question-number-badge">#{questionNumber}</div>
+                      <span className="message-icon">🤖</span>
                     <div className="message-content">
                       {/* Debug logging for props being passed to AIAnalysisResults */}
                       {(() => {
@@ -326,7 +330,8 @@ const ConversationContainer = ({
                   </div>
                 )}
               </div>
-            ))}
+              );
+            })}
             
             {isAnalyzing && (
               <div className="message message-loading">
