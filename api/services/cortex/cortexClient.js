@@ -21,10 +21,10 @@ class CortexClient {
       // Load Snowflake credentials for Cortex Analyst API
       let credentials = {};
       
-      if (process.env.SNOWFLAKE_ACCOUNT && process.env.SNOWFLAKE_USERNAME) {
+      if (process.env.SNOWFLAKE_ACCOUNT && process.env.SNOWFLAKE_USER) {
         credentials = {
           account: process.env.SNOWFLAKE_ACCOUNT,
-          username: process.env.SNOWFLAKE_USERNAME,
+          username: process.env.SNOWFLAKE_USER,
           password: process.env.SNOWFLAKE_PASSWORD
         };
         console.log('✅ Using Snowflake credentials from environment variables');
@@ -45,7 +45,7 @@ class CortexClient {
         }
       }
       
-      if (!credentials.SNOWFLAKE_ACCOUNT || !credentials.SNOWFLAKE_USERNAME) {
+      if (!credentials.account || !credentials.username) {
         console.warn('❌ Snowflake credentials not found. Enabling demo mode.');
         // Enable demo mode with mock credentials
         credentials.SNOWFLAKE_ACCOUNT = 'demo-account';
