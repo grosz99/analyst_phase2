@@ -17,7 +17,21 @@ class SnowflakeService {
     try {
       // First try environment variable (for Vercel deployment)
       if (process.env.SNOWFLAKE_PRIVATE_KEY) {
-        this.privateKey = process.env.SNOWFLAKE_PRIVATE_KEY.replace(/\|/g, '\n');
+        // Handle different formats: pipe-separated or compact
+        let key = process.env.SNOWFLAKE_PRIVATE_KEY;
+        if (key.includes('|')) {
+          // Pipe-separated format
+          key = key.replace(/\|/g, '\n');
+        } else {
+          // Compact format - add newlines after headers and every 64 chars
+          key = key
+            .replace('-----BEGIN PRIVATE KEY-----', '-----BEGIN PRIVATE KEY-----\n')
+            .replace('-----END PRIVATE KEY-----', '\n-----END PRIVATE KEY-----')
+            .replace(/(.{64})/g, '$1\n')
+            .replace(/\n\n/g, '\n')
+            .trim();
+        }
+        this.privateKey = key;
         console.log('✅ RSA private key loaded from environment variable');
       } else {
         // Fallback to local file (for development)
