@@ -25,13 +25,19 @@ class SnowflakeService {
     }
 
     this.config = {
-      account: process.env.SNOWFLAKE_ACCOUNT || 'laqwzde-umc37678',
-      username: process.env.SNOWFLAKE_USER || 'J99G',
-      password: process.env.SNOWFLAKE_PASSWORD || 'Cleartelligence.99!!!',
-      warehouse: process.env.SNOWFLAKE_WAREHOUSE || 'SUPERSTOREWAREHOUSE',
-      database: process.env.SNOWFLAKE_DATABASE || 'SUPERSTOREDB',
-      schema: process.env.SNOWFLAKE_SCHEMA || 'DATA',
-      role: process.env.SNOWFLAKE_ROLE || 'SYSADMIN',
+      account: process.env.SNOWFLAKE_ACCOUNT,
+      username: process.env.SNOWFLAKE_USER,
+      // Prioritize RSA key authentication if available
+      ...(this.privateKey ? { 
+        privateKey: this.privateKey,
+        authenticator: 'SNOWFLAKE_JWT'
+      } : {
+        password: process.env.SNOWFLAKE_PASSWORD
+      }),
+      warehouse: process.env.SNOWFLAKE_WAREHOUSE,
+      database: process.env.SNOWFLAKE_DATABASE,
+      schema: process.env.SNOWFLAKE_SCHEMA,
+      role: process.env.SNOWFLAKE_ROLE,
       // Performance optimizations
       timeout: 30000,
       maxConnections: 5,
