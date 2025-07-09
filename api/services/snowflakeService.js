@@ -12,13 +12,20 @@ class SnowflakeService {
     this.cacheTTL = 5 * 60 * 1000; // 5 minutes cache
     
     // Connection configuration with RSA key authentication
-    const privateKeyPath = path.join(__dirname, '../../snowflake_rsa_key.pem');
     this.privateKey = null;
     
     try {
-      if (fs.existsSync(privateKeyPath)) {
-        this.privateKey = fs.readFileSync(privateKeyPath, 'utf8');
-        console.log('✅ RSA private key loaded for Snowflake authentication');
+      // First try environment variable (for Vercel deployment)
+      if (process.env.SNOWFLAKE_PRIVATE_KEY) {
+        this.privateKey = process.env.SNOWFLAKE_PRIVATE_KEY.replace(/\|/g, '\n');
+        console.log('✅ RSA private key loaded from environment variable');
+      } else {
+        // Fallback to local file (for development)
+        const privateKeyPath = path.join(__dirname, '../../snowflake_rsa_key.pem');
+        if (fs.existsSync(privateKeyPath)) {
+          this.privateKey = fs.readFileSync(privateKeyPath, 'utf8');
+          console.log('✅ RSA private key loaded from local file');
+        }
       }
     } catch (error) {
       console.warn('⚠️ Could not load RSA private key:', error.message);
