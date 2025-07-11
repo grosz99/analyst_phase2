@@ -1,49 +1,60 @@
 .conversation-manager {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 20px;
+  padding: 24px;
+  background: linear-gradient(135deg, #f8fffe 0%, #f0fdf4 100%);
+  min-height: 100vh;
 }
 
 .conversation-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 24px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 32px;
+  padding: 24px;
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-light) 100%);
+  border-radius: 16px;
+  color: white;
+  box-shadow: 0 8px 24px rgba(24, 121, 85, 0.15);
 }
 
 .header-content h2 {
   margin: 0 0 8px 0;
-  color: #1f2937;
-  font-size: 24px;
-  font-weight: 600;
+  color: white;
+  font-size: 28px;
+  font-weight: 700;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .header-content p {
   margin: 0;
-  color: #6b7280;
-  font-size: 14px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 16px;
+  font-weight: 400;
 }
 
 .new-conversation-btn {
-  background-color: #3b82f6;
+  background: rgba(255, 255, 255, 0.15);
   color: white;
-  border: none;
-  padding: 10px 16px;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 500;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  padding: 12px 20px;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  backdrop-filter: blur(10px);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .new-conversation-btn:hover:not(:disabled) {
-  background-color: #2563eb;
-  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .new-conversation-btn:disabled {
@@ -100,22 +111,25 @@
 
 .empty-state {
   text-align: center;
-  padding: 60px 20px;
-  background-color: #f9fafb;
-  border-radius: 8px;
-  border: 1px solid #e5e7eb;
+  padding: 80px 40px;
+  background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+  border-radius: 16px;
+  border: 2px solid #bbf7d0;
+  box-shadow: 0 4px 12px rgba(24, 121, 85, 0.08);
 }
 
 .empty-state h3 {
-  margin: 0 0 8px 0;
-  color: #1f2937;
-  font-size: 18px;
+  margin: 0 0 12px 0;
+  color: var(--primary-color);
+  font-size: 24px;
+  font-weight: 700;
 }
 
 .empty-state p {
   margin: 0;
-  color: #6b7280;
-  font-size: 14px;
+  color: #166534;
+  font-size: 16px;
+  font-weight: 500;
 }
 
 .no-data-message {
