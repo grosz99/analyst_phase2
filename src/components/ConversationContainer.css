@@ -254,6 +254,13 @@
   border-color: #ef4444;
 }
 
+.message-loading .message-icon {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  border-color: #10b981;
+  padding: 8px;
+}
+
 .message-content {
   flex: 1;
 }

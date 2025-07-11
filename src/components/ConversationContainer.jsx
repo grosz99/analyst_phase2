@@ -334,7 +334,9 @@ const ConversationContainer = ({
             
             {isAnalyzing && (
               <div className="message message-loading">
-                <span className="message-icon">🤖</span>
+                <div className="message-icon">
+                  <img src="/logo.svg" alt="Beacon" className="beacon-logo-icon" />
+                </div>
                 <div className="message-content">
                   <div className="loading-indicator">
                     <div className="loading-spinner"></div>

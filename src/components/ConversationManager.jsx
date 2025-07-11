@@ -73,22 +73,6 @@ const ConversationManager = ({
 
   return (
     <div className="conversation-manager">
-      <div className="conversation-header">
-        <div className="header-content">
-          <h2>AI Data Analysis</h2>
-          <p>Ask questions about your data. Each conversation maintains its own context.</p>
-        </div>
-        <button 
-          className="new-conversation-btn"
-          onClick={createNewConversation}
-          disabled={isLoading}
-        >
-          ➕ New Conversation
-        </button>
-      </div>
-
-      {/* Suggested questions are now handled within each conversation container */}
-
       <div className="conversations-container">
         {conversations.length === 0 ? (
           <div className="empty-state">
@@ -110,6 +94,16 @@ const ConversationManager = ({
             />
           ))
         )}
+      </div>
+
+      <div className="new-conversation-section">
+        <button 
+          className="new-conversation-btn"
+          onClick={createNewConversation}
+          disabled={isLoading}
+        >
+          ➕ New Conversation
+        </button>
       </div>
 
     </div>
