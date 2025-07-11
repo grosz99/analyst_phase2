@@ -167,13 +167,6 @@ const AIAnalysisResults = ({
           title: visualization.title || 'Analysis Results',
           filename: filename
         });
-      } else if (format === 'csv') {
-        const chartData = visualization.data.map(item => ({
-          label: item.label || 'Unknown',
-          value: item.value || 0,
-          formatted_value: item.formatted_value || item.value || 0
-        }));
-        exportToCSV(chartData, filename);
       }
     } catch (error) {
       console.error('Chart export error:', error);
@@ -505,17 +498,10 @@ const AIAnalysisResults = ({
           <div className="visualization-actions">
             <button 
               onClick={() => handleChartExport('powerpoint')} 
-              className="export-ppt-btn"
-              disabled={exportLoading}
-            >
-              {exportLoading ? '⏳ Exporting...' : '📊 Download PowerPoint'}
-            </button>
-            <button 
-              onClick={() => handleChartExport('csv')} 
               className="export-btn"
               disabled={exportLoading}
             >
-              {exportLoading ? '⏳ Exporting...' : '📊 Export Chart Data (CSV)'}
+              {exportLoading ? '⏳ Exporting...' : '📊 Download PowerPoint'}
             </button>
           </div>
           <ChartVisualization 
