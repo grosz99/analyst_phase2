@@ -2,6 +2,8 @@ import React, { useState, useRef } from 'react';
 import aiAnalysisService from '../services/aiAnalysisService.js';
 import html2canvas from 'html2canvas';
 import PptxGenJS from 'pptxgenjs';
+import ChartVisualization from './ChartVisualization';
+import { exportToCSV, exportToExcel, exportChartToPowerPoint } from '../services/exportService';
 import './AIAnalysisResults.css';
 
 const AIAnalysisResults = ({ 
@@ -136,13 +138,51 @@ const AIAnalysisResults = ({
       const filename = `analysis_results_${question?.replace(/[^a-zA-Z0-9]/g, '_') || 'data'}_${timestamp}`;
       
       if (format === 'csv') {
-        aiAnalysisService.exportToCSV(results_table.data, filename);
+        exportToCSV(results_table.data, filename);
+      } else if (format === 'excel') {
+        exportToExcel(results_table.data, filename, 'Analysis Results');
       } else if (format === 'json') {
         aiAnalysisService.exportToJSON(results_table.data, filename);
       }
     } catch (error) {
       console.error('Export error:', error);
       alert('Export failed: ' + error.message);
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
+  const handleChartExport = async (format) => {
+    if (!visualization?.data) return;
+    
+    try {
+      setExportLoading(true);
+      const timestamp = new Date().toISOString().split('T')[0];
+      const filename = `chart_${question?.replace(/[^a-zA-Z0-9]/g, '_') || 'visualization'}_${timestamp}`;
+      
+      if (format === 'powerpoint') {
+        const chartData = visualization.data.map(item => ({
+          name: item.label || 'Unknown',
+          value: item.value || 0
+        }));
+        
+        await exportChartToPowerPoint({
+          chartType: 'bar',
+          chartData: chartData,
+          title: visualization.title || 'Analysis Results',
+          filename: filename
+        });
+      } else if (format === 'csv') {
+        const chartData = visualization.data.map(item => ({
+          label: item.label || 'Unknown',
+          value: item.value || 0,
+          formatted_value: item.formatted_value || item.value || 0
+        }));
+        exportToCSV(chartData, filename);
+      }
+    } catch (error) {
+      console.error('Chart export error:', error);
+      alert('Chart export failed: ' + error.message);
     } finally {
       setExportLoading(false);
     }
@@ -357,6 +397,32 @@ const AIAnalysisResults = ({
 
     return (
       <div className="results-table-container">
+        <div className="table-header">
+          <h4>Analysis Results</h4>
+          <div className="export-controls">
+            <button 
+              onClick={() => handleExportResults('csv')} 
+              className="export-btn"
+              disabled={exportLoading}
+            >
+              {exportLoading ? '⏳ Exporting...' : '📊 Download CSV'}
+            </button>
+            <button 
+              onClick={() => handleExportResults('excel')} 
+              className="export-btn"
+              disabled={exportLoading}
+            >
+              {exportLoading ? '⏳ Exporting...' : '📈 Download Excel'}
+            </button>
+            <button 
+              onClick={() => handleExportResults('json')} 
+              className="export-btn"
+              disabled={exportLoading}
+            >
+              {exportLoading ? '⏳ Exporting...' : '📋 Download JSON'}
+            </button>
+          </div>
+        </div>
         <table className="results-table">
           <thead>
             <tr>
@@ -447,45 +513,36 @@ const AIAnalysisResults = ({
       
       console.log('✅ Rendering bar chart with', data.length, 'items, max value:', maxValue);
 
+      // Convert data to format expected by ChartVisualization
+      const chartData = data.map(item => ({
+        name: item.label || 'Unknown',
+        value: item.value || 0
+      }));
+      
       return (
         <div className="chart-container">
           <div className="visualization-actions">
             <button 
-              onClick={exportToPowerPoint} 
+              onClick={() => handleChartExport('powerpoint')} 
               className="export-ppt-btn"
               disabled={exportLoading}
             >
               {exportLoading ? '⏳ Exporting...' : '📊 Download PowerPoint'}
             </button>
+            <button 
+              onClick={() => handleChartExport('csv')} 
+              className="export-btn"
+              disabled={exportLoading}
+            >
+              {exportLoading ? '⏳ Exporting...' : '📊 Export Chart Data (CSV)'}
+            </button>
           </div>
-          <div className="bar-chart" ref={visualizationRef}>
-            {data.map((item, index) => {
-              if (!item || typeof item !== 'object') {
-                console.warn(`⚠️ Invalid item at index ${index}:`, item);
-                return null;
-              }
-              
-              const value = item.value || 0;
-              const label = item.label || `Item ${index + 1}`;
-              const formattedValue = item.formatted_value || value;
-              
-              return (
-                <div key={index} className="bar-item">
-                  <div className="bar-label">{label}</div>
-                  <div className="bar-container">
-                    <div 
-                      className="bar-fill" 
-                      style={{ 
-                        width: `${maxValue > 0 ? (value / maxValue) * 100 : 0}%`,
-                        backgroundColor: `hsl(${200 + (index * 30) % 160}, 70%, 50%)`
-                      }}
-                    ></div>
-                  </div>
-                  <div className="bar-value">{formattedValue}</div>
-                </div>
-              );
-            })}
-          </div>
+          <ChartVisualization 
+            data={chartData}
+            title={title || 'Analysis Results'}
+            chartType="bar"
+            ref={visualizationRef}
+          />
         </div>
       );
     }

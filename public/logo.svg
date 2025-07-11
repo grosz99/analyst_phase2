@@ -1,0 +1,20 @@
+<svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Base circle -->
+  <circle cx="100" cy="100" r="80" fill="#1e7e34" />
+  
+  <!-- Lighthouse body -->
+  <rect x="85" y="60" width="30" height="100" fill="white" />
+  
+  <!-- Lighthouse top -->
+  <polygon points="70,60 130,60 100,30" fill="white" />
+  
+  <!-- Light beams -->
+  <path d="M100 70 L150 40" stroke="white" stroke-width="6" stroke-linecap="round" />
+  <path d="M100 90 L160 70" stroke="white" stroke-width="6" stroke-linecap="round" />
+  <path d="M100 110 L160 100" stroke="white" stroke-width="6" stroke-linecap="round" />
+  
+  <!-- Windows -->
+  <rect x="95" y="80" width="10" height="10" fill="#1e7e34" />
+  <rect x="95" y="100" width="10" height="10" fill="#1e7e34" />
+  <rect x="95" y="120" width="10" height="10" fill="#1e7e34" />
+</svg>
