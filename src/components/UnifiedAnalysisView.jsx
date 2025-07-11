@@ -60,16 +60,37 @@ const DataPreview = ({ previewData, totalRows, onExport }) => {
 };
 
 // Mock regional access permissions for security demonstration
-const UserPermissions = ({ previewData }) => {
+const UserPermissions = ({ previewData, selectedDataSource }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   
-  // Mock regional permissions based on data content
-  const mockRegionalAccess = [
-    { region: 'North America', access: 'Full Access', color: '#16a34a' },
-    { region: 'EMESA', access: 'Read Only', color: '#eab308' },
-    { region: 'Asia Pacific', access: 'Full Access', color: '#16a34a' },
-    { region: 'Europe', access: 'Restricted', color: '#dc2626' }
-  ];
+  // Mock regional permissions based on data source
+  const getAccessibleRegions = () => {
+    // Different regions accessible per data source
+    const dataSourcePermissions = {
+      'ORDERS': [
+        { region: 'North America', access: 'Full Access', color: '#16a34a' },
+        { region: 'Asia Pacific', access: 'Full Access', color: '#16a34a' }
+      ],
+      'CUSTOMERS': [
+        { region: 'North America', access: 'Full Access', color: '#16a34a' },
+        { region: 'EMESA', access: 'Read Only', color: '#eab308' },
+        { region: 'Asia Pacific', access: 'Full Access', color: '#16a34a' }
+      ],
+      'PRODUCTS': [
+        { region: 'North America', access: 'Full Access', color: '#16a34a' }
+      ]
+    };
+    
+    // Default permissions if no specific data source
+    const defaultPermissions = [
+      { region: 'North America', access: 'Full Access', color: '#16a34a' },
+      { region: 'EMESA', access: 'Read Only', color: '#eab308' }
+    ];
+    
+    return dataSourcePermissions[selectedDataSource] || defaultPermissions;
+  };
+
+  const accessibleRegions = getAccessibleRegions();
 
   // Only show if we have data
   if (!previewData || previewData.length === 0) {
@@ -99,14 +120,14 @@ const UserPermissions = ({ previewData }) => {
               fontSize: '14px',
               marginBottom: '8px'
             }}>
-              Based on your security permissions, you have access to the following regions:
+              You have access to the following regions{selectedDataSource ? ` for ${selectedDataSource}` : ''}:
             </p>
             <div style={{ 
               display: 'flex', 
               flexWrap: 'wrap', 
               gap: '8px' 
             }}>
-              {mockRegionalAccess.map((permission, index) => (
+              {accessibleRegions.map((permission, index) => (
                 <div
                   key={index}
                   style={{
@@ -210,7 +231,7 @@ function UnifiedAnalysisView({
 
       <div className="content-area">
         {/* Security Permissions */}
-        <UserPermissions previewData={previewData || initialData} />
+        <UserPermissions previewData={previewData || initialData} selectedDataSource={selectedDataSource} />
         
         {/* Data Preview */}
         <DataPreview 

@@ -529,6 +529,53 @@ const DataSourceDiscovery = ({
 
       {/* Right Panel - Available Fields */}
       <div className="fields-preview-panel">
+        {/* Security Permissions Section */}
+        {selectedDataSource && (
+          <div className="security-permissions-section">
+            <div className="security-header">
+              <h4>🔒 Your Regional Access</h4>
+            </div>
+            <div className="permissions-content">
+              <p className="permissions-description">
+                Regions you have access to for {selectedDataSource}:
+              </p>
+              <div className="permissions-badges">
+                {(() => {
+                  // Define data source specific permissions
+                  const dataSourcePermissions = {
+                    'ORDERS': [
+                      { region: 'North America', access: 'Full Access', className: 'full-access' },
+                      { region: 'Asia Pacific', access: 'Full Access', className: 'full-access' }
+                    ],
+                    'CUSTOMERS': [
+                      { region: 'North America', access: 'Full Access', className: 'full-access' },
+                      { region: 'EMESA', access: 'Read Only', className: 'read-only' },
+                      { region: 'Asia Pacific', access: 'Full Access', className: 'full-access' }
+                    ],
+                    'PRODUCTS': [
+                      { region: 'North America', access: 'Full Access', className: 'full-access' }
+                    ]
+                  };
+                  
+                  const permissions = dataSourcePermissions[selectedDataSource] || [
+                    { region: 'North America', access: 'Full Access', className: 'full-access' },
+                    { region: 'EMESA', access: 'Read Only', className: 'read-only' }
+                  ];
+                  
+                  return permissions.map((perm, index) => (
+                    <span key={index} className={`permission-badge ${perm.className}`}>
+                      ✓ {perm.region} ({perm.access})
+                    </span>
+                  ));
+                })()}
+              </div>
+              <p className="permissions-note">
+                Last updated: {new Date().toLocaleDateString()}
+              </p>
+            </div>
+          </div>
+        )}
+        
         <div className="fields-header">
           <h3>Data Fields</h3>
           {selectedDataSource && (
