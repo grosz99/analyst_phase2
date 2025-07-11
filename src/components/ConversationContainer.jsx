@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import AIAnalysisResults from './AIAnalysisResults.jsx';
+import SavedQueries from './SavedQueries.jsx';
+import SaveQueryButton from './SaveQueryButton.jsx';
 import './ConversationContainer.css';
 
 const ConversationContainer = ({ 
@@ -17,6 +19,7 @@ const ConversationContainer = ({
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [suggestedQuestions, setSuggestedQuestions] = useState([]);
+  const [showSavedQueries, setShowSavedQueries] = useState(false);
   const containerRef = useRef(null);
   const inputRef = useRef(null);
   
@@ -206,6 +209,15 @@ const ConversationContainer = ({
     }
   };
 
+  const handleSelectSavedQuery = (savedQuery) => {
+    console.log('💾 Saved query selected:', savedQuery);
+    setCurrentQuestion(savedQuery.question);
+    setShowSavedQueries(false);
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  };
+
   const getConversationTitle = () => {
     if (messages.length === 0) return 'New Conversation';
     const firstUserMessage = messages.find(m => m.type === 'user');
@@ -318,6 +330,16 @@ const ConversationContainer = ({
                         selectedBackend="anthropic"
                         sessionId={sessionId}
                       />
+                      {/* Save Query Button */}
+                      {message.result?.success && (
+                        <div style={{ marginTop: '12px', textAlign: 'right' }}>
+                          <SaveQueryButton
+                            question={message.question}
+                            results={message.result}
+                            dataSource="ORDERS"
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -349,6 +371,15 @@ const ConversationContainer = ({
 
           <form className="conversation-input-form" onSubmit={handleSubmit}>
             <div className="input-wrapper">
+              <button 
+                type="button"
+                className="saved-queries-button"
+                onClick={() => setShowSavedQueries(true)}
+                disabled={isAnalyzing}
+                title="Browse saved queries"
+              >
+                📚
+              </button>
               <textarea
                 ref={inputRef}
                 value={currentQuestion}
@@ -369,6 +400,14 @@ const ConversationContainer = ({
             </div>
           </form>
         </>
+      )}
+      
+      {/* Saved Queries Modal */}
+      {showSavedQueries && (
+        <SavedQueries
+          onSelectQuery={handleSelectSavedQuery}
+          onClose={() => setShowSavedQueries(false)}
+        />
       )}
     </div>
   );
