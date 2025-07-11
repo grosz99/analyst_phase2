@@ -59,111 +59,6 @@ const DataPreview = ({ previewData, totalRows, onExport }) => {
   );
 };
 
-// Mock regional access permissions for security demonstration
-const UserPermissions = ({ previewData, selectedDataSource }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-  
-  // Mock regional permissions based on data source
-  const getAccessibleRegions = () => {
-    // Different regions accessible per data source
-    const dataSourcePermissions = {
-      'ORDERS': [
-        { region: 'North America', access: 'Full Access', color: '#16a34a' },
-        { region: 'Asia Pacific', access: 'Full Access', color: '#16a34a' }
-      ],
-      'CUSTOMERS': [
-        { region: 'North America', access: 'Full Access', color: '#16a34a' },
-        { region: 'EMESA', access: 'Read Only', color: '#eab308' },
-        { region: 'Asia Pacific', access: 'Full Access', color: '#16a34a' }
-      ],
-      'PRODUCTS': [
-        { region: 'North America', access: 'Full Access', color: '#16a34a' }
-      ]
-    };
-    
-    // Default permissions if no specific data source
-    const defaultPermissions = [
-      { region: 'North America', access: 'Full Access', color: '#16a34a' },
-      { region: 'EMESA', access: 'Read Only', color: '#eab308' }
-    ];
-    
-    return dataSourcePermissions[selectedDataSource] || defaultPermissions;
-  };
-
-  const accessibleRegions = getAccessibleRegions();
-
-  // Only show if we have data
-  if (!previewData || previewData.length === 0) {
-    return null;
-  }
-
-  return (
-    <div className="data-preview-container" style={{ marginBottom: '16px' }}>
-      <button 
-        className="preview-toggle"
-        onClick={() => setIsExpanded(!isExpanded)}
-        style={{ background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)', borderColor: '#0ea5e9' }}
-      >
-        🔒 Your Regional Access Permissions {isExpanded ? '▼' : '▶'}
-      </button>
-      {isExpanded && (
-        <div className="preview-content">
-          <div style={{ 
-            display: 'flex', 
-            flexDirection: 'column', 
-            gap: '12px',
-            padding: '8px 0'
-          }}>
-            <p style={{ 
-              margin: 0, 
-              color: '#64748b', 
-              fontSize: '14px',
-              marginBottom: '8px'
-            }}>
-              You have access to the following regions{selectedDataSource ? ` for ${selectedDataSource}` : ''}:
-            </p>
-            <div style={{ 
-              display: 'flex', 
-              flexWrap: 'wrap', 
-              gap: '8px' 
-            }}>
-              {accessibleRegions.map((permission, index) => (
-                <div
-                  key={index}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '6px 12px',
-                    backgroundColor: permission.color + '20',
-                    color: permission.color,
-                    border: `1px solid ${permission.color}40`,
-                    borderRadius: '16px',
-                    fontSize: '13px',
-                    fontWeight: '500'
-                  }}
-                >
-                  <span style={{ fontSize: '12px' }}>✓</span>
-                  {permission.region} ({permission.access})
-                </div>
-              ))}
-            </div>
-            <p style={{ 
-              margin: 0, 
-              color: '#9ca3af', 
-              fontSize: '12px',
-              fontStyle: 'italic',
-              marginTop: '8px'
-            }}>
-              Last updated: {new Date().toLocaleDateString()} • Contact security team to modify access
-            </p>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
 function UnifiedAnalysisView({ 
   initialData, 
   cachedDataset, 
@@ -230,9 +125,6 @@ function UnifiedAnalysisView({
       </div>
 
       <div className="content-area">
-        {/* Security Permissions */}
-        <UserPermissions previewData={previewData || initialData} selectedDataSource={selectedDataSource} />
-        
         {/* Data Preview */}
         <DataPreview 
           previewData={previewData || initialData?.slice(0, 5)} 

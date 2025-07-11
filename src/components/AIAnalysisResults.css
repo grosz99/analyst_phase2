@@ -1,8 +1,8 @@
 /* Analysis Results Container */
 .analysis-results-container {
-  max-width: 1400px;
+  max-width: 100%;
   margin: 0 auto;
-  padding: 0;
+  padding: 0 20px;
   background: transparent;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
   animation: fadeInUp 0.6s ease-out;
@@ -206,10 +206,11 @@
 .current-result {
   background: white;
   border-radius: 12px;
-  padding: 2rem;
+  padding: 2rem 3rem;
   margin-bottom: 2rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   border: 1px solid #e5e7eb;
+  width: 100%;
 }
 
 .analysis-question {

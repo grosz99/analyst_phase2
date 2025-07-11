@@ -1,7 +1,7 @@
 .conversation-manager {
-  max-width: 1400px;
+  max-width: 1800px;
   margin: 0 auto;
-  padding: 24px;
+  padding: 24px 48px;
   background: linear-gradient(135deg, #f8fffe 0%, #f0fdf4 100%);
   min-height: 100vh;
 }
