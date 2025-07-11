@@ -20,7 +20,7 @@
 .panel-header {
   padding: 20px;
   border-bottom: 1px solid #e0e0e0;
-  background: #f8f9fa;
+  background: var(--gray-neutral);
 }
 
 .panel-header h3 {
@@ -55,14 +55,14 @@
 }
 
 .mode-option:hover {
-  border-color: #007bff;
-  background: #f8f9fa;
+  border-color: var(--primary-color);
+  background: rgba(24, 121, 85, 0.08);
 }
 
 .mode-option.selected {
-  border-color: #007bff;
-  background: #e7f3ff;
-  color: #0056b3;
+  border-color: var(--primary-color);
+  background: var(--background-light);
+  color: var(--primary-dark);
 }
 
 .mode-option input[type="radio"] {
@@ -123,7 +123,7 @@
 }
 
 .message.user .message-content {
-  background: #007bff;
+  background: var(--primary-color);
   color: white;
 }
 
@@ -187,13 +187,13 @@
 }
 
 .source-button:hover {
-  background: #f8f9fa;
-  border-color: #007bff;
+  background: rgba(24, 121, 85, 0.08);
+  border-color: var(--primary-color);
 }
 
 .source-button.selected {
-  background: #e7f3ff;
-  border-color: #007bff;
+  background: var(--background-light);
+  border-color: var(--primary-color);
 }
 
 .source-button.high {
@@ -281,7 +281,7 @@
 }
 
 .chat-input:focus {
-  border-color: #007bff;
+  border-color: var(--primary-color);
 }
 
 .chat-input:disabled {
@@ -294,7 +294,7 @@
   height: 40px;
   border-radius: 50%;
   border: none;
-  background: #007bff;
+  background: var(--primary-color);
   color: white;
   display: flex;
   align-items: center;
@@ -304,7 +304,7 @@
 }
 
 .send-button:hover:not(:disabled) {
-  background: #0056b3;
+  background: var(--primary-dark);
   transform: scale(1.05);
 }
 
@@ -362,13 +362,13 @@
 }
 
 .source-list-item:hover {
-  background: #f8f9fa;
-  border-color: #007bff;
+  background: rgba(24, 121, 85, 0.08);
+  border-color: var(--primary-color);
 }
 
 .source-list-item.selected {
-  background: #e7f3ff;
-  border-color: #007bff;
+  background: var(--background-light);
+  border-color: var(--primary-color);
 }
 
 .source-details {
@@ -421,8 +421,8 @@
   align-items: center;
   gap: 8px;
   padding: 6px 12px;
-  background: #e7f3ff;
-  color: #007bff;
+  background: var(--background-light);
+  color: var(--primary-color);
   border-radius: 16px;
   font-size: 14px;
   font-weight: 500;
@@ -452,10 +452,10 @@
 }
 
 .field-card:hover {
-  border-color: #007bff;
+  border-color: var(--primary-color);
   background: #fff;
   transform: translateY(-2px);
-  box-shadow: 0 2px 8px rgba(0, 123, 255, 0.1);
+  box-shadow: 0 2px 8px rgba(24, 121, 85, 0.1);
 }
 
 .field-name {

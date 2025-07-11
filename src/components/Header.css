@@ -1,9 +1,8 @@
 .app-header {
   padding: 1rem 0;
-  background-color: #1e8449; /* Beacon green */
+  background-color: var(--primary-color);
   color: white;
-
-
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .header-content {
@@ -15,10 +14,22 @@
   justify-content: space-between;
 }
 
+.logo-container {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.bcg-logo {
+  height: 60px;
+  width: auto;
+}
+
 .logo-text {
   font-size: 2rem;
   font-weight: bold;
-  /* In a real app, you'd use a specific font */
+  margin: 0;
+  letter-spacing: -0.02em;
 }
 
 .step-indicator-container {
@@ -54,7 +65,7 @@
 
 .step.active .step-number {
   background-color: white;
-  color: #1e8449;
+  color: var(--primary-color);
 }
 
 .step-name {

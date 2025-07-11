@@ -17,7 +17,10 @@ const Header = ({ currentStep }) => {
   return (
     <header className="app-header">
       <div className="header-content">
-        <h1 className="logo-text">Beacon</h1>
+        <div className="logo-container">
+          <img src="/bcg-logo.svg" alt="BCG" className="bcg-logo" />
+          <h1 className="logo-text">Beacon</h1>
+        </div>
         <div className="step-indicator-container">
           {steps.map((step, index) => (
             <React.Fragment key={step.id}>

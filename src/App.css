@@ -1,13 +1,13 @@
 /* Main App Styles */
 
-/* Using a more modern, clean font stack */
+/* Using Beacon's font stack */
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+  font-family: 'Segoe UI', 'Arial', 'Helvetica Neue', -apple-system, BlinkMacSystemFont,
+    'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans',
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #f8f9fa; /* A very light grey background */
+  background-color: var(--gray-light);
 }
 
 /* Main container for each step's content */
@@ -43,7 +43,7 @@ body {
 
 .btn:focus {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(30, 132, 73, 0.3);
+  box-shadow: 0 0 0 3px rgba(24, 121, 85, 0.3);
 }
 
 .btn:disabled {
@@ -52,25 +52,28 @@ body {
 }
 
 .btn-primary {
-  background-color: #1e8449; /* Beacon Green */
+  background-color: var(--primary-color);
   color: #fff;
-  border-color: #1e8449;
+  border-color: var(--primary-color);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background-color: #196f3d;
-  border-color: #196f3d;
+  background-color: var(--primary-dark);
+  border-color: var(--primary-dark);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(24, 121, 85, 0.2);
 }
 
 .btn-secondary {
   background-color: #fff;
-  color: #495057;
+  color: var(--secondary-color);
   border-color: #ced4da;
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background-color: #f8f9fa;
+  background-color: var(--gray-neutral);
   border-color: #adb5bd;
+  color: var(--primary-color);
 }
 
 /* Navigation container */
