@@ -76,36 +76,6 @@ class AIAnalysisService {
     }
   }
 
-  // Get available backends
-  async getAvailableBackends() {
-    try {
-      const response = await fetch(`${this.baseURL}/api/ai/backends`);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      const result = await response.json();
-      
-      if (result.success) {
-        return result.backends;
-      } else {
-        throw new Error(result.error || 'Failed to fetch available backends');
-      }
-    } catch (error) {
-      console.error('Failed to get available backends:', error);
-      // Return fallback backends
-      return [
-        {
-          id: 'anthropic',
-          name: 'Anthropic Claude',
-          description: 'Advanced AI analysis with custom pandas execution',
-          features: ['Natural language understanding', 'Python code generation'],
-          status: 'available'
-        }
-      ];
-    }
-  }
 
   // Main AI analysis method
   async analyzeData(data, question = '', analysisType = 'general', sessionId = null, backend = 'anthropic', contextPrompt = null) {
@@ -121,7 +91,7 @@ class AIAnalysisService {
         analysisType: analysisType,
         userContext: question || `Perform ${analysisType} analysis on this business data`,
         sessionId: sessionId || `session-${Date.now()}`,
-        backend: backend,
+        backend: 'anthropic',
         contextPrompt: contextPrompt // Add context prompt to payload
       };
 

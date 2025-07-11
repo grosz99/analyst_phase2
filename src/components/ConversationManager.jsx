@@ -6,8 +6,7 @@ import './ConversationManager.css';
 const ConversationManager = ({ 
   initialData, 
   cachedDataset, 
-  sessionId, 
-  selectedBackend = 'anthropic',
+  sessionId,
   datasetInfo,
   selectedFilters
 }) => {
@@ -104,7 +103,6 @@ const ConversationManager = ({
               initialData={initialData}
               cachedDataset={cachedDataset}
               sessionId={sessionId}
-              selectedBackend={selectedBackend}
               aiAnalysisService={aiAnalysisService}
               onClose={closeConversation}
               isActive={activeConversationId === conversation.id}

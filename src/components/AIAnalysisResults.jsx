@@ -14,7 +14,6 @@ const AIAnalysisResults = ({
   isLoading = false,
   showCompactInput = true,
   showContextControl = false,
-  selectedBackend = 'anthropic',
   sessionId = null
 }) => {
   const [activeTab, setActiveTab] = useState('results');
@@ -638,7 +637,7 @@ const AIAnalysisResults = ({
         compactQuestion,
         'general',
         sessionId,
-        selectedBackend
+        'anthropic'
       );
       
       if (result.success) {
@@ -668,7 +667,7 @@ const AIAnalysisResults = ({
         suggestion,
         'general',
         sessionId,
-        selectedBackend
+        'anthropic'
       );
       
       if (result.success) {
@@ -734,11 +733,6 @@ const AIAnalysisResults = ({
       <div className="current-result">
         <div className="analysis-question">
           <h2>{question}</h2>
-          <div className="backend-indicator">
-            <span className={`backend-badge ${selectedBackend}`}>
-              {selectedBackend === 'cortex_analyst' ? '🧠 Cortex Analyst' : '🤖 Anthropic Claude'}
-            </span>
-          </div>
         </div>
 
         {/* AI Response */}

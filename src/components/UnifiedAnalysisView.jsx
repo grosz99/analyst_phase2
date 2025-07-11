@@ -70,9 +70,6 @@ function UnifiedAnalysisView({
   selectedDataSource, 
   onReset 
 }) {
-  // Backend selection state
-  const [selectedBackend, setSelectedBackend] = useState('anthropic');
-  const [availableBackends, setAvailableBackends] = useState([]);
   const [aiServiceStatus, setAiServiceStatus] = useState(null);
   
   // Initialize AI service
@@ -82,30 +79,8 @@ function UnifiedAnalysisView({
         // Check AI service status
         const status = await aiAnalysisService.getStatus();
         setAiServiceStatus(status);
-        
-        // Load available backends
-        const backends = await aiAnalysisService.getAvailableBackends();
-        setAvailableBackends(backends);
-        
       } catch (error) {
         console.error('Failed to initialize AI service:', error);
-        // Set fallback backends so user can still select
-        setAvailableBackends([
-          {
-            id: 'anthropic',
-            name: 'Anthropic Claude',
-            description: 'Advanced AI analysis with custom pandas execution',
-            features: ['Natural language understanding', 'Python code generation'],
-            status: 'available'
-          },
-          {
-            id: 'cortex_analyst',
-            name: 'Snowflake Cortex Analyst',
-            description: 'Native Snowflake AI analyst with semantic model understanding',
-            features: ['SQL generation', 'Semantic model integration'],
-            status: 'available'
-          }
-        ]);
       }
     };
 
@@ -157,45 +132,12 @@ function UnifiedAnalysisView({
           onExport={handleExportData} 
         />
 
-        {/* Backend Selection */}
-        {availableBackends.length > 0 && (
-          <div className="backend-selector">
-            <div className="selector-header">
-              <h4>🤖 Choose AI Backend</h4>
-              <p>Select the AI engine for your data analysis</p>
-            </div>
-            <div className="backend-options">
-              {availableBackends.map((backend) => (
-                <div
-                  key={backend.id}
-                  className={`backend-option ${selectedBackend === backend.id ? 'selected' : ''} ${backend.status !== 'available' ? 'disabled' : ''}`}
-                  onClick={() => backend.status === 'available' && setSelectedBackend(backend.id)}
-                >
-                  <div className="backend-info">
-                    <div className="backend-name">
-                      {backend.name}
-                      {backend.status !== 'available' && <span className="status-badge unavailable">Unavailable</span>}
-                      {selectedBackend === backend.id && <span className="status-badge selected">Selected</span>}
-                    </div>
-                    <div className="backend-description">{backend.description}</div>
-                    <div className="backend-features">
-                      {backend.features.slice(0, 2).map((feature, idx) => (
-                        <span key={idx} className="feature-tag">{feature}</span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Conversation Manager - New unified interface */}
         <ConversationManager
           initialData={initialData}
           cachedDataset={cachedDataset}
           sessionId={sessionId}
-          selectedBackend={selectedBackend}
           datasetInfo={datasetInfo}
           selectedFilters={selectedFilters}
         />

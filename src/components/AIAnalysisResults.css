@@ -96,33 +96,6 @@
   justify-content: flex-end;
 }
 
-/* Backend Indicator */
-.backend-indicator {
-  margin-top: 0.5rem;
-}
-
-.backend-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.25rem 0.75rem;
-  border-radius: 12px;
-  font-size: 0.75rem;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.backend-badge.anthropic {
-  background: #e0f2fe;
-  color: #0277bd;
-  border: 1px solid #b3e5fc;
-}
-
-.backend-badge.cortex_analyst {
-  background: #f3e8ff;
-  color: #7c3aed;
-  border: 1px solid #ddd6fe;
-}
 
 /* Error and Debug Styles */
 .ai-analysis-error {

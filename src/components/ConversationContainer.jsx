@@ -7,7 +7,6 @@ const ConversationContainer = ({
   initialData,
   cachedDataset,
   sessionId,
-  selectedBackend,
   aiAnalysisService,
   onClose,
   isActive,
@@ -28,7 +27,6 @@ const ConversationContainer = ({
     hasCachedDataset: !!cachedDataset,
     cachedDatasetRows: cachedDataset?.length,
     sessionId,
-    selectedBackend,
     hasAiAnalysisService: !!aiAnalysisService,
     isActive,
     messagesCount: messages?.length || 0
@@ -139,7 +137,7 @@ const ConversationContainer = ({
         question,
         'general',
         sessionId,
-        selectedBackend,
+        'anthropic',
         contextPrompt
       );
       
@@ -304,7 +302,6 @@ const ConversationContainer = ({
                           resultKeys: Object.keys(message.result || {}),
                           hasOriginalData: !!initialData,
                           originalDataRows: initialData?.length,
-                          selectedBackend,
                           sessionId
                         });
                         return null;
@@ -316,7 +313,7 @@ const ConversationContainer = ({
                         isLoading={false}
                         showCompactInput={false}
                         showContextControl={false}
-                        selectedBackend={selectedBackend}
+                        selectedBackend="anthropic"
                         sessionId={sessionId}
                       />
                     </div>
