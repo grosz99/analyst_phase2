@@ -3,7 +3,7 @@ import aiAnalysisService from '../services/aiAnalysisService.js';
 import html2canvas from 'html2canvas';
 import PptxGenJS from 'pptxgenjs';
 import ChartVisualization from './ChartVisualization';
-import { exportToCSV, exportToExcel, exportChartToPowerPoint } from '../services/exportService';
+import { exportToCSV, exportChartToPowerPoint } from '../services/exportService';
 import './AIAnalysisResults.css';
 
 const AIAnalysisResults = ({ 
@@ -138,10 +138,6 @@ const AIAnalysisResults = ({
       
       if (format === 'csv') {
         exportToCSV(results_table.data, filename);
-      } else if (format === 'excel') {
-        exportToExcel(results_table.data, filename, 'Analysis Results');
-      } else if (format === 'json') {
-        aiAnalysisService.exportToJSON(results_table.data, filename);
       }
     } catch (error) {
       console.error('Export error:', error);
@@ -405,20 +401,6 @@ const AIAnalysisResults = ({
               disabled={exportLoading}
             >
               {exportLoading ? '⏳ Exporting...' : '📊 Download CSV'}
-            </button>
-            <button 
-              onClick={() => handleExportResults('excel')} 
-              className="export-btn"
-              disabled={exportLoading}
-            >
-              {exportLoading ? '⏳ Exporting...' : '📈 Download Excel'}
-            </button>
-            <button 
-              onClick={() => handleExportResults('json')} 
-              className="export-btn"
-              disabled={exportLoading}
-            >
-              {exportLoading ? '⏳ Exporting...' : '📋 Download JSON'}
             </button>
           </div>
         </div>

@@ -290,7 +290,9 @@ const ConversationContainer = ({
                   {message.type === 'assistant' && (
                     <div className="assistant-message">
                       <div className="question-number-badge">#{questionNumber}</div>
-                      <span className="message-icon">🤖</span>
+                      <div className="message-icon">
+                        <img src="/logo.svg" alt="Beacon" className="beacon-logo-icon" />
+                      </div>
                     <div className="message-content">
                       {/* Debug logging for props being passed to AIAnalysisResults */}
                       {(() => {
