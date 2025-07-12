@@ -9,6 +9,7 @@
   transition: all 0.3s ease;
   box-shadow: 0 4px 12px rgba(24, 121, 85, 0.08);
   width: 100%;
+  max-width: none;
 }
 
 .conversation-container.active {

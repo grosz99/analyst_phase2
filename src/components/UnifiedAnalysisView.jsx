@@ -34,7 +34,7 @@ const DataPreview = ({ previewData, totalRows, onExport }) => {
           className="preview-toggle"
           onClick={() => setIsExpanded(!isExpanded)}
         >
-          🚀 Ready to Analyze Your Data {isExpanded ? '▼' : '▶'}
+          📊 Data Preview {isExpanded ? '▼' : '▶'}
         </button>
         {isExpanded && (
           <div className="preview-actions">
@@ -110,6 +110,12 @@ function UnifiedAnalysisView({
     <div className="unified-analysis-view">
 
       <div className="content-area">
+        {/* Data Section Header */}
+        <div className="data-section-header">
+          <h2>🚀 Ready to Analyze Your Data</h2>
+          <p>Your data is loaded and ready for AI-powered analysis</p>
+        </div>
+        
         {/* Data Preview */}
         <DataPreview 
           previewData={previewData || initialData?.slice(0, 5)} 
