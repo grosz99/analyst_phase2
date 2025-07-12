@@ -14,7 +14,8 @@ const AIAnalysisResults = ({
   isLoading = false,
   showCompactInput = true,
   showContextControl = false,
-  sessionId = null
+  sessionId = null,
+  selectedDataSource = null
 }) => {
   const [activeTab, setActiveTab] = useState('results');
   const [exportLoading, setExportLoading] = useState(false);
@@ -600,12 +601,17 @@ const AIAnalysisResults = ({
     
     setCompactAnalyzing(true);
     try {
+      // Get dataset ID for specialized AI context
+      const datasetId = selectedDataSource?.toLowerCase() || null;
+      
       const result = await aiAnalysisService.analyzeData(
         originalData,
         compactQuestion,
         'general',
         sessionId,
-        'anthropic'
+        'anthropic',
+        null, // no context prompt for follow-up questions
+        datasetId
       );
       
       if (result.success) {

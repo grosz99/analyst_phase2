@@ -8,7 +8,8 @@ const ConversationManager = ({
   cachedDataset, 
   sessionId,
   datasetInfo,
-  selectedFilters
+  selectedFilters,
+  selectedDataSource
 }) => {
   const [conversations, setConversations] = useState([]);
   const [activeConversationId, setActiveConversationId] = useState(null);
@@ -91,6 +92,7 @@ const ConversationManager = ({
               onClose={closeConversation}
               isActive={activeConversationId === conversation.id}
               onActivate={setActiveConversationId}
+              selectedDataSource={selectedDataSource}
             />
           ))
         )}

@@ -12,7 +12,8 @@ const ConversationContainer = ({
   aiAnalysisService,
   onClose,
   isActive,
-  onActivate
+  onActivate,
+  selectedDataSource
 }) => {
   const [messages, setMessages] = useState([]);
   const [currentQuestion, setCurrentQuestion] = useState('');
@@ -138,13 +139,17 @@ const ConversationContainer = ({
         
       console.log('🎯 Context prompt:', contextPrompt ? contextPrompt.substring(0, 200) + '...' : 'No context');
 
+      // Get dataset ID for specialized AI context
+      const datasetId = selectedDataSource?.toLowerCase() || null;
+      
       const result = await aiAnalysisService.analyzeData(
         dataToAnalyze,
         question,
         'general',
         sessionId,
         'anthropic',
-        contextPrompt
+        contextPrompt,
+        datasetId
       );
       
       console.log('📊 Analysis result received:', {
@@ -351,6 +356,7 @@ const ConversationContainer = ({
                         showContextControl={false}
                         selectedBackend="anthropic"
                         sessionId={sessionId}
+                        selectedDataSource={selectedDataSource}
                       />
                       {/* Save Query Button */}
                       {message.result?.success && (

@@ -131,6 +131,7 @@ function UnifiedAnalysisView({
           sessionId={sessionId}
           datasetInfo={datasetInfo}
           selectedFilters={selectedFilters}
+          selectedDataSource={selectedDataSource}
         />
 
         {/* Service Unavailable Message */}

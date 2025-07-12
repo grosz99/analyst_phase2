@@ -77,8 +77,8 @@ class AIAnalysisService {
   }
 
 
-  // Main AI analysis method
-  async analyzeData(data, question = '', analysisType = 'general', sessionId = null, backend = 'anthropic', contextPrompt = null) {
+  // Main AI analysis method with dataset-specific context
+  async analyzeData(data, question = '', analysisType = 'general', sessionId = null, backend = 'anthropic', contextPrompt = null, datasetId = null) {
     try {
       console.log(`🤖 Starting AI analysis: ${question || analysisType}`);
       console.log(`📊 Data: ${data.length} rows`);
@@ -86,13 +86,18 @@ class AIAnalysisService {
         console.log(`📝 Context mode active:`, contextPrompt.split('\n')[0]);
       }
       
+      // Generate dataset-specific context if datasetId is provided
+      const datasetContext = this.getDatasetSpecificContext(datasetId, data);
+      const enhancedContextPrompt = contextPrompt || datasetContext;
+      
       const payload = {
         data: data,
         analysisType: analysisType,
         userContext: question || `Perform ${analysisType} analysis on this business data`,
         sessionId: sessionId || `session-${Date.now()}`,
         backend: 'anthropic',
-        contextPrompt: contextPrompt // Add context prompt to payload
+        contextPrompt: enhancedContextPrompt,
+        datasetId: datasetId // Include dataset ID for specialized handling
       };
 
       const response = await fetch(`${this.baseURL}/api/ai/analyze`, {
@@ -441,6 +446,135 @@ class AIAnalysisService {
         keyFeatures: ['General data fields']
       };
     }
+  }
+
+  // Generate dataset-specific AI context for better analysis consistency
+  getDatasetSpecificContext(datasetId, data) {
+    if (!datasetId || !data || data.length === 0) {
+      return null;
+    }
+
+    const datasetContexts = {
+      'attendance': {
+        name: 'Office Attendance Data',
+        description: 'Global office attendance tracking with headcount, presence rates, and organizational cohorts',
+        keyMetrics: ['headcount', 'people_attended', 'attendance_rate', 'absence_count'],
+        keyDimensions: ['office', 'date', 'cohort', 'org'],
+        analysisGuidance: `
+ATTENDANCE DATA ANALYSIS INSTRUCTIONS:
+- This dataset tracks office attendance across global locations
+- Key metrics: headcount (total capacity), people_attended (actual attendance), attendance_rate (percentage)
+- Key dimensions: office (location), date (time period), cohort (org group), org (organization)
+- When analyzing "top offices", rank by total attendance, attendance_rate, or utilization
+- Always include attendance_rate calculations when comparing offices
+- Focus on trends over time, utilization patterns, and cohort differences
+- Ensure numeric aggregations use actual attendance values, not zeros
+        `
+      },
+      'ncc': {
+        name: 'Net Cash Contribution (NCC) Financial Data',
+        description: 'Project profitability tracking showing financial performance by office, region, sector, and client',
+        keyMetrics: ['timesheet_charges', 'adjustments', 'ncc', 'adjustment_rate'],
+        keyDimensions: ['office', 'region', 'sector', 'month', 'client', 'project_id', 'year'],
+        analysisGuidance: `
+NCC FINANCIAL DATA ANALYSIS INSTRUCTIONS:
+- This dataset tracks Net Cash Contribution (profitability) for projects
+- Key metrics: timesheet_charges (billable hours), adjustments (corrections), ncc (net profit), adjustment_rate
+- Key dimensions: office (location), region (geographic area), sector (industry), client, project_id
+- When analyzing "top offices", rank by total NCC (net cash contribution) values
+- NCC = timesheet_charges + adjustments (can be positive or negative)
+- Focus on profitability trends, sector performance, regional differences
+- Always aggregate NCC values properly - sum timesheet_charges and adjustments
+- Include adjustment_rate analysis to show billing accuracy
+        `
+      },
+      'pipeline': {
+        name: 'Sales Pipeline Data',
+        description: 'Sales opportunities tracking deal stages, potential values, and expected close dates',
+        keyMetrics: ['potential_value_usd', 'days_to_close', 'value_millions'],
+        keyDimensions: ['company', 'stage', 'sector', 'region', 'close_quarter', 'close_year'],
+        analysisGuidance: `
+SALES PIPELINE DATA ANALYSIS INSTRUCTIONS:
+- This dataset tracks sales opportunities and deal progression
+- Key metrics: potential_value_usd (deal value), days_to_close (timeline), value_millions (value in millions)
+- Key dimensions: company (prospect), stage (deal phase), sector (industry), region
+- When analyzing pipeline, focus on total potential value, stage distribution, close timelines
+- Aggregate potential_value_usd to show total pipeline value
+- Analyze conversion rates between stages
+- Include time-based analysis using close_quarter and close_year
+- Focus on regional performance and sector trends
+        `
+      }
+    };
+
+    const context = datasetContexts[datasetId.toLowerCase()];
+    if (!context) {
+      return null;
+    }
+
+    // Add data structure validation
+    const actualColumns = Object.keys(data[0] || {});
+    const sampleRow = data[0] || {};
+    
+    return `
+${context.analysisGuidance}
+
+ACTUAL DATA STRUCTURE:
+- Dataset: ${context.name}
+- Columns available: ${actualColumns.join(', ')}
+- Sample values: ${JSON.stringify(sampleRow, null, 2)}
+- Row count: ${data.length}
+
+ANALYSIS REQUIREMENTS:
+1. Use only the actual column names listed above
+2. For numeric aggregations, ensure you're using the correct column names
+3. Validate that results are non-zero when data exists
+4. Include data validation in your analysis
+5. If results seem incorrect (like all zeros), double-check column names and data types
+    `;
+  }
+
+  // Validate analysis results for consistency
+  validateAnalysisResults(results, datasetId, originalData) {
+    if (!results || !results.results_table || !originalData) {
+      return { valid: true, warnings: [] };
+    }
+
+    const warnings = [];
+    const validation = { valid: true, warnings };
+
+    try {
+      // Check for suspicious zero values in key metrics
+      if (datasetId === 'ncc') {
+        const hasNccData = originalData.some(row => 
+          (row.ncc && row.ncc !== 0) || 
+          (row.timesheet_charges && row.timesheet_charges !== 0) ||
+          (row.NCC && row.NCC !== 0) ||
+          (row.TIMESHEET_CHARGES && row.TIMESHEET_CHARGES !== 0)
+        );
+        
+        if (hasNccData && results.results_table.every(row => 
+          Object.values(row).every(val => val === 0 || val === '0')
+        )) {
+          warnings.push('NCC analysis returned all zeros but source data has non-zero values. Check column name mapping.');
+          validation.valid = false;
+        }
+      }
+
+      // Check if analysis used correct column names
+      const actualColumns = Object.keys(originalData[0] || {});
+      const resultColumns = Object.keys(results.results_table[0] || {});
+      
+      if (resultColumns.length === 0) {
+        warnings.push('Analysis returned no result columns.');
+        validation.valid = false;
+      }
+
+    } catch (error) {
+      warnings.push(`Validation error: ${error.message}`);
+    }
+
+    return validation;
   }
 
   // Download file helper
