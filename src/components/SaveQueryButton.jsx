@@ -18,6 +18,9 @@ const SaveQueryButton = ({ question, results, dataSource, autoOpen = false, onCl
       tags: tags.split(',').map(t => t.trim()).filter(t => t),
       results: results ? {
         summary: results.analysis,
+        pythonCode: results.python_code,
+        resultsTable: results.results_table,
+        visualization: results.visualization,
         hasTable: !!results.results_table,
         hasVisualization: !!results.visualization,
         timestamp: new Date().toISOString()

@@ -194,6 +194,31 @@ const SavedQueries = ({ onSelectQuery, onClose }) => {
                   <p className="query-description">{query.description}</p>
                 )}
                 
+                {/* Show saved analysis preview if available */}
+                {query.results && (
+                  <div className="query-results-preview">
+                    <div className="results-indicators">
+                      {query.results.hasTable && (
+                        <span className="result-badge">📊 Data Table</span>
+                      )}
+                      {query.results.hasVisualization && (
+                        <span className="result-badge">📈 Chart</span>
+                      )}
+                      {query.results.pythonCode && (
+                        <span className="result-badge">🐍 Python Code</span>
+                      )}
+                    </div>
+                    {query.results.pythonCode && (
+                      <div className="python-code-preview">
+                        <pre className="code-snippet">
+                          {query.results.pythonCode.split('\n').slice(0, 3).join('\n')}
+                          {query.results.pythonCode.split('\n').length > 3 && '\n...'}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
                 <div className="query-footer">
                   <div className="query-tags">
                     {query.tags.map((tag, index) => (

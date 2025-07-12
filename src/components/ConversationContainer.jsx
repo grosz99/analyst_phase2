@@ -217,12 +217,91 @@ const ConversationContainer = ({
     }
   };
 
-  const handleSelectSavedQuery = (savedQuery) => {
+  const handleSelectSavedQuery = async (savedQuery) => {
     console.log('💾 Saved query selected:', savedQuery);
-    setCurrentQuestion(savedQuery.question);
     setShowSavedQueries(false);
-    if (inputRef.current) {
-      inputRef.current.focus();
+    
+    // If we have saved Python code, execute it directly with current data
+    if (savedQuery.results?.pythonCode) {
+      console.log('🐍 Executing saved Python code with current data');
+      
+      // Set up the analysis with saved code
+      setIsAnalyzing(true);
+      
+      // Add user message to conversation
+      const userMessage = {
+        id: Date.now(),
+        type: 'user',
+        content: savedQuery.question,
+        timestamp: new Date(),
+        fromSavedQuery: true
+      };
+      setMessages(prev => [...prev, userMessage]);
+      
+      try {
+        const dataToAnalyze = cachedDataset || initialData;
+        const datasetId = selectedDataSource?.toLowerCase() || null;
+        
+        // Create context prompt that includes the saved Python code
+        const contextPrompt = `
+REUSING SAVED ANALYSIS:
+This is a saved query being re-executed with current data.
+
+Original Question: ${savedQuery.question}
+Original Python Code:
+${savedQuery.results.pythonCode}
+
+INSTRUCTIONS:
+1. Use the same analysis approach as the saved Python code above
+2. Apply it to the current dataset 
+3. Ensure the code works with any changes in data structure
+4. Provide updated results using the same methodology
+        `;
+        
+        const result = await aiAnalysisService.analyzeData(
+          dataToAnalyze,
+          savedQuery.question,
+          'general',
+          sessionId,
+          'anthropic',
+          contextPrompt,
+          datasetId
+        );
+        
+        if (result.success) {
+          const assistantMessage = {
+            id: Date.now() + 1,
+            type: 'assistant',
+            content: `Re-executed saved query with current data`,
+            result: result,
+            question: savedQuery.question,
+            timestamp: new Date(),
+            fromSavedQuery: true
+          };
+          setMessages(prev => [...prev, assistantMessage]);
+        } else {
+          throw new Error(result.error || 'Analysis failed');
+        }
+      } catch (error) {
+        console.error('Failed to execute saved query:', error);
+        const errorMessage = {
+          id: Date.now() + 1,
+          type: 'assistant',
+          content: `Failed to execute saved query: ${error.message}`,
+          timestamp: new Date(),
+          isError: true
+        };
+        setMessages(prev => [...prev, errorMessage]);
+      } finally {
+        setIsAnalyzing(false);
+      }
+    } else {
+      // Fallback: just set the question text if no saved code
+      console.log('📝 No saved code found, setting question text');
+      setCurrentQuestion(savedQuery.question);
+      if (inputRef.current) {
+        inputRef.current.focus();
+      }
     }
   };
 
