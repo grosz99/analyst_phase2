@@ -218,9 +218,9 @@
 /* Data Preview */
 .data-preview-container {
   background: white;
-  border-radius: 16px;
-  margin-bottom: 2rem;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   border: 1px solid #e2e8f0;
   overflow: hidden;
   transition: all 0.3s ease;
@@ -234,13 +234,13 @@
   width: 100%;
   background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
   border: none;
-  padding: 1.25rem 2rem;
+  padding: 1rem 1.5rem;
   text-align: left;
   font-weight: 600;
   color: #374151;
   cursor: pointer;
   transition: all 0.3s ease;
-  font-size: 1.05rem;
+  font-size: 1rem;
   border-radius: 0;
   position: relative;
 }
@@ -251,7 +251,7 @@
 }
 
 .preview-content {
-  padding: 0 2rem 2rem 2rem;
+  padding: 0 1.5rem 1.5rem 1.5rem;
 }
 
 .preview-header {

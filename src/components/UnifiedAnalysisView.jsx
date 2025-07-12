@@ -14,11 +14,11 @@ const DataPreview = ({ previewData, totalRows, onExport }) => {
           className="preview-toggle"
           onClick={() => setIsExpanded(!isExpanded)}
         >
-          📊 Data Preview {isExpanded ? '▼' : '▶'} 
+          📊 Your Data Awaits {isExpanded ? '▼' : '▶'} 
         </button>
         {isExpanded && (
           <div className="preview-content">
-            <p className="placeholder-text">No data available for preview.</p>
+            <p className="placeholder-text">Load your data to get started with AI-powered analysis.</p>
           </div>
         )}
       </div>
@@ -34,15 +34,12 @@ const DataPreview = ({ previewData, totalRows, onExport }) => {
           className="preview-toggle"
           onClick={() => setIsExpanded(!isExpanded)}
         >
-          📊 Data Preview ({totalRows || previewData.length} rows) {isExpanded ? '▼' : '▶'}
+          🚀 Ready to Analyze Your Data {isExpanded ? '▼' : '▶'}
         </button>
         {isExpanded && (
           <div className="preview-actions">
             <button onClick={() => onExport('csv')} className="export-btn">
               📊 Export CSV
-            </button>
-            <button onClick={() => onExport('json')} className="export-btn">
-              📄 Export JSON
             </button>
           </div>
         )}
@@ -111,18 +108,6 @@ function UnifiedAnalysisView({
 
   return (
     <div className="unified-analysis-view">
-      {/* Dataset Info Bar */}
-      <div className="dataset-info-bar">
-        <span className="dataset-status">
-          {cachedDataset ? '⚡ Data Cached in Memory' : '✅ AI Analysis Ready'}
-        </span>
-        <span className="dataset-details">
-          {cachedDataset 
-            ? `${cachedDataset.length} rows cached • Loaded ${dataLoadedTimestamp ? new Date(dataLoadedTimestamp).toLocaleTimeString() : 'now'}`
-            : datasetInfo
-          }
-        </span>
-      </div>
 
       <div className="content-area">
         {/* Data Preview */}

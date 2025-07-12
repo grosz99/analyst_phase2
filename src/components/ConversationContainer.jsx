@@ -20,6 +20,9 @@ const ConversationContainer = ({
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [suggestedQuestions, setSuggestedQuestions] = useState([]);
   const [showSavedQueries, setShowSavedQueries] = useState(false);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [questionToSave, setQuestionToSave] = useState(null);
+  const [resultsToSave, setResultsToSave] = useState(null);
   const containerRef = useRef(null);
   const inputRef = useRef(null);
   
@@ -295,7 +298,26 @@ const ConversationContainer = ({
                     <div className="user-message">
                       <div className="question-number-badge">#{questionNumber}</div>
                       <span className="message-icon">👤</span>
-                      <div className="message-content">{message.content}</div>
+                      <div className="message-content">
+                        <div className="user-question-container">
+                          <span className="user-question-text">{message.content}</span>
+                          <button 
+                            className="save-question-btn"
+                            onClick={() => {
+                              // Find the corresponding analysis result for this question
+                              const nextMessage = messages[index + 1];
+                              const analysisResult = nextMessage && nextMessage.type === 'assistant' ? nextMessage.result : null;
+                              
+                              setQuestionToSave(message.content);
+                              setResultsToSave(analysisResult);
+                              setShowSaveModal(true);
+                            }}
+                            title="Save this question"
+                          >
+                            🔒
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   )}
                   
@@ -378,7 +400,7 @@ const ConversationContainer = ({
                 disabled={isAnalyzing}
                 title="Browse saved queries"
               >
-                📚
+                📖
               </button>
               <textarea
                 ref={inputRef}
@@ -408,6 +430,23 @@ const ConversationContainer = ({
           onSelectQuery={handleSelectSavedQuery}
           onClose={() => setShowSavedQueries(false)}
         />
+      )}
+      
+      {/* Save Query Modal */}
+      {showSaveModal && questionToSave && (
+        <div style={{ position: 'relative' }}>
+          <SaveQueryButton
+            question={questionToSave}
+            results={resultsToSave}
+            dataSource="ORDERS"
+            autoOpen={true}
+            onClose={() => {
+              setShowSaveModal(false);
+              setQuestionToSave(null);
+              setResultsToSave(null);
+            }}
+          />
+        </div>
       )}
     </div>
   );

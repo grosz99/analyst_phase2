@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import savedQueriesService from '../services/savedQueriesService';
 import './SaveQueryButton.css';
 
-const SaveQueryButton = ({ question, results, dataSource }) => {
-  const [showModal, setShowModal] = useState(false);
+const SaveQueryButton = ({ question, results, dataSource, autoOpen = false, onClose }) => {
+  const [showModal, setShowModal] = useState(autoOpen);
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('General');
   const [tags, setTags] = useState('');
@@ -33,6 +33,7 @@ const SaveQueryButton = ({ question, results, dataSource }) => {
       setSaved(false);
       setDescription('');
       setTags('');
+      if (onClose) onClose();
     }, 1500);
   };
 
@@ -49,11 +50,17 @@ const SaveQueryButton = ({ question, results, dataSource }) => {
       </button>
 
       {showModal && (
-        <div className="save-query-overlay" onClick={() => setShowModal(false)}>
+        <div className="save-query-overlay" onClick={() => {
+          setShowModal(false);
+          if (onClose) onClose();
+        }}>
           <div className="save-query-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>💾 Save Query for Future Use</h3>
-              <button className="close-btn" onClick={() => setShowModal(false)}>✕</button>
+              <button className="close-btn" onClick={() => {
+                setShowModal(false);
+                if (onClose) onClose();
+              }}>✕</button>
             </div>
 
             {!saved ? (
@@ -95,7 +102,10 @@ const SaveQueryButton = ({ question, results, dataSource }) => {
                 </div>
 
                 <div className="modal-footer">
-                  <button className="cancel-btn" onClick={() => setShowModal(false)}>
+                  <button className="cancel-btn" onClick={() => {
+                    setShowModal(false);
+                    if (onClose) onClose();
+                  }}>
                     Cancel
                   </button>
                   <button className="save-btn" onClick={handleSave}>
