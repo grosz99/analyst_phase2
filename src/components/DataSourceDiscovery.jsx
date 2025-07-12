@@ -3,55 +3,56 @@ import { Send, MessageCircle, Database, CheckCircle, Search, List } from 'lucide
 import aiAnalysisService from '../services/aiAnalysisService.js';
 import './DataSourceDiscovery.css';
 
-// Semantic model information mapped to actual Snowflake tables
+// Real business data semantic model mapped to actual Snowflake tables
 const SEMANTIC_MODEL = {
   tables: {
-    'ORDERS': {
-      description: 'Comprehensive sales and order data including transactions, revenue, and financial metrics',
-      keywords: ['sales', 'revenue', 'orders', 'purchase', 'transaction', 'money', 'financial', 'profit', 'discount'],
-      dimensions: ['order_id', 'order_date', 'ship_date', 'ship_mode', 'customer_id', 'product_id', 'region', 'country', 'city', 'state'],
-      metrics: ['sales', 'profit', 'quantity', 'discount', 'revenue'],
+    'ATTENDANCE': {
+      description: 'Office attendance tracking across global locations with headcount, attendance rates, and organizational cohorts',
+      keywords: ['attendance', 'office', 'headcount', 'cohort', 'presence', 'workplace', 'location', 'hybrid', 'remote', 'onsite'],
+      dimensions: ['office', 'date', 'cohort', 'org'],
+      metrics: ['headcount', 'people_attended', 'attendance_rate', 'absence_count'],
       questions: [
-        'sales performance',
+        'attendance patterns',
+        'office utilization',
+        'workforce presence',
+        'attendance trends',
+        'cohort analysis',
+        'office capacity',
+        'attendance by location'
+      ],
+      relatedConcepts: ['hybrid work', 'office space', 'workforce', 'utilization', 'trends']
+    },
+    'NCC': {
+      description: 'Net Cash Contribution financial data showing project profitability by office, region, sector, and client',
+      keywords: ['ncc', 'net cash contribution', 'financial', 'revenue', 'profit', 'project', 'billing', 'timesheet', 'charges', 'adjustments'],
+      dimensions: ['office', 'region', 'sector', 'month', 'client', 'project_id', 'year'],
+      metrics: ['timesheet_charges', 'adjustments', 'ncc', 'adjustment_rate'],
+      questions: [
+        'financial performance',
+        'project profitability',
         'revenue analysis',
-        'order analysis',
-        'purchase history',
-        'transaction data',
-        'profit margins',
-        'regional performance'
+        'sector performance',
+        'regional profitability',
+        'client value',
+        'billing efficiency'
       ],
-      relatedConcepts: ['performance', 'trends', 'analysis', 'metrics', 'kpi']
+      relatedConcepts: ['profitability', 'revenue', 'billing', 'projects', 'clients', 'financial health']
     },
-    'CUSTOMERS': {
-      description: 'Customer master data including demographics, segments, tiers, and location information',
-      keywords: ['customer', 'client', 'buyer', 'consumer', 'demographics', 'segment', 'tier', 'level', 'vip', 'loyalty'],
-      dimensions: ['customer_id', 'customer_name', 'segment', 'city', 'state', 'postal_code', 'region'],
-      metrics: ['customer_count', 'lifetime_value', 'average_order_value'],
+    'PIPELINE': {
+      description: 'Sales pipeline opportunities tracking deal stages, potential values, and expected close dates across regions',
+      keywords: ['pipeline', 'sales', 'deals', 'opportunities', 'prospects', 'stage', 'close', 'value', 'forecast', 'win'],
+      dimensions: ['company', 'stage', 'sector', 'region', 'close_quarter', 'close_year'],
+      metrics: ['potential_value_usd', 'days_to_close', 'value_millions'],
       questions: [
-        'customer analysis',
-        'customer segments',
-        'buyer behavior',
-        'customer tiers',
-        'customer levels',
-        'vip customers',
-        'customer demographics'
+        'sales pipeline',
+        'deal analysis',
+        'revenue forecast',
+        'opportunity stages',
+        'sales performance',
+        'win rates',
+        'pipeline health'
       ],
-      relatedConcepts: ['segmentation', 'demographics', 'behavior', 'loyalty', 'retention']
-    },
-    'PRODUCTS': {
-      description: 'Product catalog with categories, subcategories, pricing, and inventory details',
-      keywords: ['product', 'item', 'category', 'inventory', 'catalog', 'merchandise', 'sku', 'price'],
-      dimensions: ['product_id', 'product_name', 'category', 'sub_category', 'manufacturer'],
-      metrics: ['product_count', 'price', 'cost', 'margin'],
-      questions: [
-        'product performance',
-        'category analysis',
-        'inventory analysis',
-        'product catalog',
-        'pricing analysis',
-        'product profitability'
-      ],
-      relatedConcepts: ['catalog', 'inventory', 'pricing', 'categories', 'assortment']
+      relatedConcepts: ['sales', 'opportunities', 'forecast', 'deals', 'revenue pipeline', 'conversion']
     }
   }
 };
@@ -100,20 +101,23 @@ const DataSourceDiscovery = ({
   const getAnalysisType = (query, tableName) => {
     const queryLower = query.toLowerCase();
     
-    if (tableName === 'CUSTOMERS') {
-      if (queryLower.includes('tier')) return 'customer tier analysis';
-      if (queryLower.includes('segment')) return 'customer segmentation analysis';
-      if (queryLower.includes('demographic')) return 'demographic analysis';
-      return 'customer analysis';
-    } else if (tableName === 'ORDERS') {
-      if (queryLower.includes('performance')) return 'sales performance analysis';
+    if (tableName === 'ATTENDANCE') {
+      if (queryLower.includes('utilization')) return 'office utilization analysis';
+      if (queryLower.includes('trend')) return 'attendance trend analysis';
+      if (queryLower.includes('cohort')) return 'cohort attendance analysis';
+      return 'attendance analysis';
+    } else if (tableName === 'NCC') {
+      if (queryLower.includes('profitability')) return 'project profitability analysis';
       if (queryLower.includes('revenue')) return 'revenue analysis';
-      if (queryLower.includes('trend')) return 'trend analysis';
-      return 'order analysis';
-    } else if (tableName === 'PRODUCTS') {
-      if (queryLower.includes('category')) return 'category performance analysis';
-      if (queryLower.includes('price')) return 'pricing analysis';
-      return 'product analysis';
+      if (queryLower.includes('sector')) return 'sector performance analysis';
+      if (queryLower.includes('region')) return 'regional financial analysis';
+      return 'financial performance analysis';
+    } else if (tableName === 'PIPELINE') {
+      if (queryLower.includes('forecast')) return 'sales forecast analysis';
+      if (queryLower.includes('pipeline')) return 'pipeline health analysis';
+      if (queryLower.includes('stage')) return 'deal stage analysis';
+      if (queryLower.includes('win')) return 'win rate analysis';
+      return 'sales opportunity analysis';
     }
     return 'data analysis';
   };
@@ -196,17 +200,21 @@ const DataSourceDiscovery = ({
           }
         });
 
-        // Special cases for common analysis patterns
-        if (queryLower.includes('profit') && source === 'ORDERS') score += 30;
-        if (queryLower.includes('segment') && source === 'CUSTOMERS') score += 25;
-        if (queryLower.includes('category') && source === 'PRODUCTS') score += 25;
-        if (queryLower.includes('region') && source === 'ORDERS') score += 20;
-        if (queryLower.includes('performance') && source === 'ORDERS') score += 20;
-        if ((queryLower.includes('tier') || queryLower.includes('level')) && source === 'CUSTOMERS') score += 40;
-        if (queryLower.includes('customer') && source === 'CUSTOMERS') score += 35;
-        if (queryLower.includes('customer') && source === 'ORDERS') score += 15;
-        if (queryLower.includes('vip') && source === 'CUSTOMERS') score += 35;
-        if (queryLower.includes('loyalty') && source === 'CUSTOMERS') score += 30;
+        // Special cases for common analysis patterns - Real data
+        if (queryLower.includes('attendance') && source === 'ATTENDANCE') score += 40;
+        if (queryLower.includes('office') && source === 'ATTENDANCE') score += 30;
+        if (queryLower.includes('headcount') && source === 'ATTENDANCE') score += 35;
+        if (queryLower.includes('utilization') && source === 'ATTENDANCE') score += 30;
+        if (queryLower.includes('ncc') && source === 'NCC') score += 50;
+        if (queryLower.includes('profit') && source === 'NCC') score += 35;
+        if (queryLower.includes('revenue') && source === 'NCC') score += 30;
+        if (queryLower.includes('financial') && source === 'NCC') score += 25;
+        if (queryLower.includes('project') && source === 'NCC') score += 25;
+        if (queryLower.includes('pipeline') && source === 'PIPELINE') score += 40;
+        if (queryLower.includes('sales') && source === 'PIPELINE') score += 35;
+        if (queryLower.includes('deals') && source === 'PIPELINE') score += 30;
+        if (queryLower.includes('opportunities') && source === 'PIPELINE') score += 30;
+        if (queryLower.includes('forecast') && source === 'PIPELINE') score += 25;
       }
 
       if (score > 0) {
@@ -543,18 +551,21 @@ const DataSourceDiscovery = ({
                 {(() => {
                   // Define data source specific permissions
                   const dataSourcePermissions = {
-                    'ORDERS': [
+                    'ATTENDANCE': [
                       { region: 'North America', access: 'Full Access', className: 'full-access' },
-                      { region: 'Asia Pacific', access: 'Full Access', className: 'full-access' }
+                      { region: 'Asia Pacific', access: 'Full Access', className: 'full-access' },
+                      { region: 'EMESA', access: 'Read Only', className: 'read-only' }
                     ],
-                    'CUSTOMERS': [
+                    'NCC': [
                       { region: 'North America', access: 'Full Access', className: 'full-access' },
-                      { region: 'EMESA', access: 'Read Only', className: 'read-only' },
-                      { region: 'Asia Pacific', access: 'Full Access', className: 'full-access' }
+                      { region: 'Asia Pacific', access: 'Full Access', className: 'full-access' },
+                      { region: 'EMESA', access: 'Full Access', className: 'full-access' }
                     ],
-                    'PRODUCTS': [
-                      { region: 'North America', access: 'Full Access', className: 'full-access' }
-                    ]
+                    'PIPELINE': [
+                      { region: 'Americas', access: 'Full Access', className: 'full-access' },
+                      { region: 'APAC', access: 'Full Access', className: 'full-access' },
+                      { region: 'EMEA', access: 'Read Only', className: 'read-only' }
+                    ],
                   };
                   
                   const permissions = dataSourcePermissions[selectedDataSource] || [

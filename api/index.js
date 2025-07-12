@@ -117,61 +117,7 @@ app.get('/api', (req, res) => {
   });
 });
 
-// Mock data for testing
-const mockDatasets = [
-  {
-    id: 'sales_data',
-    name: 'Sales Data',
-    description: 'Historical sales transactions and performance metrics',
-    tables: ['sales_transactions', 'customer_data', 'product_catalog'],
-    row_count: 2400000,
-    last_updated: '2024-06-15T10:30:00Z'
-  },
-  {
-    id: 'customer_data',
-    name: 'Customer Data',
-    description: 'Customer demographics and behavior analytics',
-    tables: ['customers', 'customer_segments', 'customer_journey'],
-    row_count: 150000,
-    last_updated: '2024-06-14T15:45:00Z'
-  },
-  {
-    id: 'product_data',
-    name: 'Product Data',
-    description: 'Product catalog and inventory management',
-    tables: ['products', 'inventory', 'suppliers'],
-    row_count: 85000,
-    last_updated: '2024-06-16T09:15:00Z'
-  }
-];
-
-const mockColumns = {
-  sales_data: [
-    { name: 'date', type: 'Date', category: 'dimension' },
-    { name: 'region', type: 'String', category: 'dimension' },
-    { name: 'product', type: 'String', category: 'dimension' },
-    { name: 'customer_segment', type: 'String', category: 'dimension' },
-    { name: 'revenue', type: 'Number', category: 'metric' },
-    { name: 'units_sold', type: 'Number', category: 'metric' },
-    { name: 'profit_margin', type: 'Number', category: 'metric' }
-  ],
-  customer_data: [
-    { name: 'customer_id', type: 'String', category: 'dimension' },
-    { name: 'age_group', type: 'String', category: 'dimension' },
-    { name: 'location', type: 'String', category: 'dimension' },
-    { name: 'acquisition_date', type: 'Date', category: 'dimension' },
-    { name: 'lifetime_value', type: 'Number', category: 'metric' },
-    { name: 'purchase_frequency', type: 'Number', category: 'metric' }
-  ],
-  product_data: [
-    { name: 'product_id', type: 'String', category: 'dimension' },
-    { name: 'category', type: 'String', category: 'dimension' },
-    { name: 'brand', type: 'String', category: 'dimension' },
-    { name: 'launch_date', type: 'Date', category: 'dimension' },
-    { name: 'price', type: 'Number', category: 'metric' },
-    { name: 'units_available', type: 'Number', category: 'metric' }
-  ]
-};
+// Only real Snowflake data - no mock fallbacks
 
 // Get available datasets
 app.get('/api/available-datasets', async (req, res) => {
@@ -181,15 +127,20 @@ app.get('/api/available-datasets', async (req, res) => {
     
     // Try to get real Snowflake tables first
     try {
-      const snowflakeTables = await snowflakeService.discoverTables();
+      const allSnowflakeTables = await snowflakeService.discoverTables();
       const duration = Date.now() - startTime;
       
-      console.log(`Retrieved ${snowflakeTables.length} Snowflake tables in ${duration}ms`);
+      // Filter to only show the three real business datasets
+      const businessDatasets = allSnowflakeTables.filter(table => 
+        ['ATTENDANCE', 'NCC', 'PIPELINE'].includes(table.name)
+      );
+      
+      console.log(`Retrieved ${allSnowflakeTables.length} Snowflake tables, filtered to ${businessDatasets.length} business datasets in ${duration}ms`);
       
       res.json({
         success: true,
-        datasets: snowflakeTables,
-        total_count: snowflakeTables.length,
+        datasets: businessDatasets,
+        total_count: businessDatasets.length,
         timestamp: new Date().toISOString(),
         source: 'snowflake',
         performance: {
@@ -199,20 +150,14 @@ app.get('/api/available-datasets', async (req, res) => {
       });
       
     } catch (snowflakeError) {
-      console.warn('Snowflake unavailable, using mock data:', snowflakeError.message);
+      console.error('Snowflake unavailable:', snowflakeError.message);
       
-      // Fallback to mock data
-      const duration = Date.now() - startTime;
-      res.json({
-        success: true,
-        datasets: mockDatasets,
-        total_count: mockDatasets.length,
-        timestamp: new Date().toISOString(),
-        source: 'mock_fallback',
+      // Return error - no fallback data
+      res.status(503).json({
+        success: false,
+        error: 'Data source unavailable. Please check your connection.',
         snowflake_error: snowflakeError.message,
-        performance: {
-          duration: duration
-        }
+        timestamp: new Date().toISOString()
       });
     }
     
@@ -276,37 +221,15 @@ app.post('/api/load-dataset', async (req, res) => {
       res.json(result);
       
     } catch (snowflakeError) {
-      console.warn(`Snowflake dataset loading failed for ${datasetId}, using mock:`, snowflakeError.message);
+      console.error(`Snowflake dataset loading failed for ${datasetId}:`, snowflakeError.message);
       
-      // Fallback to mock data
-      const dataset = mockDatasets.find(d => d.id === datasetId);
-      if (!dataset) {
-        return res.status(404).json({
-          success: false,
-          error: 'Dataset not found'
-        });
-      }
-
-      const columns = mockColumns[datasetId] || [];
-      const duration = Date.now() - startTime;
-      
-      const mockResult = {
-        success: true,
+      res.status(503).json({
+        success: false,
+        error: 'Data source unavailable. Please check your connection.',
         dataset_id: datasetId,
-        schema: {
-          columns: columns,
-          row_count: Math.floor(dataset.row_count * (userSelections.sample_rate || 1)),
-          memory_usage: Math.round((dataset.row_count / 10000) * (userSelections.sample_rate || 1))
-        },
-        filters_applied: userSelections,
-        message: `Loaded ${dataset.name} with ${columns.length} columns (fallback mode)`,
-        processing_time: duration,
-        timestamp: new Date().toISOString(),
-        source: 'mock_fallback',
-        snowflake_error: snowflakeError.message
-      };
-
-      res.json(mockResult);
+        snowflake_error: snowflakeError.message,
+        timestamp: new Date().toISOString()
+      });
     }
     
   } catch (error) {
@@ -331,11 +254,11 @@ app.post('/api/ai-query', (req, res) => {
       });
     }
 
-    const dataset = mockDatasets.find(d => d.id === datasetId);
-    if (!dataset) {
+    // AI query endpoint - requires real Snowflake connection
+    if (!datasetId || !['attendance', 'ncc', 'pipeline'].includes(datasetId)) {
       return res.status(404).json({
         success: false,
-        error: 'Dataset not loaded. Please load dataset first.'
+        error: 'Dataset not found. Only ATTENDANCE, NCC, and PIPELINE datasets are available.'
       });
     }
 
@@ -469,36 +392,14 @@ app.get('/api/dataset/:datasetId/schema', async (req, res) => {
       });
       
     } catch (snowflakeError) {
-      console.warn(`Snowflake schema unavailable for ${datasetId}, using mock:`, snowflakeError.message);
+      console.error(`Snowflake schema unavailable for ${datasetId}:`, snowflakeError.message);
       
-      // Fallback to mock data
-      const dataset = mockDatasets.find(d => d.id === datasetId);
-      if (!dataset) {
-        return res.status(404).json({
-          success: false,
-          error: 'Dataset not found'
-        });
-      }
-
-      const columns = mockColumns[datasetId] || [];
-      const duration = Date.now() - startTime;
-      
-      res.json({
-        success: true,
+      res.status(503).json({
+        success: false,
+        error: 'Data source unavailable. Please check your connection.',
         dataset_id: datasetId,
-        dataset_name: dataset.name,
-        schema: {
-          columns: columns,
-          total_columns: columns.length,
-          dimensions: columns.filter(c => c.category === 'dimension').length,
-          metrics: columns.filter(c => c.category === 'metric').length
-        },
-        timestamp: new Date().toISOString(),
-        source: 'mock_fallback',
         snowflake_error: snowflakeError.message,
-        performance: {
-          duration: duration
-        }
+        timestamp: new Date().toISOString()
       });
     }
     

@@ -34,12 +34,7 @@ class SnowflakeService {
         this.privateKey = key;
         console.log('✅ RSA private key loaded from environment variable');
       } else {
-        // Fallback to local file (for development)
-        const privateKeyPath = path.join(__dirname, '../../snowflake_rsa_key.pem');
-        if (fs.existsSync(privateKeyPath)) {
-          this.privateKey = fs.readFileSync(privateKeyPath, 'utf8');
-          console.log('✅ RSA private key loaded from local file');
-        }
+        // No local file fallback for production security
       }
     } catch (error) {
       console.warn('⚠️ Could not load RSA private key:', error.message);
@@ -109,7 +104,7 @@ class SnowflakeService {
       console.error('❌ All Snowflake authentication methods failed');
       console.error('💡 To fix this, you need to:');
       console.error('   1. Disable MFA for the user account, OR');
-      console.error('   2. Associate the RSA public key with user J99G in Snowflake');
+      console.error('   2. Associate the RSA public key with the user in Snowflake');
       
       return {
         success: false,

@@ -30,35 +30,8 @@ class DatasetService {
         throw new Error(result.error || 'Failed to fetch datasets');
       }
     } catch (error) {
-      console.warn('API unavailable, falling back to mock data:', error.message);
-      
-      // Fallback to mock data structure
-      return [
-        {
-          id: 'sales_data',
-          name: 'Sales Data',
-          description: 'Historical sales transactions and performance metrics',
-          tables: ['sales_transactions', 'customer_data', 'product_catalog'],
-          row_count: 2400000,
-          last_updated: '2024-06-15T10:30:00Z'
-        },
-        {
-          id: 'customer_data',
-          name: 'Customer Data', 
-          description: 'Customer demographics and behavior analytics',
-          tables: ['customers', 'customer_segments', 'customer_journey'],
-          row_count: 150000,
-          last_updated: '2024-06-14T15:45:00Z'
-        },
-        {
-          id: 'product_data',
-          name: 'Product Data',
-          description: 'Product catalog and inventory management',
-          tables: ['products', 'inventory', 'suppliers'],
-          row_count: 85000,
-          last_updated: '2024-06-16T09:15:00Z'
-        }
-      ];
+      console.error('API unavailable:', error.message);
+      throw new Error('Data source unavailable. Please check your connection.');
     }
   }
 
@@ -78,19 +51,8 @@ class DatasetService {
         throw new Error(result.error || 'Failed to fetch schema');
       }
     } catch (error) {
-      console.warn('Schema API unavailable, using fallback');
-      // Return basic schema structure
-      return {
-        columns: [
-          { name: 'date', type: 'Date', category: 'dimension' },
-          { name: 'region', type: 'String', category: 'dimension' },
-          { name: 'revenue', type: 'Number', category: 'metric' },
-          { name: 'units_sold', type: 'Number', category: 'metric' }
-        ],
-        total_columns: 4,
-        dimensions: 2,
-        metrics: 2
-      };
+      console.error('Schema API unavailable for', datasetId, ':', error.message);
+      throw new Error(`Failed to fetch schema for ${datasetId}. Please check your connection.`);
     }
   }
 
@@ -200,14 +162,10 @@ class DatasetService {
 
   mapDataSourceToId(dataSourceName) {
     const mapping = {
-      // Old mock data mappings (for fallback)
-      'Sales Data': 'sales_data',
-      'Customer Data': 'customer_data', 
-      'Product Data': 'product_data',
-      // New Snowflake table mappings
-      'ORDERS': 'orders',
-      'CUSTOMERS': 'customers',
-      'PRODUCTS': 'products'
+      // Real business datasets only
+      'ATTENDANCE': 'attendance',
+      'NCC': 'ncc',
+      'PIPELINE': 'pipeline'
     };
     
     // If exact match found, use it
@@ -217,7 +175,7 @@ class DatasetService {
     
     // Try lowercase version
     const lowercaseId = dataSourceName.toLowerCase();
-    return lowercaseId || 'orders'; // Default to orders table
+    return lowercaseId || 'attendance'; // Default to attendance data
   }
 
   generateMockDataFromSchema(schema, selectedColumns) {
