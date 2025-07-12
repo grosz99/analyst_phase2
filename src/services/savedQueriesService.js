@@ -141,7 +141,8 @@ class SavedQueriesService {
 
   // Initialize with demo data
   initializeDemoData() {
-    const demoQueries = [
+    try {
+      const demoQueries = [
       {
         question: "What are the top 10 most profitable customers?",
         description: "Identifies customers with highest profit margins for targeted sales strategies",
@@ -198,6 +199,9 @@ class SavedQueriesService {
           this.toggleFavorite(this.queries[this.queries.length - 1].id);
         }
       });
+    }
+    } catch (error) {
+      console.error('Error initializing demo data:', error);
     }
   }
 

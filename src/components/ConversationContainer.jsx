@@ -225,6 +225,22 @@ const ConversationContainer = ({
     if (savedQuery.results?.pythonCode) {
       console.log('🐍 Executing saved Python code with current data');
       
+      // Check if we have data to analyze
+      const dataToAnalyze = cachedDataset || initialData;
+      if (!dataToAnalyze || dataToAnalyze.length === 0) {
+        const errorMessage = {
+          id: Date.now() + 1,
+          type: 'assistant',
+          content: `⚠️ No data available to execute saved query. Please load a dataset first.
+
+**Saved Query:** ${savedQuery.question}`,
+          timestamp: new Date(),
+          isError: true
+        };
+        setMessages(prev => [...prev, errorMessage]);
+        return;
+      }
+      
       // Set up the analysis with saved code
       setIsAnalyzing(true);
       
@@ -287,7 +303,19 @@ INSTRUCTIONS:
         const errorMessage = {
           id: Date.now() + 1,
           type: 'assistant',
-          content: `Failed to execute saved query: ${error.message}`,
+          content: `⚠️ Could not execute saved query with AI analysis. This might be because the AI service is not available or missing API keys. 
+
+**Saved Query:** ${savedQuery.question}
+
+**Options:**
+- Check if the backend API is running (localhost:3001)
+- Verify Anthropic API key is set
+- Try running the query manually by typing it in the input field
+
+**Original saved code:**
+\`\`\`python
+${savedQuery.results?.pythonCode || 'No saved code available'}
+\`\`\``,
           timestamp: new Date(),
           isError: true
         };

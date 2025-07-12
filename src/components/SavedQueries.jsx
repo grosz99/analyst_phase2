@@ -20,13 +20,23 @@ const SavedQueries = ({ onSelectQuery, onClose }) => {
   }, [queries, searchTerm, selectedCategory, viewMode]);
 
   const loadQueries = () => {
-    const allQueries = savedQueriesService.getAllQueries();
-    setQueries(allQueries);
+    try {
+      const allQueries = savedQueriesService.getAllQueries();
+      setQueries(allQueries);
+    } catch (error) {
+      console.error('Error loading saved queries:', error);
+      setQueries([]);
+    }
   };
 
   const loadCategories = () => {
-    const cats = savedQueriesService.getCategories();
-    setCategories(['All', ...cats]);
+    try {
+      const cats = savedQueriesService.getCategories();
+      setCategories(['All', ...cats]);
+    } catch (error) {
+      console.error('Error loading categories:', error);
+      setCategories(['All']);
+    }
   };
 
   const filterQueries = () => {
