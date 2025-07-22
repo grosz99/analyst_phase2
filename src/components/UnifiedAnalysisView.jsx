@@ -132,6 +132,7 @@ function UnifiedAnalysisView({
           datasetInfo={datasetInfo}
           selectedFilters={selectedFilters}
           selectedDataSource={selectedDataSource}
+          onReset={onReset}
         />
 
         {/* Service Unavailable Message */}

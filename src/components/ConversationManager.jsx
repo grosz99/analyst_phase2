@@ -9,7 +9,8 @@ const ConversationManager = ({
   sessionId,
   datasetInfo,
   selectedFilters,
-  selectedDataSource
+  selectedDataSource,
+  onReset
 }) => {
   const [conversations, setConversations] = useState([]);
   const [activeConversationId, setActiveConversationId] = useState(null);
@@ -101,10 +102,10 @@ const ConversationManager = ({
       <div className="new-conversation-section">
         <button 
           className="new-conversation-btn"
-          onClick={createNewConversation}
+          onClick={onReset}
           disabled={isLoading}
         >
-          ➕ New Conversation
+          🔄 Ask Question On Another Source
         </button>
       </div>
 
