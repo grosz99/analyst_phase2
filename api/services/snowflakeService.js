@@ -317,8 +317,8 @@ class SnowflakeService {
     });
   }
 
-  // Sample data from table efficiently
-  async sampleData(tableName, columns = [], limit = 100) {
+  // Sample data from table efficiently with filter support
+  async sampleData(tableName, columns = [], limit = 100, filters = {}) {
     if (!this.isConnected) {
       const testResult = await this.testConnection();
       if (!testResult.success) {
@@ -326,19 +326,26 @@ class SnowflakeService {
       }
     }
 
-    console.log(`Sampling data from ${tableName}...`);
+    console.log(`Sampling data from ${tableName} with filters:`, filters);
     const startTime = Date.now();
     
     return new Promise((resolve, reject) => {
       // Build column list
       const columnList = columns.length > 0 ? columns.join(', ') : '*';
       
+      // Build WHERE clause from filters
+      const whereConditions = this.buildWhereClause(tableName, filters);
+      const whereClause = whereConditions ? `WHERE ${whereConditions}` : '';
+      
       const query = `
         SELECT ${columnList}
         FROM ${this.config.database}.${this.config.schema}.${tableName.toUpperCase()}
+        ${whereClause}
         SAMPLE (100 ROWS)
         LIMIT ${Math.min(limit, 1000)}
       `;
+
+      console.log(`Executing query: ${query}`);
 
       this.connection.execute({
         sqlText: query,
@@ -351,6 +358,88 @@ class SnowflakeService {
           } else {
             console.log(`Sampled ${rows.length} rows from ${tableName} (${duration}ms)`);
             resolve(rows);
+          }
+        }
+      });
+    });
+  }
+
+  // Build WHERE clause from filters
+  buildWhereClause(tableName, filters) {
+    if (!filters || Object.keys(filters).length === 0) {
+      return '';
+    }
+
+    const conditions = [];
+    
+    // Handle NCC date range filters specially
+    if (tableName.toUpperCase() === 'NCC') {
+      if (filters.from_reporting_date && filters.to_reporting_date) {
+        const fromDate = filters.from_reporting_date;
+        const toDate = filters.to_reporting_date;
+        
+        // Convert date range to month/year format for NCC
+        const fromMonthYear = `${fromDate.year}-${String(fromDate.month).padStart(2, '0')}-01`;
+        const toMonthYear = `${toDate.year}-${String(toDate.month).padStart(2, '0')}-01`;
+        
+        conditions.push(`month >= '${fromMonthYear}'::DATE`);
+        conditions.push(`month <= '${toMonthYear}'::DATE`);
+        
+        // Remove these from regular filter processing
+        delete filters.from_reporting_date;
+        delete filters.to_reporting_date;
+      }
+    }
+    
+    // Handle regular filters
+    for (const [field, value] of Object.entries(filters)) {
+      if (Array.isArray(value) && value.length > 0) {
+        // Multiple values - use IN clause
+        const escapedValues = value.map(v => `'${String(v).replace(/'/g, "''")}'`).join(', ');
+        conditions.push(`${field} IN (${escapedValues})`);
+      } else if (value !== null && value !== undefined && value !== '') {
+        // Single value
+        const escapedValue = String(value).replace(/'/g, "''");
+        conditions.push(`${field} = '${escapedValue}'`);
+      }
+    }
+    
+    return conditions.join(' AND ');
+  }
+
+  // Get distinct values for a field (for filter options)
+  async getDistinctValues(tableName, fieldName, limit = 100) {
+    if (!this.isConnected) {
+      const testResult = await this.testConnection();
+      if (!testResult.success) {
+        throw new Error(`Cannot connect to Snowflake: ${testResult.error}`);
+      }
+    }
+
+    console.log(`Getting distinct values for ${tableName}.${fieldName}...`);
+    const startTime = Date.now();
+    
+    return new Promise((resolve, reject) => {
+      const query = `
+        SELECT DISTINCT ${fieldName}
+        FROM ${this.config.database}.${this.config.schema}.${tableName.toUpperCase()}
+        WHERE ${fieldName} IS NOT NULL
+        ORDER BY ${fieldName}
+        LIMIT ${Math.min(limit, 1000)}
+      `;
+
+      this.connection.execute({
+        sqlText: query,
+        complete: (err, stmt, rows) => {
+          const duration = Date.now() - startTime;
+          
+          if (err) {
+            console.error(`Failed to get distinct values for ${tableName}.${fieldName} (${duration}ms):`, err.message);
+            reject(new Error(`Failed to get distinct values: ${err.message}`));
+          } else {
+            const values = rows.map(row => row[fieldName.toUpperCase()]);
+            console.log(`Got ${values.length} distinct values for ${tableName}.${fieldName} (${duration}ms)`);
+            resolve(values);
           }
         }
       });

@@ -257,6 +257,17 @@
   color: white;
 }
 
+/* Date Range Chip */
+.date-range-chip {
+  background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+  color: #e65100;
+  border-color: #ffcc80;
+}
+
+.date-range-chip strong {
+  color: #bf360c;
+}
+
 .clear-all-filters {
   background: #dc3545;
   color: white;

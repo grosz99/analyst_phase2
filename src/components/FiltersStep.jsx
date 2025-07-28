@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import datasetService from '../services/datasetService.js';
+import DateRangeFilter from './DateRangeFilter.jsx';
 import './FiltersStep.css';
 
 const FiltersStep = ({ 
@@ -12,10 +13,17 @@ const FiltersStep = ({
   // Filter to categorical fields - more inclusive type checking
   const categoricalFields = availableFields.filter(field => {
     const fieldType = field.type ? field.type.toLowerCase() : '';
-    return fieldType === 'string' || 
+    const isCategorial = fieldType === 'string' || 
            fieldType === 'boolean' || 
            fieldType === 'date' ||
            fieldType === 'utf8'; // Snowflake sometimes uses utf8 for strings
+    
+    // For NCC data source, exclude month field as it's handled by date range
+    if (selectedDataSource === 'NCC' && field.name.toLowerCase() === 'month') {
+      return false;
+    }
+    
+    return isCategorial;
   });
 
   // Debug logging
@@ -26,6 +34,7 @@ const FiltersStep = ({
   const [filterOptions, setFilterOptions] = useState({});
   const [loadingFilters, setLoadingFilters] = useState({});
   const [estimatedRows, setEstimatedRows] = useState(null);
+  const [dateRange, setDateRange] = useState(null);
 
   // Clear filter options when data source changes
   useEffect(() => {
@@ -156,9 +165,35 @@ const FiltersStep = ({
 
   const activeFilterOptions = filterOptions[selectedField] || [];
   const isLoadingActiveFilter = loadingFilters[selectedField] || false;
-  const activeFilters = Object.entries(selectedFilters).flatMap(([field, values]) => 
-    Array.isArray(values) ? values.map(value => ({ field, value })) : [{ field, value: values }]
-  );
+  const activeFilters = Object.entries(selectedFilters).flatMap(([field, values]) => {
+    // Skip date range fields for custom display
+    if (field === 'from_reporting_date' || field === 'to_reporting_date') {
+      return [];
+    }
+    return Array.isArray(values) ? values.map(value => ({ field, value })) : [{ field, value: values }];
+  });
+
+  // Handle date range changes for NCC
+  const handleDateRangeChange = (newDateRange) => {
+    setDateRange(newDateRange);
+    
+    // Update the selectedFilters with date range
+    if (selectedDataSource === 'NCC' && newDateRange) {
+      setSelectedFilters(prev => ({
+        ...prev,
+        from_reporting_date: {
+          year: newDateRange.from.year,
+          month: newDateRange.from.month,
+          week: newDateRange.from.week
+        },
+        to_reporting_date: {
+          year: newDateRange.to.year,
+          month: newDateRange.to.month,
+          week: newDateRange.to.week
+        }
+      }));
+    }
+  };
 
   return (
     <div className="filters-step-container">
@@ -166,6 +201,14 @@ const FiltersStep = ({
         <h1 className="text-2xl font-bold text-gray-800">Filter Your Data</h1>
         <p className="text-gray-500 mt-2">Select filters to reduce your dataset for optimal analysis performance.</p>
       </div>
+      
+      {/* Date Range Filter for NCC */}
+      {selectedDataSource === 'NCC' && (
+        <DateRangeFilter 
+          onDateRangeChange={handleDateRangeChange}
+          selectedDataSource={selectedDataSource}
+        />
+      )}
       
       {/* Row Count and Performance Guidance */}
       {estimatedRows !== null && (
@@ -263,10 +306,33 @@ const FiltersStep = ({
       )}
 
       {/* Active Filters Display */}
-      {activeFilters.length > 0 && (
+      {(activeFilters.length > 0 || (selectedDataSource === 'NCC' && dateRange)) && (
         <div className="active-filters-display">
-          <h3 className="active-filters-title">Active Filters ({activeFilters.length}):</h3>
+          <h3 className="active-filters-title">
+            Active Filters ({activeFilters.length + (dateRange && selectedDataSource === 'NCC' ? 1 : 0)}):
+          </h3>
           <div className="active-filters-list">
+            {/* Show date range for NCC */}
+            {selectedDataSource === 'NCC' && dateRange && (
+              <div className="active-filter-chip date-range-chip">
+                <span><strong>Date Range:</strong> {dateRange.fromFormatted} to {dateRange.toFormatted}</span>
+                <button 
+                  onClick={() => {
+                    setDateRange(null);
+                    setSelectedFilters(prev => {
+                      const newFilters = { ...prev };
+                      delete newFilters.from_reporting_date;
+                      delete newFilters.to_reporting_date;
+                      return newFilters;
+                    });
+                  }} 
+                  title="Remove date range filter"
+                >
+                  &times;
+                </button>
+              </div>
+            )}
+            
             {activeFilters.map(({ field, value }, index) => (
               <div key={`${field}-${value}-${index}`} className="active-filter-chip">
                 <span><strong>{field}:</strong> {value}</span>
@@ -280,7 +346,10 @@ const FiltersStep = ({
             ))}
             <button 
               className="clear-all-filters"
-              onClick={() => setSelectedFilters({})}
+              onClick={() => {
+                setSelectedFilters({});
+                setDateRange(null);
+              }}
               title="Clear all filters"
             >
               Clear All

@@ -465,6 +465,82 @@ class DatasetService {
     this.datasetInfo = null;
     this.datasetSession = null;
   }
+
+  async getSampleDataForFilters(datasetId, fieldName) {
+    try {
+      console.log(`Getting distinct values for filter field: ${fieldName} in dataset: ${datasetId}`);
+      
+      const response = await fetch(`${this.baseURL}/api/dataset/${datasetId}/field/${fieldName}/values?limit=100`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        console.log(`Retrieved ${result.count} distinct values for ${fieldName}`);
+        return result.values;
+      } else {
+        throw new Error(result.error || 'Failed to fetch filter values');
+      }
+    } catch (error) {
+      console.error(`Failed to get filter values for ${fieldName}:`, error);
+      
+      // Fallback to mock data for demo if API fails
+      return this.generateMockFilterValues(datasetId, fieldName);
+    }
+  }
+
+  generateMockFilterValues(datasetId, fieldName) {
+    const fieldLower = fieldName.toLowerCase();
+    
+    // Mock values based on data source and field
+    if (datasetId === 'ncc') {
+      if (fieldLower === 'office') {
+        return ['New York', 'London', 'Singapore', 'Tokyo', 'Sydney'];
+      }
+      if (fieldLower === 'region') {
+        return ['Americas', 'EMEA', 'APAC'];
+      }
+      if (fieldLower === 'sector') {
+        return ['Technology', 'Healthcare', 'Financial Services', 'Consumer Goods', 'Energy'];
+      }
+      if (fieldLower === 'client') {
+        return ['Client A', 'Client B', 'Client C', 'Client D', 'Client E'];
+      }
+    }
+    
+    if (datasetId === 'attendance') {
+      if (fieldLower === 'office') {
+        return ['NYC HQ', 'London Office', 'Singapore Hub', 'Tokyo Branch', 'Sydney Office'];
+      }
+      if (fieldLower === 'cohort') {
+        return ['Senior', 'Mid-Level', 'Junior', 'Intern', 'Executive'];
+      }
+      if (fieldLower === 'org') {
+        return ['Engineering', 'Sales', 'Marketing', 'Operations', 'Finance'];
+      }
+    }
+    
+    if (datasetId === 'pipeline') {
+      if (fieldLower === 'stage') {
+        return ['Prospecting', 'Qualification', 'Proposal', 'Negotiation', 'Closed Won', 'Closed Lost'];
+      }
+      if (fieldLower === 'company') {
+        return ['Acme Corp', 'TechStart Inc', 'Global Solutions', 'Enterprise Co', 'Innovation Labs'];
+      }
+      if (fieldLower === 'sector') {
+        return ['Technology', 'Healthcare', 'Retail', 'Manufacturing', 'Services'];
+      }
+      if (fieldLower === 'region') {
+        return ['North America', 'Europe', 'Asia Pacific', 'Latin America'];
+      }
+    }
+    
+    // Generic fallback
+    return ['Option 1', 'Option 2', 'Option 3', 'Option 4', 'Option 5'];
+  }
 }
 
 const datasetService = new DatasetService();

@@ -189,9 +189,11 @@ app.post('/api/load-dataset', async (req, res) => {
     try {
       // Get schema and full analysis data from Snowflake
       const analysisRowLimit = userSelections.analysisMode ? 5000 : 1000; // Load more data for AI analysis
+      const filters = userSelections.filters || {};
+      
       const [schema, analysisData] = await Promise.all([
         snowflakeService.discoverColumns(datasetId),
-        snowflakeService.sampleData(datasetId, userSelections.columns, analysisRowLimit)
+        snowflakeService.sampleData(datasetId, userSelections.columns, analysisRowLimit, filters)
       ]);
       
       const duration = Date.now() - startTime;
@@ -356,6 +358,55 @@ result = result.head(5)`.trim();
     }, 1200); // Simulate AI processing time
     
   } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Get distinct values for a field (for filter options)
+app.get('/api/dataset/:datasetId/field/:fieldName/values', async (req, res) => {
+  try {
+    const { datasetId, fieldName } = req.params;
+    const { limit = 100 } = req.query;
+    
+    console.log(`Getting distinct values for ${datasetId}.${fieldName}...`);
+    const startTime = Date.now();
+    
+    try {
+      const values = await snowflakeService.getDistinctValues(datasetId, fieldName, parseInt(limit));
+      const duration = Date.now() - startTime;
+      
+      res.json({
+        success: true,
+        dataset_id: datasetId,
+        field_name: fieldName,
+        values: values,
+        count: values.length,
+        timestamp: new Date().toISOString(),
+        source: 'snowflake',
+        performance: {
+          duration: duration
+        }
+      });
+      
+    } catch (snowflakeError) {
+      console.error(`Failed to get values for ${datasetId}.${fieldName}:`, snowflakeError.message);
+      
+      res.status(503).json({
+        success: false,
+        error: 'Data source unavailable. Please check your connection.',
+        dataset_id: datasetId,
+        field_name: fieldName,
+        snowflake_error: snowflakeError.message,
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+  } catch (error) {
+    console.error('Field values endpoint error:', error);
     res.status(500).json({
       success: false,
       error: error.message,
