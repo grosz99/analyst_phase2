@@ -40,18 +40,22 @@ const FiltersStep = ({
   useEffect(() => {
     setFilterOptions({});
     setLoadingFilters({});
+    setSelectedField(''); // Clear selected field to trigger auto-selection
   }, [selectedDataSource]);
 
   // Auto-select first field if none selected
   useEffect(() => {
-    if (categoricalFields.length > 0 && !selectedField) {
+    // For NCC, prioritize Date Range
+    if (selectedDataSource === 'NCC' && !selectedField) {
+      setSelectedField('date_range');
+    } else if (categoricalFields.length > 0 && !selectedField) {
       setSelectedField(categoricalFields[0].name);
-    } else if (categoricalFields.length > 0 && !categoricalFields.find(f => f.name === selectedField)) {
+    } else if (categoricalFields.length > 0 && !categoricalFields.find(f => f.name === selectedField) && selectedField !== 'date_range') {
       setSelectedField(categoricalFields[0].name);
-    } else if (categoricalFields.length === 0) {
+    } else if (categoricalFields.length === 0 && selectedDataSource !== 'NCC') {
       setSelectedField('');
     }
-  }, [categoricalFields, selectedField]);
+  }, [categoricalFields, selectedField, selectedDataSource]);
 
   const handleFilterChange = (field, value, isChecked) => {
     setSelectedFilters(prev => {
@@ -202,13 +206,6 @@ const FiltersStep = ({
         <p className="text-gray-500 mt-2">Select filters to reduce your dataset for optimal analysis performance.</p>
       </div>
       
-      {/* Date Range Filter for NCC */}
-      {selectedDataSource === 'NCC' && (
-        <DateRangeFilter 
-          onDateRangeChange={handleDateRangeChange}
-          selectedDataSource={selectedDataSource}
-        />
-      )}
       
       {/* Row Count and Performance Guidance */}
       {estimatedRows !== null && (
@@ -235,12 +232,27 @@ const FiltersStep = ({
         </div>
       )}
 
-      {categoricalFields.length > 0 ? (
+      {(categoricalFields.length > 0 || selectedDataSource === 'NCC') ? (
         <div className="filters-layout">
           {/* Left Panel - Filter Fields */}
           <div className="filter-fields-panel">
             <h3 className="panel-title">Available Filters</h3>
             <div className="filter-fields-list">
+              {/* Date Range Filter for NCC */}
+              {selectedDataSource === 'NCC' && (
+                <button
+                  onClick={() => setSelectedField('date_range')}
+                  className={`filter-field-button ${
+                    selectedField === 'date_range' ? 'active' : ''
+                  } ${dateRange ? 'has-filters' : ''}`}
+                >
+                  <div className="field-name">Date Range</div>
+                  {dateRange && (
+                    <div className="filter-count">1</div>
+                  )}
+                </button>
+              )}
+              
               {categoricalFields.map(field => {
                 const hasFilters = selectedFilters[field.name] && selectedFilters[field.name].length > 0;
                 return (
@@ -267,32 +279,46 @@ const FiltersStep = ({
           <div className="filter-values-panel">
             {selectedField && (
               <>
-                <h3 className="panel-title">
-                  {selectedField} Values
-                  {isLoadingActiveFilter && <span className="loading-indicator">Loading...</span>}
-                </h3>
-                <div className="filter-values-container">
-                  {isLoadingActiveFilter ? (
-                    <div className="loading-state">Loading filter options...</div>
-                  ) : (
-                    <div className="filter-values-list">
-                      {activeFilterOptions.map(value => {
-                        const isChecked = selectedFilters[selectedField]?.includes(value) || false;
-                        return (
-                          <label key={value} className="filter-value-option">
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={(e) => handleFilterChange(selectedField, value, e.target.checked)}
-                              className="filter-checkbox"
-                            />
-                            <span className="filter-value-text">{String(value)}</span>
-                          </label>
-                        );
-                      })}
+                {selectedField === 'date_range' && selectedDataSource === 'NCC' ? (
+                  <>
+                    <h3 className="panel-title">Date Range Selection</h3>
+                    <div className="filter-values-container">
+                      <DateRangeFilter 
+                        onDateRangeChange={handleDateRangeChange}
+                        selectedDataSource={selectedDataSource}
+                      />
                     </div>
-                  )}
-                </div>
+                  </>
+                ) : (
+                  <>
+                    <h3 className="panel-title">
+                      {selectedField} Values
+                      {isLoadingActiveFilter && <span className="loading-indicator">Loading...</span>}
+                    </h3>
+                    <div className="filter-values-container">
+                      {isLoadingActiveFilter ? (
+                        <div className="loading-state">Loading filter options...</div>
+                      ) : (
+                        <div className="filter-values-list">
+                          {activeFilterOptions.map(value => {
+                            const isChecked = selectedFilters[selectedField]?.includes(value) || false;
+                            return (
+                              <label key={value} className="filter-value-option">
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={(e) => handleFilterChange(selectedField, value, e.target.checked)}
+                                  className="filter-checkbox"
+                                />
+                                <span className="filter-value-text">{String(value)}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
               </>
             )}
           </div>
