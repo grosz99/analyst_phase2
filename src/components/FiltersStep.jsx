@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import datasetService from '../services/datasetService.js';
 import DateRangeFilter from './DateRangeFilter.jsx';
+import SimpleDateRangeFilter from './SimpleDateRangeFilter.jsx';
 import './FiltersStep.css';
 
 const FiltersStep = ({ 
@@ -35,6 +36,8 @@ const FiltersStep = ({
   const [loadingFilters, setLoadingFilters] = useState({});
   const [estimatedRows, setEstimatedRows] = useState(null);
   const [dateRange, setDateRange] = useState(null);
+  const [snapshotDateRange, setSnapshotDateRange] = useState(null);
+  const [openDateRange, setOpenDateRange] = useState(null);
 
   // Clear filter options when data source changes
   useEffect(() => {
@@ -48,11 +51,16 @@ const FiltersStep = ({
     // For NCC, prioritize Date Range
     if (selectedDataSource === 'NCC' && !selectedField) {
       setSelectedField('date_range');
+    }
+    // For PIPELINE, prioritize Snapshot Date
+    else if (selectedDataSource === 'PIPELINE' && !selectedField) {
+      setSelectedField('snapshot_date');
     } else if (categoricalFields.length > 0 && !selectedField) {
       setSelectedField(categoricalFields[0].name);
-    } else if (categoricalFields.length > 0 && !categoricalFields.find(f => f.name === selectedField) && selectedField !== 'date_range') {
+    } else if (categoricalFields.length > 0 && !categoricalFields.find(f => f.name === selectedField) && 
+               !['date_range', 'snapshot_date', 'open_date'].includes(selectedField)) {
       setSelectedField(categoricalFields[0].name);
-    } else if (categoricalFields.length === 0 && selectedDataSource !== 'NCC') {
+    } else if (categoricalFields.length === 0 && !['NCC', 'PIPELINE'].includes(selectedDataSource)) {
       setSelectedField('');
     }
   }, [categoricalFields, selectedField, selectedDataSource]);
@@ -171,7 +179,7 @@ const FiltersStep = ({
   const isLoadingActiveFilter = loadingFilters[selectedField] || false;
   const activeFilters = Object.entries(selectedFilters).flatMap(([field, values]) => {
     // Skip date range fields for custom display
-    if (field === 'from_reporting_date' || field === 'to_reporting_date') {
+    if (['from_reporting_date', 'to_reporting_date', 'snapshot_date_from', 'snapshot_date_to', 'open_date_from', 'open_date_to'].includes(field)) {
       return [];
     }
     return Array.isArray(values) ? values.map(value => ({ field, value })) : [{ field, value: values }];
@@ -195,6 +203,27 @@ const FiltersStep = ({
           month: newDateRange.to.month,
           week: newDateRange.to.week
         }
+      }));
+    }
+  };
+
+  // Handle simple date range changes for PIPELINE
+  const handleSimpleDateRangeChange = (dateRangeData) => {
+    const { filterType, from, to } = dateRangeData;
+    
+    if (filterType === 'snapshot_date') {
+      setSnapshotDateRange({ from, to });
+      setSelectedFilters(prev => ({
+        ...prev,
+        snapshot_date_from: from,
+        snapshot_date_to: to
+      }));
+    } else if (filterType === 'open_date') {
+      setOpenDateRange({ from, to });
+      setSelectedFilters(prev => ({
+        ...prev,
+        open_date_from: from,
+        open_date_to: to
       }));
     }
   };
@@ -232,7 +261,7 @@ const FiltersStep = ({
         </div>
       )}
 
-      {(categoricalFields.length > 0 || selectedDataSource === 'NCC') ? (
+      {(categoricalFields.length > 0 || ['NCC', 'PIPELINE'].includes(selectedDataSource)) ? (
         <div className="filters-layout">
           {/* Left Panel - Filter Fields */}
           <div className="filter-fields-panel">
@@ -251,6 +280,35 @@ const FiltersStep = ({
                     <div className="filter-count">1</div>
                   )}
                 </button>
+              )}
+
+              {/* Date Filters for PIPELINE */}
+              {selectedDataSource === 'PIPELINE' && (
+                <>
+                  <button
+                    onClick={() => setSelectedField('snapshot_date')}
+                    className={`filter-field-button ${
+                      selectedField === 'snapshot_date' ? 'active' : ''
+                    } ${snapshotDateRange ? 'has-filters' : ''}`}
+                  >
+                    <div className="field-name">Snapshot Date</div>
+                    {snapshotDateRange && (
+                      <div className="filter-count">1</div>
+                    )}
+                  </button>
+
+                  <button
+                    onClick={() => setSelectedField('open_date')}
+                    className={`filter-field-button ${
+                      selectedField === 'open_date' ? 'active' : ''
+                    } ${openDateRange ? 'has-filters' : ''}`}
+                  >
+                    <div className="field-name">Open Date</div>
+                    {openDateRange && (
+                      <div className="filter-count">1</div>
+                    )}
+                  </button>
+                </>
               )}
               
               {categoricalFields.map(field => {
@@ -286,6 +344,26 @@ const FiltersStep = ({
                       <DateRangeFilter 
                         onDateRangeChange={handleDateRangeChange}
                         selectedDataSource={selectedDataSource}
+                      />
+                    </div>
+                  </>
+                ) : selectedField === 'snapshot_date' && selectedDataSource === 'PIPELINE' ? (
+                  <>
+                    <h3 className="panel-title">Snapshot Date Selection</h3>
+                    <div className="filter-values-container">
+                      <SimpleDateRangeFilter 
+                        filterType="snapshot_date"
+                        onDateRangeChange={handleSimpleDateRangeChange}
+                      />
+                    </div>
+                  </>
+                ) : selectedField === 'open_date' && selectedDataSource === 'PIPELINE' ? (
+                  <>
+                    <h3 className="panel-title">Open Date Selection</h3>
+                    <div className="filter-values-container">
+                      <SimpleDateRangeFilter 
+                        filterType="open_date"
+                        onDateRangeChange={handleSimpleDateRangeChange}
                       />
                     </div>
                   </>
@@ -332,10 +410,17 @@ const FiltersStep = ({
       )}
 
       {/* Active Filters Display */}
-      {(activeFilters.length > 0 || (selectedDataSource === 'NCC' && dateRange)) && (
+      {(activeFilters.length > 0 || 
+        (selectedDataSource === 'NCC' && dateRange) || 
+        (selectedDataSource === 'PIPELINE' && (snapshotDateRange || openDateRange))) && (
         <div className="active-filters-display">
           <h3 className="active-filters-title">
-            Active Filters ({activeFilters.length + (dateRange && selectedDataSource === 'NCC' ? 1 : 0)}):
+            Active Filters ({
+              activeFilters.length + 
+              (dateRange && selectedDataSource === 'NCC' ? 1 : 0) +
+              (snapshotDateRange && selectedDataSource === 'PIPELINE' ? 1 : 0) +
+              (openDateRange && selectedDataSource === 'PIPELINE' ? 1 : 0)
+            }):
           </h3>
           <div className="active-filters-list">
             {/* Show date range for NCC */}
@@ -358,6 +443,48 @@ const FiltersStep = ({
                 </button>
               </div>
             )}
+
+            {/* Show snapshot date range for PIPELINE */}
+            {selectedDataSource === 'PIPELINE' && snapshotDateRange && (
+              <div className="active-filter-chip date-range-chip">
+                <span><strong>Snapshot Date:</strong> {new Date(snapshotDateRange.from).toLocaleDateString()} to {new Date(snapshotDateRange.to).toLocaleDateString()}</span>
+                <button 
+                  onClick={() => {
+                    setSnapshotDateRange(null);
+                    setSelectedFilters(prev => {
+                      const newFilters = { ...prev };
+                      delete newFilters.snapshot_date_from;
+                      delete newFilters.snapshot_date_to;
+                      return newFilters;
+                    });
+                  }} 
+                  title="Remove snapshot date filter"
+                >
+                  &times;
+                </button>
+              </div>
+            )}
+
+            {/* Show open date range for PIPELINE */}
+            {selectedDataSource === 'PIPELINE' && openDateRange && (
+              <div className="active-filter-chip date-range-chip">
+                <span><strong>Open Date:</strong> {new Date(openDateRange.from).toLocaleDateString()} to {new Date(openDateRange.to).toLocaleDateString()}</span>
+                <button 
+                  onClick={() => {
+                    setOpenDateRange(null);
+                    setSelectedFilters(prev => {
+                      const newFilters = { ...prev };
+                      delete newFilters.open_date_from;
+                      delete newFilters.open_date_to;
+                      return newFilters;
+                    });
+                  }} 
+                  title="Remove open date filter"
+                >
+                  &times;
+                </button>
+              </div>
+            )}
             
             {activeFilters.map(({ field, value }, index) => (
               <div key={`${field}-${value}-${index}`} className="active-filter-chip">
@@ -375,6 +502,8 @@ const FiltersStep = ({
               onClick={() => {
                 setSelectedFilters({});
                 setDateRange(null);
+                setSnapshotDateRange(null);
+                setOpenDateRange(null);
               }}
               title="Clear all filters"
             >
