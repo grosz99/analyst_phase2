@@ -136,23 +136,23 @@ class SupabaseService {
         return this.metadataCache.get(cacheKey);
       }
 
-      // For now, return schema based on what we know from your fixedMetadata
+      // Return schema based on actual Supabase table structure
       const tableSchemas = {
         ncc: {
           columns: [
-            { name: 'MONTH', type: 'timestamp', category: 'dimension' },
-            { name: 'OFFICE', type: 'text', category: 'dimension' },
-            { name: 'REGION', type: 'text', category: 'dimension' },
-            { name: 'SECTOR', type: 'text', category: 'dimension' },
-            { name: 'CLIENT', type: 'text', category: 'dimension' },
-            { name: 'CALLS_HANDLED', type: 'integer', category: 'metric' },
-            { name: 'AVG_HANDLE_TIME', type: 'numeric', category: 'metric' },
-            { name: 'SATISFACTION_SCORE', type: 'numeric', category: 'metric' },
-            { name: 'REVENUE', type: 'numeric', category: 'metric' }
+            { name: 'Month', type: 'text', category: 'dimension' },
+            { name: 'Office', type: 'text', category: 'dimension' },
+            { name: 'Region', type: 'text', category: 'dimension' },
+            { name: 'Sector', type: 'text', category: 'dimension' },
+            { name: 'Client', type: 'text', category: 'dimension' },
+            { name: 'Project_ID', type: 'text', category: 'dimension' },
+            { name: 'Timesheet_Charges', type: 'numeric', category: 'metric' },
+            { name: 'Adjustments', type: 'numeric', category: 'metric' },
+            { name: 'NCC', type: 'numeric', category: 'metric' }
           ],
           total_columns: 9,
-          dimensions: 5,
-          metrics: 4
+          dimensions: 6,
+          metrics: 3
         },
         attendance: {
           columns: [

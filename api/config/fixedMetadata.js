@@ -54,19 +54,19 @@ const fixedMetadata = {
     
     ncc: {
       columns: [
-        { name: 'MONTH', type: 'Date', category: 'dimension', nullable: false, comment: 'Month of metrics' },
-        { name: 'OFFICE', type: 'String', category: 'dimension', nullable: false, comment: 'Office location' },
-        { name: 'REGION', type: 'String', category: 'dimension', nullable: false, comment: 'Geographic region' },
-        { name: 'SECTOR', type: 'String', category: 'dimension', nullable: true, comment: 'Business sector' },
-        { name: 'CLIENT', type: 'String', category: 'dimension', nullable: true, comment: 'Client name' },
-        { name: 'CALLS_HANDLED', type: 'Integer', category: 'metric', nullable: false, comment: 'Number of calls handled' },
-        { name: 'AVG_HANDLE_TIME', type: 'Number', category: 'metric', nullable: true, comment: 'Average handle time in minutes' },
-        { name: 'SATISFACTION_SCORE', type: 'Number', category: 'metric', nullable: true, comment: 'Customer satisfaction score' },
-        { name: 'REVENUE', type: 'Number', category: 'metric', nullable: true, comment: 'Revenue generated' }
+        { name: 'Month', type: 'String', category: 'dimension', nullable: false, comment: 'Month of metrics' },
+        { name: 'Office', type: 'String', category: 'dimension', nullable: false, comment: 'Office location' },
+        { name: 'Region', type: 'String', category: 'dimension', nullable: false, comment: 'Geographic region' },
+        { name: 'Sector', type: 'String', category: 'dimension', nullable: true, comment: 'Business sector' },
+        { name: 'Client', type: 'String', category: 'dimension', nullable: true, comment: 'Client name' },
+        { name: 'Project_ID', type: 'String', category: 'dimension', nullable: false, comment: 'Project identifier' },
+        { name: 'Timesheet_Charges', type: 'Number', category: 'metric', nullable: false, comment: 'Timesheet charges amount' },
+        { name: 'Adjustments', type: 'Number', category: 'metric', nullable: true, comment: 'Billing adjustments' },
+        { name: 'NCC', type: 'Number', category: 'metric', nullable: true, comment: 'Net Cash Contribution' }
       ],
       total_columns: 9,
-      dimensions: 5,
-      metrics: 4
+      dimensions: 6,
+      metrics: 3
     },
     
     pipeline: {
@@ -97,10 +97,10 @@ const fixedMetadata = {
       STATUS: ['Present', 'Absent', 'Remote', 'Holiday', 'Sick Leave']
     },
     ncc: {
-      OFFICE: ['New York', 'London', 'Singapore', 'Tokyo', 'Sydney'],
-      REGION: ['Americas', 'EMEA', 'APAC'],
-      SECTOR: ['Technology', 'Healthcare', 'Financial Services', 'Consumer Goods', 'Energy'],
-      CLIENT: ['Client A', 'Client B', 'Client C', 'Client D', 'Client E']
+      Office: ['Singapore', 'Sydney', 'Munich', 'London', 'Boston'],
+      Region: ['Asia Pacific', 'EMESA', 'North America'],
+      Sector: ['Industrial Goods', 'Consumer', 'TMT', 'Financial Institutions'],
+      Client: ['Client_1', 'Client_2', 'Client_3', 'Client_4', 'Client_5']
     },
     pipeline: {
       STAGE: ['Prospecting', 'Qualification', 'Proposal', 'Negotiation', 'Closed Won', 'Closed Lost'],
