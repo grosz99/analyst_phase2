@@ -431,7 +431,7 @@ app.get('/api/dataset/:datasetId/field/:fieldName/values', async (req, res) => {
         console.error(`Failed to get values for ${datasetId}.${fieldName}:`, supabaseError.message);
         
         // Fallback to fixed metadata
-        const fixedValues = fixedMetadata.filterValues[datasetId.toLowerCase()]?.[fieldName.toUpperCase()];
+        const fixedValues = fixedMetadata.filterValues[datasetId.toLowerCase()]?.[fieldName];
         if (fixedValues) {
           const duration = Date.now() - startTime;
           res.json({
@@ -459,7 +459,7 @@ app.get('/api/dataset/:datasetId/field/:fieldName/values', async (req, res) => {
       }
     } else {
       // DEFAULT: Use fixed metadata to avoid expensive queries
-      const fixedValues = fixedMetadata.filterValues[datasetId.toLowerCase()]?.[fieldName.toUpperCase()];
+      const fixedValues = fixedMetadata.filterValues[datasetId.toLowerCase()]?.[fieldName];
       
       if (fixedValues) {
         const duration = Date.now() - startTime;
