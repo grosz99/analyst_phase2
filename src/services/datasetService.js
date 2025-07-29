@@ -15,7 +15,7 @@ class DatasetService {
     try {
       console.log('Fetching available datasets from API...');
       
-      const response = await fetch(`${this.baseURL}/api/available-datasets?live=true`);
+      const response = await fetch(`${this.baseURL}/api/available-datasets`);
       
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -37,7 +37,7 @@ class DatasetService {
 
   async getDatasetSchema(datasetId) {
     try {
-      const response = await fetch(`${this.baseURL}/api/dataset/${datasetId}/schema?live=true`);
+      const response = await fetch(`${this.baseURL}/api/dataset/${datasetId}/schema`);
       
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
