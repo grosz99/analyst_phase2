@@ -3,6 +3,7 @@ const cors = require('cors');
 require('dotenv').config();
 const snowflakeService = require('./services/snowflakeService');
 const anthropicService = require('./services/anthropicService');
+const fixedMetadata = require('./config/fixedMetadata');
 
 const app = express();
 
@@ -119,45 +120,75 @@ app.get('/api', (req, res) => {
 
 // Only real Snowflake data - no mock fallbacks
 
-// Get available datasets
+// Get available datasets - Now using fixed metadata to reduce costs
 app.get('/api/available-datasets', async (req, res) => {
   try {
     console.log('Fetching available datasets...');
     const startTime = Date.now();
     
-    // Try to get real Snowflake tables first
-    try {
-      const allSnowflakeTables = await snowflakeService.discoverTables();
+    // Check if we should use live data (only when explicitly requested)
+    const useLiveData = req.query.live === 'true';
+    
+    if (useLiveData) {
+      // Only query Snowflake when explicitly requested
+      try {
+        const allSnowflakeTables = await snowflakeService.discoverTables();
+        const duration = Date.now() - startTime;
+        
+        // Filter to only show the three real business datasets
+        const businessDatasets = allSnowflakeTables.filter(table => 
+          ['ATTENDANCE', 'NCC', 'PIPELINE'].includes(table.name)
+        );
+        
+        console.log(`Retrieved ${allSnowflakeTables.length} Snowflake tables, filtered to ${businessDatasets.length} business datasets in ${duration}ms`);
+        
+        res.json({
+          success: true,
+          datasets: businessDatasets,
+          total_count: businessDatasets.length,
+          timestamp: new Date().toISOString(),
+          source: 'snowflake',
+          performance: {
+            duration: duration,
+            cached: duration < 1000
+          }
+        });
+      } catch (snowflakeError) {
+        console.error('Snowflake unavailable:', snowflakeError.message);
+        
+        // Fallback to fixed metadata
+        console.log('Falling back to fixed metadata due to Snowflake error');
+        const duration = Date.now() - startTime;
+        
+        res.json({
+          success: true,
+          datasets: fixedMetadata.tables,
+          total_count: fixedMetadata.tables.length,
+          timestamp: new Date().toISOString(),
+          source: 'fixed_metadata',
+          performance: {
+            duration: duration,
+            cached: true
+          },
+          notice: 'Using cached metadata due to connection issues'
+        });
+      }
+    } else {
+      // DEFAULT: Use fixed metadata to avoid expensive queries
       const duration = Date.now() - startTime;
       
-      // Filter to only show the three real business datasets
-      const businessDatasets = allSnowflakeTables.filter(table => 
-        ['ATTENDANCE', 'NCC', 'PIPELINE'].includes(table.name)
-      );
-      
-      console.log(`Retrieved ${allSnowflakeTables.length} Snowflake tables, filtered to ${businessDatasets.length} business datasets in ${duration}ms`);
+      console.log(`Using fixed metadata for datasets (${duration}ms)`);
       
       res.json({
         success: true,
-        datasets: businessDatasets,
-        total_count: businessDatasets.length,
+        datasets: fixedMetadata.tables,
+        total_count: fixedMetadata.tables.length,
         timestamp: new Date().toISOString(),
-        source: 'snowflake',
+        source: 'fixed_metadata',
         performance: {
           duration: duration,
-          cached: duration < 1000 // Fast response likely from cache
+          cached: true
         }
-      });
-      
-    } catch (snowflakeError) {
-      console.error('Snowflake unavailable:', snowflakeError.message);
-      
-      // Return error - no fallback data
-      res.status(503).json({
-        success: false,
-        error: 'Data source unavailable. Please check your connection.',
-        snowflake_error: snowflakeError.message,
-        timestamp: new Date().toISOString()
       });
     }
     
@@ -366,7 +397,7 @@ result = result.head(5)`.trim();
   }
 });
 
-// Get distinct values for a field (for filter options)
+// Get distinct values for a field (for filter options) - Now using fixed metadata to reduce costs
 app.get('/api/dataset/:datasetId/field/:fieldName/values', async (req, res) => {
   try {
     const { datasetId, fieldName } = req.params;
@@ -375,34 +406,94 @@ app.get('/api/dataset/:datasetId/field/:fieldName/values', async (req, res) => {
     console.log(`Getting distinct values for ${datasetId}.${fieldName}...`);
     const startTime = Date.now();
     
-    try {
-      const values = await snowflakeService.getDistinctValues(datasetId, fieldName, parseInt(limit));
-      const duration = Date.now() - startTime;
-      
-      res.json({
-        success: true,
-        dataset_id: datasetId,
-        field_name: fieldName,
-        values: values,
-        count: values.length,
-        timestamp: new Date().toISOString(),
-        source: 'snowflake',
-        performance: {
-          duration: duration
+    // Check if we should use live data (only when explicitly requested)
+    const useLiveData = req.query.live === 'true';
+    
+    if (useLiveData) {
+      // Only query Snowflake when explicitly requested
+      try {
+        const values = await snowflakeService.getDistinctValues(datasetId, fieldName, parseInt(limit));
+        const duration = Date.now() - startTime;
+        
+        res.json({
+          success: true,
+          dataset_id: datasetId,
+          field_name: fieldName,
+          values: values,
+          count: values.length,
+          timestamp: new Date().toISOString(),
+          source: 'snowflake',
+          performance: {
+            duration: duration
+          }
+        });
+      } catch (snowflakeError) {
+        console.error(`Failed to get values for ${datasetId}.${fieldName}:`, snowflakeError.message);
+        
+        // Fallback to fixed metadata
+        const fixedValues = fixedMetadata.filterValues[datasetId.toLowerCase()]?.[fieldName.toUpperCase()];
+        if (fixedValues) {
+          const duration = Date.now() - startTime;
+          res.json({
+            success: true,
+            dataset_id: datasetId,
+            field_name: fieldName,
+            values: fixedValues.slice(0, parseInt(limit)),
+            count: fixedValues.length,
+            timestamp: new Date().toISOString(),
+            source: 'fixed_metadata',
+            performance: {
+              duration: duration
+            },
+            notice: 'Using cached values due to connection issues'
+          });
+        } else {
+          res.status(404).json({
+            success: false,
+            error: 'Field not found or no values available',
+            dataset_id: datasetId,
+            field_name: fieldName,
+            timestamp: new Date().toISOString()
+          });
         }
-      });
+      }
+    } else {
+      // DEFAULT: Use fixed metadata to avoid expensive queries
+      const fixedValues = fixedMetadata.filterValues[datasetId.toLowerCase()]?.[fieldName.toUpperCase()];
       
-    } catch (snowflakeError) {
-      console.error(`Failed to get values for ${datasetId}.${fieldName}:`, snowflakeError.message);
-      
-      res.status(503).json({
-        success: false,
-        error: 'Data source unavailable. Please check your connection.',
-        dataset_id: datasetId,
-        field_name: fieldName,
-        snowflake_error: snowflakeError.message,
-        timestamp: new Date().toISOString()
-      });
+      if (fixedValues) {
+        const duration = Date.now() - startTime;
+        console.log(`Using fixed metadata for ${datasetId}.${fieldName} values (${duration}ms)`);
+        
+        res.json({
+          success: true,
+          dataset_id: datasetId,
+          field_name: fieldName,
+          values: fixedValues.slice(0, parseInt(limit)),
+          count: fixedValues.length,
+          timestamp: new Date().toISOString(),
+          source: 'fixed_metadata',
+          performance: {
+            duration: duration
+          }
+        });
+      } else {
+        // If no fixed values available, return empty array
+        const duration = Date.now() - startTime;
+        res.json({
+          success: true,
+          dataset_id: datasetId,
+          field_name: fieldName,
+          values: [],
+          count: 0,
+          timestamp: new Date().toISOString(),
+          source: 'fixed_metadata',
+          performance: {
+            duration: duration
+          },
+          notice: 'No predefined values available for this field'
+        });
+      }
     }
     
   } catch (error) {
@@ -415,43 +506,93 @@ app.get('/api/dataset/:datasetId/field/:fieldName/values', async (req, res) => {
   }
 });
 
-// Get dataset schema/columns
+// Get dataset schema/columns - Now using fixed metadata to reduce costs
 app.get('/api/dataset/:datasetId/schema', async (req, res) => {
   try {
     const { datasetId } = req.params;
     console.log(`Getting schema for dataset: ${datasetId}`);
     const startTime = Date.now();
     
-    // Try Snowflake first
-    try {
-      const schema = await snowflakeService.discoverColumns(datasetId);
-      const duration = Date.now() - startTime;
-      
-      console.log(`Retrieved schema for ${datasetId} in ${duration}ms`);
-      
-      res.json({
-        success: true,
-        dataset_id: datasetId,
-        dataset_name: datasetId.toUpperCase(),
-        schema: schema,
-        timestamp: new Date().toISOString(),
-        source: 'snowflake',
-        performance: {
-          duration: duration,
-          cached: duration < 500
+    // Check if we should use live data (only when explicitly requested)
+    const useLiveData = req.query.live === 'true';
+    
+    if (useLiveData) {
+      // Only query Snowflake when explicitly requested
+      try {
+        const schema = await snowflakeService.discoverColumns(datasetId);
+        const duration = Date.now() - startTime;
+        
+        console.log(`Retrieved schema for ${datasetId} in ${duration}ms`);
+        
+        res.json({
+          success: true,
+          dataset_id: datasetId,
+          dataset_name: datasetId.toUpperCase(),
+          schema: schema,
+          timestamp: new Date().toISOString(),
+          source: 'snowflake',
+          performance: {
+            duration: duration,
+            cached: duration < 500
+          }
+        });
+      } catch (snowflakeError) {
+        console.error(`Snowflake schema unavailable for ${datasetId}:`, snowflakeError.message);
+        
+        // Fallback to fixed metadata
+        const schema = fixedMetadata.schemas[datasetId.toLowerCase()];
+        if (schema) {
+          const duration = Date.now() - startTime;
+          res.json({
+            success: true,
+            dataset_id: datasetId,
+            dataset_name: datasetId.toUpperCase(),
+            schema: schema,
+            timestamp: new Date().toISOString(),
+            source: 'fixed_metadata',
+            performance: {
+              duration: duration,
+              cached: true
+            },
+            notice: 'Using cached schema due to connection issues'
+          });
+        } else {
+          res.status(404).json({
+            success: false,
+            error: 'Dataset not found',
+            dataset_id: datasetId,
+            timestamp: new Date().toISOString()
+          });
         }
-      });
+      }
+    } else {
+      // DEFAULT: Use fixed metadata to avoid expensive queries
+      const schema = fixedMetadata.schemas[datasetId.toLowerCase()];
       
-    } catch (snowflakeError) {
-      console.error(`Snowflake schema unavailable for ${datasetId}:`, snowflakeError.message);
-      
-      res.status(503).json({
-        success: false,
-        error: 'Data source unavailable. Please check your connection.',
-        dataset_id: datasetId,
-        snowflake_error: snowflakeError.message,
-        timestamp: new Date().toISOString()
-      });
+      if (schema) {
+        const duration = Date.now() - startTime;
+        console.log(`Using fixed metadata for ${datasetId} schema (${duration}ms)`);
+        
+        res.json({
+          success: true,
+          dataset_id: datasetId,
+          dataset_name: datasetId.toUpperCase(),
+          schema: schema,
+          timestamp: new Date().toISOString(),
+          source: 'fixed_metadata',
+          performance: {
+            duration: duration,
+            cached: true
+          }
+        });
+      } else {
+        res.status(404).json({
+          success: false,
+          error: 'Dataset not found',
+          dataset_id: datasetId,
+          timestamp: new Date().toISOString()
+        });
+      }
     }
     
   } catch (error) {
