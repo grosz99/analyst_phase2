@@ -1,7 +1,7 @@
 import snowflake.connector
 import pandas as pd
 import redis
-import pickle
+import json
 import hashlib
 import time
 import os

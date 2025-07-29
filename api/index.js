@@ -1,5 +1,7 @@
 const express = require('express');
 const cors = require('cors');
+const session = require('express-session');
+const csrf = require('csrf');
 require('dotenv').config();
 const supabaseService = require('./services/supabaseService');
 const anthropicService = require('./services/anthropicService');
@@ -17,6 +19,51 @@ app.use(cors({
 }));
 
 app.use(express.json());
+
+// Session configuration for CSRF protection
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'fallback-secret-change-in-production',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+    httpOnly: true,
+    maxAge: 1000 * 60 * 60 // 1 hour
+  }
+}));
+
+// CSRF protection middleware
+const csrfTokens = csrf();
+
+// CSRF middleware function
+const csrfProtection = (req, res, next) => {
+  const token = req.headers['x-csrf-token'] || req.body._csrf;
+  const secret = req.session.csrfSecret;
+  
+  if (!secret) {
+    req.session.csrfSecret = csrfTokens.secretSync();
+  }
+  
+  if (req.method === 'POST' && !csrfTokens.verify(req.session.csrfSecret, token)) {
+    return res.status(403).json({ error: 'Invalid CSRF token' });
+  }
+  
+  next();
+};
+
+// Apply CSRF protection to sensitive endpoints
+app.use('/api/ai/analyze', csrfProtection);
+app.use('/api/load-dataset', csrfProtection);
+app.use('/api/ai/recommend-datasource', csrfProtection);
+
+// CSRF token endpoint
+app.get('/api/csrf-token', (req, res) => {
+  if (!req.session.csrfSecret) {
+    req.session.csrfSecret = csrfTokens.secretSync();
+  }
+  const token = csrfTokens.create(req.session.csrfSecret);
+  res.json({ csrfToken: token });
+});
 
 // Basic health check endpoint
 app.get('/api/health', (req, res) => {
@@ -182,7 +229,7 @@ app.get('/api/available-datasets', async (req, res) => {
       // DEFAULT: Use fixed metadata to avoid expensive queries
       const duration = Date.now() - startTime;
       
-      console.log(`Using fixed metadata for datasets (${duration}ms)`);
+      console.log('Using fixed metadata for datasets', { duration: `${duration}ms` });
       
       res.json({
         success: true,
@@ -211,8 +258,8 @@ app.get('/api/available-datasets', async (req, res) => {
 app.post('/api/load-dataset', async (req, res) => {
   try {
     const { datasetId, userSelections = {} } = req.body;
-    console.log(`🔄 Loading dataset ${datasetId} with selections:`, JSON.stringify(userSelections, null, 2));
-    console.log(`📡 Request from: ${req.ip}, User-Agent: ${req.get('User-Agent')}`);
+    console.log('🔄 Loading dataset with selections:', { datasetId, userSelections: JSON.stringify(userSelections, null, 2) });
+    console.log('📡 Request details:', { ip: req.ip, userAgent: req.get('User-Agent') });
     const startTime = Date.now();
     
     if (!datasetId) {
