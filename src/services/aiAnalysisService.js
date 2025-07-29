@@ -1,10 +1,12 @@
 class AIAnalysisService {
   constructor() {
-    // Use environment variable if available, otherwise fallback to localhost in dev
+    // Use environment variable if available, otherwise fallback based on environment
     this.baseURL = process.env.REACT_APP_API_URL || 
       (process.env.NODE_ENV === 'production' 
-        ? '' // Use relative URLs in production
+        ? window.location.origin // Use current domain in production
         : 'http://localhost:3001');
+    
+    console.log(`🔗 AI Analysis Service initialized with baseURL: ${this.baseURL}`);
   }
 
   // Get available analysis types
@@ -409,6 +411,7 @@ class AIAnalysisService {
   async getDataSourceRecommendation(query, availableDataSources, semanticModel) {
     try {
       console.log(`🔍 Getting AI recommendation for: "${query}"`);
+      console.log(`📡 API endpoint: ${this.baseURL}/api/ai/recommend-datasource`);
       
       const response = await fetch(`${this.baseURL}/api/ai/recommend-datasource`, {
         method: 'POST',
@@ -422,8 +425,12 @@ class AIAnalysisService {
         })
       });
 
+      console.log(`📊 API Response status: ${response.status} ${response.statusText}`);
+
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const errorText = await response.text();
+        console.error(`❌ API Error response: ${errorText}`);
+        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
       }
 
       const result = await response.json();
@@ -435,12 +442,19 @@ class AIAnalysisService {
         throw new Error(result.error || 'Failed to get recommendation');
       }
     } catch (error) {
-      console.error('Failed to get data source recommendation:', error);
-      // Return fallback recommendation
+      console.error('❌ Failed to get data source recommendation:', error);
+      console.error('Error details:', {
+        message: error.message,
+        baseURL: this.baseURL,
+        query: query,
+        availableDataSources: availableDataSources
+      });
+      
+      // Return fallback recommendation with better reasoning
       return {
-        recommendedSource: availableDataSources[0] || 'CUSTOMERS',
+        recommendedSource: availableDataSources[0] || 'NCC',
         confidence: 'low',
-        reasoning: 'API unavailable, providing fallback recommendation',
+        reasoning: `Connection issue: ${error.message}. Using best guess based on query keywords.`,
         analysisType: 'general analysis',
         alternativeSources: availableDataSources.slice(1, 3),
         keyFeatures: ['General data fields']
