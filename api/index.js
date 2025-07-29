@@ -255,12 +255,58 @@ app.post('/api/load-dataset', async (req, res) => {
     } catch (supabaseError) {
       console.error(`Supabase dataset loading failed for ${datasetId}:`, supabaseError.message);
       
-      // Return error - no fallback data for actual analysis
+      // Try fallback to fixed metadata with sample data
+      try {
+        const fallbackSchema = fixedMetadata.schemas[datasetId.toLowerCase()];
+        const fallbackSample = fixedMetadata.sampleData[datasetId.toLowerCase()] || [];
+        
+        if (fallbackSchema && fallbackSample.length > 0) {
+          const duration = Date.now() - startTime;
+          console.log(`Using fallback data for ${datasetId} with ${fallbackSample.length} sample rows`);
+          
+          return res.json({
+            success: true,
+            dataset_id: datasetId,
+            schema: {
+              ...fallbackSchema,
+              row_count: fallbackSample.length,
+              memory_usage: Math.round(fallbackSample.length * fallbackSchema.total_columns * 0.1)
+            },
+            sample_data: fallbackSample.slice(0, 10), // First 10 rows for preview
+            analysis_data: fallbackSample, // Full fallback data for AI analysis
+            filters_applied: userSelections,
+            message: `Loaded ${datasetId.toUpperCase()} with ${fallbackSchema.total_columns} columns (${fallbackSample.length} sample rows) from fallback cache`,
+            processing_time: duration,
+            timestamp: new Date().toISOString(),
+            source: 'fallback_cache',
+            warning: 'Using cached sample data due to connection issues. Some features may be limited.',
+            performance: {
+              duration: duration,
+              rows_sampled: fallbackSample.length
+            }
+          });
+        }
+      } catch (fallbackError) {
+        console.error('Fallback data loading also failed:', fallbackError.message);
+      }
+      
+      // Only return 503 if all fallbacks fail
       res.status(503).json({
         success: false,
-        error: 'Data source unavailable. Please check your connection.',
+        error: 'Data source temporarily unavailable. Please try again in a few moments.',
         dataset_id: datasetId,
         supabase_error: supabaseError.message,
+        troubleshooting: {
+          message: 'We are experiencing connectivity issues with our data source.',
+          steps: [
+            'Check your internet connection',
+            'Refresh the page and try again',
+            'Verify that you have proper access permissions',
+            'Contact support if the issue persists'
+          ],
+          support_contact: 'Please check the system status or contact your administrator'
+        },
+        retry_after: 30, // Suggest retry after 30 seconds
         timestamp: new Date().toISOString()
       });
     }

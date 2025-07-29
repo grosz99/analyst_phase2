@@ -288,6 +288,50 @@ class SupabaseService {
     }
   }
 
+  // Health check with latency measurement
+  async healthCheck() {
+    const startTime = Date.now();
+    
+    try {
+      if (!this.client) {
+        return { 
+          healthy: false, 
+          error: 'Supabase client not initialized',
+          latency: 0
+        };
+      }
+
+      // Quick health check - get one row from NCC table
+      const { data, error } = await this.client
+        .from('NCC')
+        .select('*')
+        .limit(1);
+      
+      const latency = Date.now() - startTime;
+      
+      if (error) {
+        return { 
+          healthy: false, 
+          error: error.message,
+          latency: latency
+        };
+      }
+      
+      return { 
+        healthy: true, 
+        latency: latency,
+        sample_data_available: data && data.length > 0
+      };
+      
+    } catch (err) {
+      return { 
+        healthy: false, 
+        error: err.message,
+        latency: Date.now() - startTime
+      };
+    }
+  }
+
   // Get service status
   getStatus() {
     return {
