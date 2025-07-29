@@ -1,53 +1,146 @@
-// Test script to simulate frontend request to backend
-const { execSync } = require('child_process');
+#!/usr/bin/env node
+/**
+ * Test script to verify frontend-backend integration after the fixes
+ */
 
-async function testBackendConnection() {
-  console.log('🧪 Testing backend connection...');
+const fetch = require('node-fetch');
+
+const BACKEND_URL = 'http://localhost:3001';
+const FRONTEND_URL = 'http://localhost:3000';
+
+async function testBackendEndpoints() {
+  console.log('🔍 Testing Backend Endpoints...\n');
   
-  try {
-    // Test 1: Health check
-    console.log('1️⃣ Testing health endpoint...');
-    const healthResponse = await fetch('http://localhost:3001/api/health');
-    const healthData = await healthResponse.json();
-    console.log('✅ Health check:', healthData.status);
-    
-    // Test 2: Available datasets
-    console.log('2️⃣ Testing available datasets...');
-    const datasetsResponse = await fetch('http://localhost:3001/api/available-datasets');
-    const datasetsData = await datasetsResponse.json();
-    console.log('✅ Available datasets:', datasetsData.success);
-    
-    // Test 3: Load dataset (simulating frontend request)
-    console.log('3️⃣ Testing load dataset (like frontend would)...');
-    const loadResponse = await fetch('http://localhost:3001/api/load-dataset', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        datasetId: 'ncc',
-        userSelections: {
-          columns: ['Office', 'Region', 'NCC'],
-          filters: {
-            Office: ['Singapore']
-          }
-        }
-      })
-    });
-    
-    if (!loadResponse.ok) {
-      console.error('❌ Load dataset failed:', loadResponse.status, loadResponse.statusText);
-      const errorText = await loadResponse.text();
-      console.error('Error details:', errorText);
-    } else {
-      const loadData = await loadResponse.json();
-      console.log('✅ Load dataset success:', loadData.success);
-      console.log('📊 Rows returned:', loadData.analysis_data?.length);
+  const tests = [
+    {
+      name: 'Health Check',
+      url: `${BACKEND_URL}/api/health`,
+      expectedStatus: 200
+    },
+    {
+      name: 'Available Datasets (Fixed)',
+      url: `${BACKEND_URL}/api/available-datasets`,
+      expectedStatus: 200
+    },
+    {
+      name: 'Available Datasets (Live)',
+      url: `${BACKEND_URL}/api/available-datasets?live=true`,
+      expectedStatus: 200
+    },
+    {
+      name: 'NCC Schema (Live)',
+      url: `${BACKEND_URL}/api/dataset/ncc/schema?live=true`,
+      expectedStatus: 200
+    },
+    {
+      name: 'NCC Office Filter Values (Live)',
+      url: `${BACKEND_URL}/api/dataset/ncc/field/Office/values?live=true`,
+      expectedStatus: 200
+    },
+    {
+      name: 'NCC Region Filter Values (Live)',
+      url: `${BACKEND_URL}/api/dataset/ncc/field/Region/values?live=true`,
+      expectedStatus: 200
     }
-    
-  } catch (error) {
-    console.error('❌ Connection error:', error.message);
+  ];
+
+  for (const test of tests) {
+    try {
+      const response = await fetch(test.url, {
+        headers: {
+          'Origin': 'http://localhost:3000'
+        }
+      });
+      
+      const success = response.status === test.expectedStatus;
+      const status = success ? '✅' : '❌';
+      
+      console.log(`${status} ${test.name}: ${response.status}`);
+      
+      if (test.name.includes('Filter Values')) {
+        const data = await response.json();
+        if (data.success && data.values) {
+          console.log(`   📋 Values: ${data.values.join(', ')}`);
+          console.log(`   📊 Source: ${data.source}`);
+        }
+      } else if (test.name.includes('Available Datasets')) {
+        const data = await response.json();
+        if (data.success) {
+          console.log(`   📊 Source: ${data.source}, Count: ${data.total_count}`);
+        }
+      }
+      
+    } catch (error) {
+      console.log(`❌ ${test.name}: Error - ${error.message}`);
+    }
   }
 }
 
-testBackendConnection();
+async function testDataLoading() {
+  console.log('\n🔄 Testing Data Loading...\n');
+  
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/load-dataset`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Origin': 'http://localhost:3000'
+      },
+      body: JSON.stringify({
+        datasetId: 'ncc',
+        userSelections: {}
+      })
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      console.log(`✅ NCC Data Loading: ${response.status}`);
+      console.log(`   📊 Rows: ${data.analysis_data?.length || 0}`);
+      console.log(`   📋 Columns: ${data.schema?.total_columns || 0}`);
+      console.log(`   📊 Source: ${data.source}`);
+      
+      if (data.sample_data && data.sample_data.length > 0) {
+        const sampleRow = data.sample_data[0];
+        console.log(`   🏢 Sample Office: ${sampleRow.Office}`);
+        console.log(`   🌍 Sample Region: ${sampleRow.Region}`);
+      }
+    } else {
+      console.log(`❌ NCC Data Loading: ${response.status}`);
+    }
+  } catch (error) {
+    console.log(`❌ NCC Data Loading: Error - ${error.message}`);
+  }
+}
+
+async function testFrontendAccess() {
+  console.log('\n🌐 Testing Frontend Access...\n');
+  
+  try {
+    const response = await fetch(FRONTEND_URL);
+    const success = response.status === 200;
+    const status = success ? '✅' : '❌';
+    console.log(`${status} Frontend Access: ${response.status}`);
+  } catch (error) {
+    console.log(`❌ Frontend Access: Error - ${error.message}`);
+  }
+}
+
+async function runTests() {
+  console.log('🧪 Frontend-Backend Integration Test\n');
+  console.log('=======================================\n');
+  
+  await testBackendEndpoints();
+  await testDataLoading();
+  await testFrontendAccess();
+  
+  console.log('\n=======================================');
+  console.log('📋 Summary:');
+  console.log('- Backend APIs should all show ✅');
+  console.log('- Filter values should show real data from Supabase');
+  console.log('- Office values: Singapore, Sydney, Munich, London, Boston');
+  console.log('- Region values: Asia Pacific, EMESA, North America');
+  console.log('- Frontend should be accessible');
+  console.log('=======================================\n');
+}
+
+runTests().catch(console.error);

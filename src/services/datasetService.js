@@ -15,7 +15,7 @@ class DatasetService {
     try {
       console.log('Fetching available datasets from API...');
       
-      const response = await fetch(`${this.baseURL}/api/available-datasets`);
+      const response = await fetch(`${this.baseURL}/api/available-datasets?live=true`);
       
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -37,7 +37,7 @@ class DatasetService {
 
   async getDatasetSchema(datasetId) {
     try {
-      const response = await fetch(`${this.baseURL}/api/dataset/${datasetId}/schema`);
+      const response = await fetch(`${this.baseURL}/api/dataset/${datasetId}/schema?live=true`);
       
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -164,21 +164,8 @@ class DatasetService {
 
   async getSampleDataForFilters(datasetId, fieldName) {
     try {
-      // Try to get real sample data from API
-      const response = await fetch(`${this.baseURL}/api/load-dataset`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          datasetId: datasetId,
-          userSelections: {
-            columns: [fieldName],
-            filters: {},
-            sample_rate: 0.1 // Get 10% sample for faster filter loading
-          }
-        })
-      });
+      // Use the dedicated field values endpoint with live data
+      const response = await fetch(`${this.baseURL}/api/dataset/${datasetId}/field/${fieldName}/values?live=true&limit=100`);
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -186,18 +173,17 @@ class DatasetService {
 
       const result = await response.json();
 
-      if (result.success && result.sample_data && result.sample_data.length > 0) {
-        // Extract unique values from the sample data
-        const values = result.sample_data.map(row => row[fieldName]);
-        return [...new Set(values)].filter(v => v != null).sort();
+      if (result.success && result.values && result.values.length > 0) {
+        console.log(`Got ${result.values.length} filter values for ${fieldName} from ${result.source}`);
+        return result.values;
       } else {
-        throw new Error('No sample data available');
+        throw new Error('No filter values available');
       }
     } catch (error) {
       console.error(`Failed to get real filter data for ${fieldName}:`, error.message);
       
       // No fallback - throw error to show real issue
-      throw new Error(`Cannot get filter values for ${fieldName}. Check Snowflake connection.`);
+      throw new Error(`Cannot get filter values for ${fieldName}. Check Supabase connection.`);
     }
   }
 

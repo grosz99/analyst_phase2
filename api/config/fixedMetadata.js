@@ -8,30 +8,30 @@ const fixedMetadata = {
       name: 'ATTENDANCE',
       description: 'Employee attendance tracking data',
       tables: ['ATTENDANCE'],
-      row_count: 125000,
-      size_bytes: 2560000,
-      last_updated: '2024-12-15T00:00:00Z',
-      type: 'snowflake_table'
+      row_count: 1000,
+      size_bytes: 25600,
+      last_updated: '2025-07-29T00:00:00Z',
+      type: 'supabase_table'
     },
     {
       id: 'ncc',
       name: 'NCC',
-      description: 'Network Call Center performance metrics',
+      description: 'Net Cash Contribution financial performance data',
       tables: ['NCC'],
-      row_count: 450000,
-      size_bytes: 8960000,
-      last_updated: '2024-12-15T00:00:00Z',
-      type: 'snowflake_table'
+      row_count: 100,
+      size_bytes: 8000,
+      last_updated: '2025-07-29T00:00:00Z',
+      type: 'supabase_table'
     },
     {
       id: 'pipeline',
       name: 'PIPELINE',
       description: 'Sales pipeline and opportunity tracking',
       tables: ['PIPELINE'],
-      row_count: 85000,
-      size_bytes: 1920000,
-      last_updated: '2024-12-15T00:00:00Z',
-      type: 'snowflake_table'
+      row_count: 500,
+      size_bytes: 19200,
+      last_updated: '2025-07-29T00:00:00Z',
+      type: 'supabase_table'
     }
   ],
   
