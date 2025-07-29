@@ -322,22 +322,43 @@ const DataSourceDiscovery = ({
     } catch (error) {
       console.error('Error getting AI recommendation:', error);
       
-      // Fallback to showing all available sources
-      const allSources = mockDataSources.map(source => ({
-        name: source,
-        description: SEMANTIC_MODEL.tables[source]?.description || `${source} from Snowflake`,
-        confidence: 'low'
-      }));
+      // Smart fallback using local semantic matching
+      const matchedSources = findMatchingDataSources(currentQuery);
       
-      const botResponse = {
-        id: Date.now() + 1,
-        type: 'bot',
-        content: "I'm having trouble analyzing your query right now. Here are all available data sources:",
-        timestamp: new Date(),
-        sources: allSources
-      };
-      
-      setMessages(prev => [...prev, botResponse]);
+      if (matchedSources.length > 0) {
+        const botResponse = {
+          id: Date.now() + 1,
+          type: 'bot',
+          content: `Based on your query about "${currentQuery}", here are the recommended data sources:`,
+          recommendation: getRecommendationExplanation(matchedSources, currentQuery),
+          timestamp: new Date(),
+          sources: matchedSources
+        };
+        
+        setMessages(prev => [...prev, botResponse]);
+        
+        // Auto-select highest confidence match
+        if (matchedSources[0] && matchedSources[0].confidence === 'high') {
+          setTimeout(() => handleSelectDataSource(matchedSources[0].name), 500);
+        }
+      } else {
+        // Show all sources as final fallback
+        const allSources = mockDataSources.map(source => ({
+          name: source,
+          description: SEMANTIC_MODEL.tables[source]?.description || `${source} from Snowflake`,
+          confidence: 'medium'
+        }));
+        
+        const botResponse = {
+          id: Date.now() + 1,
+          type: 'bot',
+          content: "Here are all available data sources. Click on the one that best matches your analysis needs:",
+          timestamp: new Date(),
+          sources: allSources
+        };
+        
+        setMessages(prev => [...prev, botResponse]);
+      }
     } finally {
       setIsProcessing(false);
     }
