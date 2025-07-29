@@ -103,7 +103,7 @@ app.get('/api/supabase/test', async (req, res) => {
 app.get('/api', (req, res) => {
   res.json({
     message: 'Data Analysis API - Milestone 4: Dual AI Backend',
-    version: '1.4.0',
+    version: '1.4.1',
     endpoints: {
       health: '/api/health',
       status: '/api/status',
