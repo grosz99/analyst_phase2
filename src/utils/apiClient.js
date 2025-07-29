@@ -33,7 +33,7 @@ class APIClient {
 
   // Make a secure POST request with CSRF protection
   async securePost(endpoint, data) {
-    // Get CSRF token if we don't have one
+    // Get CSRF token if we don't have one (works for both dev and production)
     if (!this.csrfToken) {
       await this.getCSRFToken();
     }

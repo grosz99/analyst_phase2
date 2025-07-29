@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const session = require('express-session');
 const csrf = require('csrf');
+const statelessCSRF = require('./utils/statelessCSRF');
 require('dotenv').config();
 const supabaseService = require('./services/supabaseService');
 const anthropicService = require('./services/anthropicService');
@@ -35,34 +36,92 @@ app.use(session({
 // CSRF protection middleware
 const csrfTokens = csrf();
 
-// CSRF middleware function
+// CSRF middleware function with debugging
 const csrfProtection = (req, res, next) => {
+  console.log('🛡️ CSRF Protection Check:', {
+    method: req.method,
+    path: req.path,
+    hasSession: !!req.session,
+    sessionId: req.sessionID,
+    hasCSRFSecret: !!(req.session && req.session.csrfSecret),
+    providedToken: req.headers['x-csrf-token'] ? 'provided' : 'missing',
+    environment: process.env.NODE_ENV
+  });
+
   const token = req.headers['x-csrf-token'] || req.body._csrf;
-  const secret = req.session.csrfSecret;
   
-  if (!secret) {
+  // Initialize session if needed
+  if (!req.session.csrfSecret) {
     req.session.csrfSecret = csrfTokens.secretSync();
+    console.log('🔑 Generated new CSRF secret for session');
   }
   
-  if (req.method === 'POST' && !csrfTokens.verify(req.session.csrfSecret, token)) {
-    return res.status(403).json({ error: 'Invalid CSRF token' });
+  // Skip CSRF check for GET requests
+  if (req.method === 'GET') {
+    return next();
   }
   
+  // For POST requests, verify token
+  if (!token) {
+    console.log('❌ CSRF token missing');
+    return res.status(403).json({ 
+      error: 'CSRF token required',
+      debug: {
+        expected_header: 'X-CSRF-Token',
+        session_exists: !!req.session,
+        environment: process.env.NODE_ENV
+      }
+    });
+  }
+  
+  const isValid = csrfTokens.verify(req.session.csrfSecret, token);
+  console.log('🔍 CSRF token verification:', { isValid, hasSecret: !!req.session.csrfSecret });
+  
+  if (!isValid) {
+    console.log('❌ Invalid CSRF token');
+    return res.status(403).json({ 
+      error: 'Invalid CSRF token',
+      debug: {
+        token_provided: !!token,
+        secret_exists: !!req.session.csrfSecret,
+        session_id: req.sessionID
+      }
+    });
+  }
+  
+  console.log('✅ CSRF token valid');
   next();
 };
 
 // Apply CSRF protection to sensitive endpoints
-app.use('/api/ai/analyze', csrfProtection);
-app.use('/api/load-dataset', csrfProtection);
-app.use('/api/ai/recommend-datasource', csrfProtection);
+if (process.env.NODE_ENV === 'production') {
+  // Use stateless CSRF for Vercel production
+  app.use('/api/ai/analyze', statelessCSRF.middleware());
+  app.use('/api/load-dataset', statelessCSRF.middleware());
+  app.use('/api/ai/recommend-datasource', statelessCSRF.middleware());
+  console.log('🛡️ Stateless CSRF protection enabled for production');
+} else {
+  // Use session-based CSRF for development
+  app.use('/api/ai/analyze', csrfProtection);
+  app.use('/api/load-dataset', csrfProtection);
+  app.use('/api/ai/recommend-datasource', csrfProtection);
+  console.log('🛡️ Session-based CSRF protection enabled for development');
+}
 
 // CSRF token endpoint
 app.get('/api/csrf-token', (req, res) => {
-  if (!req.session.csrfSecret) {
-    req.session.csrfSecret = csrfTokens.secretSync();
+  if (process.env.NODE_ENV === 'production') {
+    // Use stateless CSRF for production
+    const token = statelessCSRF.generateToken();
+    res.json({ csrfToken: token });
+  } else {
+    // Use session-based CSRF for development
+    if (!req.session.csrfSecret) {
+      req.session.csrfSecret = csrfTokens.secretSync();
+    }
+    const token = csrfTokens.create(req.session.csrfSecret);
+    res.json({ csrfToken: token });
   }
-  const token = csrfTokens.create(req.session.csrfSecret);
-  res.json({ csrfToken: token });
 });
 
 // Basic health check endpoint
