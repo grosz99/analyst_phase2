@@ -1,3 +1,5 @@
+import apiClient from '../utils/apiClient.js';
+
 class AIAnalysisService {
   constructor() {
     // Use environment variable if available, otherwise fallback based on environment
@@ -102,13 +104,7 @@ class AIAnalysisService {
         datasetId: datasetId // Include dataset ID for specialized handling
       };
 
-      const response = await fetch(`${this.baseURL}/api/ai/analyze`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload)
-      });
+      const response = await apiClient.securePost('/api/ai/analyze', payload);
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -413,16 +409,10 @@ class AIAnalysisService {
       console.log(`🔍 Getting AI recommendation for: "${query}"`);
       console.log(`📡 API endpoint: ${this.baseURL}/api/ai/recommend-datasource`);
       
-      const response = await fetch(`${this.baseURL}/api/ai/recommend-datasource`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          query,
-          availableDataSources,
-          semanticModel
-        })
+      const response = await apiClient.securePost('/api/ai/recommend-datasource', {
+        query,
+        availableDataSources,
+        semanticModel
       });
 
       console.log(`📊 API Response status: ${response.status} ${response.statusText}`);

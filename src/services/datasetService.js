@@ -1,4 +1,6 @@
 // frontend/src/services/datasetService.js
+import apiClient from '../utils/apiClient.js';
+
 class DatasetService {
   constructor() {
     this.currentDataset = null;
@@ -70,15 +72,9 @@ class DatasetService {
           sample_rate: 1.0
         };
 
-        const response = await fetch(`${this.baseURL}/api/load-dataset`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            datasetId: datasetId,
-            userSelections: userSelections
-          })
+        const response = await apiClient.securePost('/api/load-dataset', {
+          datasetId: datasetId,
+          userSelections: userSelections
         });
 
         if (!response.ok) {
