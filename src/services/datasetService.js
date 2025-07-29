@@ -104,15 +104,13 @@ class DatasetService {
             dataForAnalysis = result.analysis_data;
             dataForUI = result.sample_data || result.analysis_data.slice(0, 5); // Preview data
           } else if (result.sample_data && result.sample_data.length > 0) {
-            // Fallback to sample data
+            // Use sample data only if available
             console.log('Using sample data');
             dataForAnalysis = result.sample_data;
             dataForUI = result.sample_data;
           } else {
-            // Generate mock data from schema
-            console.log('Generating mock data from schema');
-            dataForAnalysis = this.generateMockDataFromSchema(result.schema, userSelections.columns);
-            dataForUI = dataForAnalysis.slice(0, 5);
+            // No fallback - throw error to show real issue
+            throw new Error(`No data returned from ${selectedDataSource}. Check Snowflake connection.`);
           }
           
           return {
@@ -129,30 +127,11 @@ class DatasetService {
           throw new Error(result.error || 'API call failed');
         }
       } catch (apiError) {
-        console.warn('API loading failed, no fallback available:', apiError.message);
+        console.error('API loading failed:', apiError.message);
         console.error('Full API error:', apiError);
         
-        // Generate minimal mock data as last resort to prevent UI breakage
-        const finalColumns = [...dimensions, ...metrics];
-        const mockData = Array(10).fill().map((_, i) => {
-          const row = {};
-          finalColumns.forEach(col => {
-            row[col] = this.generateSampleValue('string', i, col);
-          });
-          return row;
-        });
-
-        const sessionId = `session-${Date.now()}`;
-        const info = `Unable to connect to data source. Showing sample data structure for ${selectedDataSource}.`;
-
-        console.log(`Dataset loaded via emergency fallback: ${mockData.length} rows × ${finalColumns.length} columns`);
-        
-        return {
-          dataset: mockData,
-          info,
-          sessionId,
-          source: 'emergency_fallback'
-        };
+        // Don't generate mock data - throw error to show user real issue
+        throw new Error(`Failed to load real data from ${selectedDataSource}: ${apiError.message}`);
       }
     } catch (err) {
       console.error('Dataset loading error:', err);
@@ -178,175 +157,9 @@ class DatasetService {
     return lowercaseId || 'attendance'; // Default to attendance data
   }
 
-  generateMockDataFromSchema(schema, selectedColumns) {
-    // Generate sample data rows based on the schema for UI display
-    const sampleSize = Math.min(50, schema.row_count || 50);
-    const mockData = [];
+  // Removed mock data generation - only real Snowflake data allowed
 
-    for (let i = 0; i < sampleSize; i++) {
-      const row = {};
-      
-      selectedColumns.forEach(columnName => {
-        const column = schema.columns.find(col => col.name === columnName);
-        if (column) {
-          row[columnName] = this.generateSampleValue(column.type, i, columnName);
-        } else {
-          // Fallback for missing columns
-          row[columnName] = this.generateSampleValue('String', i, columnName);
-        }
-      });
-      
-      mockData.push(row);
-    }
-
-    return mockData;
-  }
-
-  generateSampleValue(type, index, columnName) {
-    // Create deterministic but varied data based on column name and index
-    const seed = this.simpleHash(columnName + index);
-    const random = this.seededRandom(seed);
-    
-    switch (type.toLowerCase()) {
-      case 'date':
-        const startDate = new Date('2024-01-01');
-        const randomDays = Math.floor(random() * 180);
-        const sampleDate = new Date(startDate.getTime() + randomDays * 24 * 60 * 60 * 1000);
-        return sampleDate.toISOString().split('T')[0];
-      
-      case 'string':
-      case 'utf8':
-        return this.generateStringValue(columnName, index, random);
-      
-      case 'number':
-      case 'float64':
-        return this.generateNumberValue(columnName, random);
-      
-      case 'int64':
-      case 'integer':
-        return this.generateIntegerValue(columnName, random);
-      
-      default:
-        return `${columnName}_${index + 1}`;
-    }
-  }
-
-  generateStringValue(columnName, index, random) {
-    const columnLower = columnName.toLowerCase();
-    
-    if (columnLower.includes('region')) {
-      const regions = ['North America', 'Europe', 'Asia Pacific', 'Latin America', 'Middle East', 'Africa'];
-      return regions[Math.floor(random() * regions.length)];
-    }
-    
-    if (columnLower.includes('product') || columnLower.includes('item')) {
-      const products = ['Electronics', 'Clothing', 'Home & Garden', 'Sports', 'Books', 'Automotive', 'Health', 'Beauty'];
-      return products[Math.floor(random() * products.length)];
-    }
-    
-    if (columnLower.includes('customer') || columnLower.includes('segment')) {
-      const segments = ['Enterprise', 'SMB', 'Consumer', 'Government', 'Education', 'Healthcare'];
-      return segments[Math.floor(random() * segments.length)];
-    }
-    
-    if (columnLower.includes('category')) {
-      const categories = ['Office Supplies', 'Furniture', 'Technology', 'Premium', 'Standard', 'Basic'];
-      return categories[Math.floor(random() * categories.length)];
-    }
-    
-    // CRITICAL: Add ship_mode support to match real Snowflake data
-    if (columnLower.includes('ship') || columnLower.includes('shipping') || columnLower.includes('delivery')) {
-      const shipModes = ['Standard Class', 'Second Class', 'First Class', 'Same Day'];
-      return shipModes[Math.floor(random() * shipModes.length)];
-    }
-    
-    if (columnLower.includes('status')) {
-      const statuses = ['Active', 'Inactive', 'Pending', 'Completed', 'In Progress'];
-      return statuses[Math.floor(random() * statuses.length)];
-    }
-    
-    // Default varied string values
-    const prefixes = ['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'Zeta', 'Eta', 'Theta'];
-    const suffixes = ['Pro', 'Plus', 'Max', 'Elite', 'Standard', 'Basic', 'Premium', 'Essential'];
-    
-    const prefix = prefixes[Math.floor(random() * prefixes.length)];
-    const suffix = suffixes[Math.floor(random() * suffixes.length)];
-    
-    return `${prefix} ${suffix}`;
-  }
-
-  // Simple hash function for deterministic randomness
-  simpleHash(str) {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      const char = str.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convert to 32bit integer
-    }
-    return Math.abs(hash);
-  }
-
-  // Seeded random number generator
-  seededRandom(seed) {
-    return function() {
-      seed = (seed * 9301 + 49297) % 233280;
-      return seed / 233280;
-    };
-  }
-
-  generateNumberValue(columnName, random) {
-    const columnLower = columnName.toLowerCase();
-    
-    if (columnLower.includes('revenue') || columnLower.includes('sales')) {
-      // Revenue: $10K to $10M
-      return Math.round((random() * 9990000 + 10000) * 100) / 100;
-    }
-    
-    if (columnLower.includes('price') || columnLower.includes('cost')) {
-      // Price: $1 to $1000
-      return Math.round((random() * 999 + 1) * 100) / 100;
-    }
-    
-    if (columnLower.includes('margin') || columnLower.includes('percent')) {
-      // Percentage: 0% to 100%
-      return Math.round(random() * 100 * 100) / 100;
-    }
-    
-    if (columnLower.includes('rating') || columnLower.includes('score')) {
-      // Rating: 1 to 5
-      return Math.round((random() * 4 + 1) * 100) / 100;
-    }
-    
-    // Default: general business metric
-    return Math.round((random() * 100000 + 1000) * 100) / 100;
-  }
-
-  generateIntegerValue(columnName, random) {
-    const columnLower = columnName.toLowerCase();
-    
-    if (columnLower.includes('units') || columnLower.includes('quantity') || columnLower.includes('sold')) {
-      // Units: 1 to 10,000
-      return Math.floor(random() * 9999) + 1;
-    }
-    
-    if (columnLower.includes('customer') || columnLower.includes('user')) {
-      // Customer count: 100 to 100,000
-      return Math.floor(random() * 99900) + 100;
-    }
-    
-    if (columnLower.includes('id') || columnLower.includes('identifier')) {
-      // ID: 1000 to 999999
-      return Math.floor(random() * 999000) + 1000;
-    }
-    
-    if (columnLower.includes('day') || columnLower.includes('week') || columnLower.includes('month')) {
-      // Time periods: 1 to 365
-      return Math.floor(random() * 365) + 1;
-    }
-    
-    // Default: general count
-    return Math.floor(random() * 1000) + 10;
-  }
+  // All mock data generation removed - only real Snowflake data allowed
 
   async getSampleDataForFilters(datasetId, fieldName) {
     try {
@@ -380,44 +193,14 @@ class DatasetService {
         throw new Error('No sample data available');
       }
     } catch (error) {
-      console.warn(`Failed to get sample data for ${fieldName}:`, error.message);
+      console.error(`Failed to get real filter data for ${fieldName}:`, error.message);
       
-      // Fallback to generated sample values based on field name
-      return this.generateSampleFilterValues(fieldName);
+      // No fallback - throw error to show real issue
+      throw new Error(`Cannot get filter values for ${fieldName}. Check Snowflake connection.`);
     }
   }
 
-  generateSampleFilterValues(fieldName) {
-    const fieldLower = fieldName.toLowerCase();
-    
-    if (fieldLower.includes('region')) {
-      return ['North America', 'Europe', 'Asia Pacific', 'Latin America'];
-    }
-    
-    if (fieldLower.includes('product') || fieldLower.includes('item')) {
-      return ['Electronics', 'Clothing', 'Home & Garden', 'Sports', 'Books'];
-    }
-    
-    if (fieldLower.includes('customer') || fieldLower.includes('segment')) {
-      return ['Enterprise', 'SMB', 'Consumer', 'Government'];
-    }
-    
-    if (fieldLower.includes('category')) {
-      return ['Office Supplies', 'Furniture', 'Technology'];
-    }
-    
-    // CRITICAL: Add ship_mode filter values to match Snowflake data
-    if (fieldLower.includes('ship') || fieldLower.includes('shipping') || fieldLower.includes('delivery')) {
-      return ['Standard Class', 'Second Class', 'First Class', 'Same Day'];
-    }
-    
-    if (fieldLower.includes('status')) {
-      return ['Active', 'Inactive', 'Pending', 'Completed'];
-    }
-    
-    // Default fallback
-    return ['Option A', 'Option B', 'Option C', 'Option D'];
-  }
+  // Mock filter generation removed - only real Snowflake values allowed
 
   applyFilters(data, filters) {
     // If no filters, return original data
@@ -466,81 +249,7 @@ class DatasetService {
     this.datasetSession = null;
   }
 
-  async getSampleDataForFilters(datasetId, fieldName) {
-    try {
-      console.log(`Getting distinct values for filter field: ${fieldName} in dataset: ${datasetId}`);
-      
-      const response = await fetch(`${this.baseURL}/api/dataset/${datasetId}/field/${fieldName}/values?limit=100`);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      const result = await response.json();
-      
-      if (result.success) {
-        console.log(`Retrieved ${result.count} distinct values for ${fieldName}`);
-        return result.values;
-      } else {
-        throw new Error(result.error || 'Failed to fetch filter values');
-      }
-    } catch (error) {
-      console.error(`Failed to get filter values for ${fieldName}:`, error);
-      
-      // Fallback to mock data for demo if API fails
-      return this.generateMockFilterValues(datasetId, fieldName);
-    }
-  }
-
-  generateMockFilterValues(datasetId, fieldName) {
-    const fieldLower = fieldName.toLowerCase();
-    
-    // Mock values based on data source and field
-    if (datasetId === 'ncc') {
-      if (fieldLower === 'office') {
-        return ['New York', 'London', 'Singapore', 'Tokyo', 'Sydney'];
-      }
-      if (fieldLower === 'region') {
-        return ['Americas', 'EMEA', 'APAC'];
-      }
-      if (fieldLower === 'sector') {
-        return ['Technology', 'Healthcare', 'Financial Services', 'Consumer Goods', 'Energy'];
-      }
-      if (fieldLower === 'client') {
-        return ['Client A', 'Client B', 'Client C', 'Client D', 'Client E'];
-      }
-    }
-    
-    if (datasetId === 'attendance') {
-      if (fieldLower === 'office') {
-        return ['NYC HQ', 'London Office', 'Singapore Hub', 'Tokyo Branch', 'Sydney Office'];
-      }
-      if (fieldLower === 'cohort') {
-        return ['Senior', 'Mid-Level', 'Junior', 'Intern', 'Executive'];
-      }
-      if (fieldLower === 'org') {
-        return ['Engineering', 'Sales', 'Marketing', 'Operations', 'Finance'];
-      }
-    }
-    
-    if (datasetId === 'pipeline') {
-      if (fieldLower === 'stage') {
-        return ['Prospecting', 'Qualification', 'Proposal', 'Negotiation', 'Closed Won', 'Closed Lost'];
-      }
-      if (fieldLower === 'company') {
-        return ['Acme Corp', 'TechStart Inc', 'Global Solutions', 'Enterprise Co', 'Innovation Labs'];
-      }
-      if (fieldLower === 'sector') {
-        return ['Technology', 'Healthcare', 'Retail', 'Manufacturing', 'Services'];
-      }
-      if (fieldLower === 'region') {
-        return ['North America', 'Europe', 'Asia Pacific', 'Latin America'];
-      }
-    }
-    
-    // Generic fallback
-    return ['Option 1', 'Option 2', 'Option 3', 'Option 4', 'Option 5'];
-  }
+  // Duplicate method removed - only real Snowflake filter data allowed
 }
 
 const datasetService = new DatasetService();
