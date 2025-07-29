@@ -154,7 +154,7 @@ const FiltersStep = ({
       
       try {
         const datasetId = datasetService.mapDataSourceToId(selectedDataSource);
-        const response = await fetch(`${datasetService.baseURL}/api/available-datasets?live=true`);
+        const response = await fetch(`${datasetService.baseURL}/api/available-datasets`);
         const result = await response.json();
         
         if (result.success) {

@@ -164,8 +164,8 @@ class DatasetService {
 
   async getSampleDataForFilters(datasetId, fieldName) {
     try {
-      // Use the dedicated field values endpoint with live data
-      const response = await fetch(`${this.baseURL}/api/dataset/${datasetId}/field/${fieldName}/values?live=true&limit=100`);
+      // Use fixed metadata for filter values (fast, no database cost)
+      const response = await fetch(`${this.baseURL}/api/dataset/${datasetId}/field/${fieldName}/values`);
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -180,10 +180,8 @@ class DatasetService {
         throw new Error('No filter values available');
       }
     } catch (error) {
-      console.error(`Failed to get real filter data for ${fieldName}:`, error.message);
-      
-      // No fallback - throw error to show real issue
-      throw new Error(`Cannot get filter values for ${fieldName}. Check Supabase connection.`);
+      console.error(`Failed to get filter data for ${fieldName}:`, error.message);
+      throw new Error(`Cannot get filter values for ${fieldName}.`);
     }
   }
 
