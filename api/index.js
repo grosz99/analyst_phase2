@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
-const snowflakeService = require('./services/snowflakeService');
+const supabaseService = require('./services/supabaseService');
 const anthropicService = require('./services/anthropicService');
 const fixedMetadata = require('./config/fixedMetadata');
 
@@ -31,19 +31,19 @@ app.get('/api/health', (req, res) => {
 // System status endpoint
 app.get('/api/status', async (req, res) => {
   try {
-    const snowflakeStatus = snowflakeService.getStatus();
+    const supabaseStatus = supabaseService.getStatus();
     
     res.json({
       server: 'online',
-      database: snowflakeStatus.connected ? 'connected' : 'disconnected',
+      database: supabaseStatus.connected ? 'connected' : 'disconnected',
       ai: process.env.ANTHROPIC_API_KEY ? 'configured' : 'missing_api_key',
-      cache: `${snowflakeStatus.cache_size} items cached`,
+      cache: `${supabaseStatus.cache_size} items cached`,
       uptime: process.uptime(),
       memory: process.memoryUsage(),
-      snowflake: {
-        connected: snowflakeStatus.connected,
-        error: snowflakeStatus.error,
-        config: snowflakeStatus.config
+      supabase: {
+        connected: supabaseStatus.connected,
+        error: supabaseStatus.error,
+        config: supabaseStatus.config
       },
       timestamp: new Date().toISOString()
     });
@@ -57,22 +57,20 @@ app.get('/api/status', async (req, res) => {
   }
 });
 
-// Snowflake connection test endpoint
-app.get('/api/snowflake/test', async (req, res) => {
+// Supabase connection test endpoint
+app.get('/api/supabase/test', async (req, res) => {
   try {
-    console.log('Testing Snowflake connection via API...');
-    const result = await snowflakeService.testConnection();
+    console.log('Testing Supabase connection via API...');
+    const result = await supabaseService.testConnection();
     
     if (result.success) {
       res.json({
         success: true,
-        message: 'Snowflake connection successful',
+        message: 'Supabase connection successful',
         duration: result.duration,
         config: {
-          account: result.account,
-          database: result.database,
-          schema: result.schema,
-          warehouse: result.warehouse
+          url: result.config.url,
+          status: result.config.status
         },
         timestamp: new Date().toISOString()
       });
@@ -85,7 +83,7 @@ app.get('/api/snowflake/test', async (req, res) => {
       });
     }
   } catch (error) {
-    console.error('Snowflake test endpoint error:', error);
+    console.error('Supabase test endpoint error:', error);
     res.status(500).json({
       success: false,
       error: error.message,
@@ -130,34 +128,34 @@ app.get('/api/available-datasets', async (req, res) => {
     const useLiveData = req.query.live === 'true';
     
     if (useLiveData) {
-      // Only query Snowflake when explicitly requested
+      // Only query Supabase when explicitly requested
       try {
-        const allSnowflakeTables = await snowflakeService.discoverTables();
+        const allSupabaseTables = await supabaseService.discoverTables();
         const duration = Date.now() - startTime;
         
         // Filter to only show the three real business datasets
-        const businessDatasets = allSnowflakeTables.filter(table => 
+        const businessDatasets = allSupabaseTables.filter(table => 
           ['ATTENDANCE', 'NCC', 'PIPELINE'].includes(table.name)
         );
         
-        console.log(`Retrieved ${allSnowflakeTables.length} Snowflake tables, filtered to ${businessDatasets.length} business datasets in ${duration}ms`);
+        console.log(`Retrieved ${allSupabaseTables.length} Supabase tables, filtered to ${businessDatasets.length} business datasets in ${duration}ms`);
         
         res.json({
           success: true,
           datasets: businessDatasets,
           total_count: businessDatasets.length,
           timestamp: new Date().toISOString(),
-          source: 'snowflake',
+          source: 'supabase',
           performance: {
             duration: duration,
             cached: duration < 1000
           }
         });
-      } catch (snowflakeError) {
-        console.error('Snowflake unavailable:', snowflakeError.message);
+      } catch (supabaseError) {
+        console.error('Supabase unavailable:', supabaseError.message);
         
         // Fallback to fixed metadata
-        console.log('Falling back to fixed metadata due to Snowflake error');
+        console.log('Falling back to fixed metadata due to Supabase error');
         const duration = Date.now() - startTime;
         
         res.json({
@@ -216,19 +214,19 @@ app.post('/api/load-dataset', async (req, res) => {
       });
     }
 
-    // Query Snowflake for both schema and actual data (real analysis needs real schema)
+    // Query Supabase for both schema and actual data (real analysis needs real schema)
     try {
-      // Get both schema and actual data from Snowflake for real analysis
+      // Get both schema and actual data from Supabase for real analysis
       const analysisRowLimit = userSelections.analysisMode ? 5000 : 1000;
       const filters = userSelections.filters || {};
       
       const [schema, analysisData] = await Promise.all([
-        snowflakeService.discoverColumns(datasetId),
-        snowflakeService.sampleData(datasetId, userSelections.columns, analysisRowLimit, filters)
+        supabaseService.discoverColumns(datasetId),
+        supabaseService.sampleData(datasetId, userSelections.columns, analysisRowLimit, filters)
       ]);
       
       const duration = Date.now() - startTime;
-      console.log(`Loaded Snowflake dataset ${datasetId} with ${analysisData.length} rows in ${duration}ms`);
+      console.log(`Loaded Supabase dataset ${datasetId} with ${analysisData.length} rows in ${duration}ms`);
       
       const result = {
         success: true,
@@ -241,10 +239,10 @@ app.post('/api/load-dataset', async (req, res) => {
         sample_data: analysisData.slice(0, 10), // First 10 rows for preview
         analysis_data: analysisData, // Full data for AI analysis
         filters_applied: userSelections,
-        message: `Loaded ${datasetId.toUpperCase()} with ${schema.total_columns} columns (${analysisData.length} rows) from Snowflake`,
+        message: `Loaded ${datasetId.toUpperCase()} with ${schema.total_columns} columns (${analysisData.length} rows) from Supabase`,
         processing_time: duration,
         timestamp: new Date().toISOString(),
-        source: 'snowflake',
+        source: 'supabase',
         performance: {
           duration: duration,
           rows_sampled: analysisData.length
@@ -253,15 +251,15 @@ app.post('/api/load-dataset', async (req, res) => {
 
       res.json(result);
       
-    } catch (snowflakeError) {
-      console.error(`Snowflake dataset loading failed for ${datasetId}:`, snowflakeError.message);
+    } catch (supabaseError) {
+      console.error(`Supabase dataset loading failed for ${datasetId}:`, supabaseError.message);
       
       // Return error - no fallback data for actual analysis
       res.status(503).json({
         success: false,
         error: 'Data source unavailable. Please check your connection.',
         dataset_id: datasetId,
-        snowflake_error: snowflakeError.message,
+        supabase_error: supabaseError.message,
         timestamp: new Date().toISOString()
       });
     }
@@ -411,9 +409,9 @@ app.get('/api/dataset/:datasetId/field/:fieldName/values', async (req, res) => {
     const useLiveData = req.query.live === 'true';
     
     if (useLiveData) {
-      // Only query Snowflake when explicitly requested
+      // Only query Supabase when explicitly requested
       try {
-        const values = await snowflakeService.getDistinctValues(datasetId, fieldName, parseInt(limit));
+        const values = await supabaseService.getDistinctValues(datasetId, fieldName, parseInt(limit));
         const duration = Date.now() - startTime;
         
         res.json({
@@ -423,13 +421,13 @@ app.get('/api/dataset/:datasetId/field/:fieldName/values', async (req, res) => {
           values: values,
           count: values.length,
           timestamp: new Date().toISOString(),
-          source: 'snowflake',
+          source: 'supabase',
           performance: {
             duration: duration
           }
         });
-      } catch (snowflakeError) {
-        console.error(`Failed to get values for ${datasetId}.${fieldName}:`, snowflakeError.message);
+      } catch (supabaseError) {
+        console.error(`Failed to get values for ${datasetId}.${fieldName}:`, supabaseError.message);
         
         // Fallback to fixed metadata
         const fixedValues = fixedMetadata.filterValues[datasetId.toLowerCase()]?.[fieldName.toUpperCase()];
@@ -518,9 +516,9 @@ app.get('/api/dataset/:datasetId/schema', async (req, res) => {
     const useLiveData = req.query.live === 'true';
     
     if (useLiveData) {
-      // Only query Snowflake when explicitly requested
+      // Only query Supabase when explicitly requested
       try {
-        const schema = await snowflakeService.discoverColumns(datasetId);
+        const schema = await supabaseService.discoverColumns(datasetId);
         const duration = Date.now() - startTime;
         
         console.log(`Retrieved schema for ${datasetId} in ${duration}ms`);
@@ -531,14 +529,14 @@ app.get('/api/dataset/:datasetId/schema', async (req, res) => {
           dataset_name: datasetId.toUpperCase(),
           schema: schema,
           timestamp: new Date().toISOString(),
-          source: 'snowflake',
+          source: 'supabase',
           performance: {
             duration: duration,
             cached: duration < 500
           }
         });
-      } catch (snowflakeError) {
-        console.error(`Snowflake schema unavailable for ${datasetId}:`, snowflakeError.message);
+      } catch (supabaseError) {
+        console.error(`Supabase schema unavailable for ${datasetId}:`, supabaseError.message);
         
         // Fallback to fixed metadata
         const schema = fixedMetadata.schemas[datasetId.toLowerCase()];
