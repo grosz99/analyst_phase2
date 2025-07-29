@@ -7,6 +7,122 @@ const fixedMetadata = require('./config/fixedMetadata');
 
 const app = express();
 
+// Helper function to generate realistic sample data based on schema
+function generateRealisticSampleData(datasetId, schema, rowCount = 50) {
+  const sampleData = [];
+  
+  for (let i = 0; i < rowCount; i++) {
+    const row = {};
+    
+    schema.columns.forEach(column => {
+      row[column.name] = generateColumnValue(column, i, datasetId);
+    });
+    
+    sampleData.push(row);
+  }
+  
+  return sampleData;
+}
+
+function generateColumnValue(column, rowIndex, datasetId) {
+  const { name, type, category } = column;
+  const nameLower = name.toLowerCase();
+  
+  // Generate values based on actual dataset context
+  if (datasetId === 'ncc') {
+    if (nameLower === 'month') {
+      const months = ['2024-01-01', '2024-02-01', '2024-03-01', '2024-04-01', '2024-05-01'];
+      return months[rowIndex % months.length];
+    }
+    if (nameLower === 'office') {
+      const offices = ['New York', 'London', 'Singapore', 'Tokyo', 'Sydney'];
+      return offices[rowIndex % offices.length];
+    }
+    if (nameLower === 'region') {
+      const regions = ['Americas', 'EMEA', 'APAC'];
+      return regions[rowIndex % regions.length];
+    }
+    if (nameLower === 'sector') {
+      const sectors = ['Technology', 'Healthcare', 'Financial Services', 'Consumer Goods'];
+      return sectors[rowIndex % sectors.length];
+    }
+    if (nameLower === 'client') {
+      const clients = ['Client A', 'Client B', 'Client C', 'Client D', 'Client E'];
+      return clients[rowIndex % clients.length];
+    }
+    if (nameLower === 'calls_handled') {
+      return Math.floor(Math.random() * 500) + 100;
+    }
+    if (nameLower === 'avg_handle_time') {
+      return Math.round((Math.random() * 10 + 5) * 100) / 100;
+    }
+    if (nameLower === 'satisfaction_score') {
+      return Math.round((Math.random() * 2 + 3) * 100) / 100;
+    }
+    if (nameLower === 'revenue') {
+      return Math.floor(Math.random() * 100000) + 10000;
+    }
+  }
+  
+  if (datasetId === 'attendance') {
+    if (nameLower === 'date') {
+      const date = new Date('2024-01-01');
+      date.setDate(date.getDate() + rowIndex);
+      return date.toISOString().split('T')[0];
+    }
+    if (nameLower === 'office') {
+      const offices = ['NYC HQ', 'London Office', 'Singapore Hub', 'Tokyo Branch'];
+      return offices[rowIndex % offices.length];
+    }
+    if (nameLower === 'cohort') {
+      const cohorts = ['Senior', 'Mid-Level', 'Junior', 'Executive'];
+      return cohorts[rowIndex % cohorts.length];
+    }
+    if (nameLower === 'hours_worked') {
+      return Math.round((Math.random() * 4 + 6) * 100) / 100;
+    }
+  }
+  
+  if (datasetId === 'pipeline') {
+    if (nameLower === 'create_date') {
+      const date = new Date('2024-01-01');
+      date.setDate(date.getDate() + rowIndex * 3);
+      return date.toISOString().split('T')[0];
+    }
+    if (nameLower === 'stage') {
+      const stages = ['Prospecting', 'Qualification', 'Proposal', 'Negotiation', 'Closed Won'];
+      return stages[rowIndex % stages.length];
+    }
+    if (nameLower === 'company') {
+      const companies = ['Acme Corp', 'TechStart Inc', 'Global Solutions', 'Enterprise Co'];
+      return companies[rowIndex % companies.length];
+    }
+    if (nameLower === 'opportunity_value') {
+      return Math.floor(Math.random() * 500000) + 50000;
+    }
+  }
+  
+  // Generic fallbacks based on type
+  if (type === 'Date') {
+    const date = new Date('2024-01-01');
+    date.setDate(date.getDate() + rowIndex);
+    return date.toISOString().split('T')[0];
+  }
+  
+  if (type === 'Number') {
+    return Math.round((Math.random() * 1000 + 100) * 100) / 100;
+  }
+  
+  if (type === 'Integer') {
+    return Math.floor(Math.random() * 1000) + 10;
+  }
+  
+  // String fallback
+  const prefixes = ['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon'];
+  const suffixes = ['Pro', 'Plus', 'Max', 'Elite', 'Standard'];
+  return `${prefixes[rowIndex % prefixes.length]} ${suffixes[(rowIndex + 1) % suffixes.length]}`;
+}
+
 // Middleware
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
@@ -216,16 +332,23 @@ app.post('/api/load-dataset', async (req, res) => {
       });
     }
 
-    // Try Snowflake first
+    // Use fixed metadata for schema, query Snowflake for actual data
     try {
-      // Get schema and full analysis data from Snowflake
-      const analysisRowLimit = userSelections.analysisMode ? 5000 : 1000; // Load more data for AI analysis
+      // Get schema from fixed metadata (fast)
+      const schema = fixedMetadata.schemas[datasetId.toLowerCase()];
+      if (!schema) {
+        return res.status(404).json({
+          success: false,
+          error: `Dataset ${datasetId} not found`,
+          timestamp: new Date().toISOString()
+        });
+      }
+      
+      // Get actual data from Snowflake
+      const analysisRowLimit = userSelections.analysisMode ? 5000 : 1000;
       const filters = userSelections.filters || {};
       
-      const [schema, analysisData] = await Promise.all([
-        snowflakeService.discoverColumns(datasetId),
-        snowflakeService.sampleData(datasetId, userSelections.columns, analysisRowLimit, filters)
-      ]);
+      const analysisData = await snowflakeService.sampleData(datasetId, userSelections.columns, analysisRowLimit, filters);
       
       const duration = Date.now() - startTime;
       console.log(`Loaded Snowflake dataset ${datasetId} with ${analysisData.length} rows in ${duration}ms`);
@@ -256,13 +379,46 @@ app.post('/api/load-dataset', async (req, res) => {
     } catch (snowflakeError) {
       console.error(`Snowflake dataset loading failed for ${datasetId}:`, snowflakeError.message);
       
-      res.status(503).json({
-        success: false,
-        error: 'Data source unavailable. Please check your connection.',
+      // Fallback: Use fixed metadata schema with realistic sample data
+      const schema = fixedMetadata.schemas[datasetId.toLowerCase()];
+      if (!schema) {
+        return res.status(503).json({
+          success: false,
+          error: 'Data source unavailable and no fallback data available.',
+          dataset_id: datasetId,
+          timestamp: new Date().toISOString()
+        });
+      }
+      
+      // Generate realistic sample data based on the actual schema
+      const sampleData = generateRealisticSampleData(datasetId, schema, 50);
+      const duration = Date.now() - startTime;
+      
+      console.log(`Using fallback sample data for ${datasetId} (${sampleData.length} rows)`);
+      
+      const result = {
+        success: true,
         dataset_id: datasetId,
-        snowflake_error: snowflakeError.message,
-        timestamp: new Date().toISOString()
-      });
+        schema: {
+          ...schema,
+          row_count: sampleData.length,
+          memory_usage: Math.round(sampleData.length * schema.total_columns * 0.1)
+        },
+        sample_data: sampleData.slice(0, 10),
+        analysis_data: sampleData,
+        filters_applied: userSelections,
+        message: `Using sample data for ${datasetId.toUpperCase()} (${schema.total_columns} columns, ${sampleData.length} rows) - Snowflake connection unavailable`,
+        processing_time: duration,
+        timestamp: new Date().toISOString(),
+        source: 'sample_data',
+        notice: 'Using sample data due to connection issues',
+        performance: {
+          duration: duration,
+          rows_sampled: sampleData.length
+        }
+      };
+
+      res.json(result);
     }
     
   } catch (error) {
