@@ -204,7 +204,8 @@ app.get('/api/available-datasets', async (req, res) => {
 app.post('/api/load-dataset', async (req, res) => {
   try {
     const { datasetId, userSelections = {} } = req.body;
-    console.log(`Loading dataset ${datasetId} with selections:`, userSelections);
+    console.log(`🔄 Loading dataset ${datasetId} with selections:`, JSON.stringify(userSelections, null, 2));
+    console.log(`📡 Request from: ${req.ip}, User-Agent: ${req.get('User-Agent')}`);
     const startTime = Date.now();
     
     if (!datasetId) {

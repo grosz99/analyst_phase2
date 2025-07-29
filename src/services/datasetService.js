@@ -59,6 +59,7 @@ class DatasetService {
   async loadDataset(selectedDataSource, dimensions, metrics, filters) {
     try {
       console.log('Loading dataset with:', { selectedDataSource, dimensions, metrics, filters });
+      console.log('Using API URL:', this.baseURL);
       
       // Try API first
       try {

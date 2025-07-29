@@ -625,12 +625,16 @@ const DataSourceDiscovery = ({
             </div>
             
             <div className="fields-grid">
-              {availableFields.map((field) => (
-                <div key={field.name} className="field-card">
-                  <div className="field-name">{field.name}</div>
-                  <div className="field-type">{field.type}</div>
-                </div>
-              ))}
+              {availableFields && availableFields.length > 0 ? (
+                availableFields.map((field) => (
+                  <div key={field.name} className="field-card">
+                    <div className="field-name">{field.name}</div>
+                    <div className="field-type">{field.type}</div>
+                  </div>
+                ))
+              ) : (
+                <div className="no-fields">No fields available</div>
+              )}
             </div>
           </>
         ) : (
