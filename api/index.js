@@ -3,6 +3,7 @@ const cors = require('cors');
 require('dotenv').config();
 const supabaseService = require('./services/supabaseService');
 const anthropicService = require('./services/anthropicService');
+const fallbackDataService = require('./services/fallbackDataService');
 const fixedMetadata = require('./config/fixedMetadata');
 
 const app = express();
@@ -32,12 +33,18 @@ app.get('/api/health', (req, res) => {
 app.get('/api/status', async (req, res) => {
   try {
     const supabaseStatus = supabaseService.getStatus();
+    const fallbackAvailable = fallbackDataService.getAvailableDatasets();
     
     res.json({
       server: 'online',
       database: supabaseStatus.connected ? 'connected' : 'disconnected',
       ai: process.env.ANTHROPIC_API_KEY ? 'configured' : 'missing_api_key',
       cache: `${supabaseStatus.cache_size} items cached`,
+      fallback: {
+        available: fallbackAvailable.length > 0,
+        datasets: fallbackAvailable,
+        status: 'ready'
+      },
       uptime: process.uptime(),
       memory: process.memoryUsage(),
       supabase: {
@@ -255,39 +262,25 @@ app.post('/api/load-dataset', async (req, res) => {
     } catch (supabaseError) {
       console.error(`Supabase dataset loading failed for ${datasetId}:`, supabaseError.message);
       
-      // Try fallback to fixed metadata with sample data
+      // Try fallback using dedicated fallback service
       try {
-        const fallbackSchema = fixedMetadata.schemas[datasetId.toLowerCase()];
-        const fallbackSample = fixedMetadata.sampleData[datasetId.toLowerCase()] || [];
-        
-        if (fallbackSchema && fallbackSample.length > 0) {
+        if (fallbackDataService.hasFallbackData(datasetId)) {
+          const fallbackSchema = fixedMetadata.schemas[datasetId.toLowerCase()];
           const duration = Date.now() - startTime;
-          console.log(`Using fallback data for ${datasetId} with ${fallbackSample.length} sample rows`);
           
-          return res.json({
-            success: true,
-            dataset_id: datasetId,
-            schema: {
-              ...fallbackSchema,
-              row_count: fallbackSample.length,
-              memory_usage: Math.round(fallbackSample.length * fallbackSchema.total_columns * 0.1)
-            },
-            sample_data: fallbackSample.slice(0, 10), // First 10 rows for preview
-            analysis_data: fallbackSample, // Full fallback data for AI analysis
-            filters_applied: userSelections,
-            message: `Loaded ${datasetId.toUpperCase()} with ${fallbackSchema.total_columns} columns (${fallbackSample.length} sample rows) from fallback cache`,
-            processing_time: duration,
-            timestamp: new Date().toISOString(),
-            source: 'fallback_cache',
-            warning: 'Using cached sample data due to connection issues. Some features may be limited.',
-            performance: {
-              duration: duration,
-              rows_sampled: fallbackSample.length
-            }
-          });
+          console.log(`Using fallback service for ${datasetId}`);
+          
+          const fallbackResponse = fallbackDataService.createFallbackResponse(
+            datasetId,
+            fallbackSchema,
+            userSelections,
+            duration
+          );
+          
+          return res.json(fallbackResponse);
         }
       } catch (fallbackError) {
-        console.error('Fallback data loading also failed:', fallbackError.message);
+        console.error('Fallback service also failed:', fallbackError.message);
       }
       
       // Only return 503 if all fallbacks fail
