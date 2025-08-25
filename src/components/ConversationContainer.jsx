@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import AIAnalysisResults from './AIAnalysisResults.jsx';
 import SavedQueries from './SavedQueries.jsx';
 import SaveQueryButton from './SaveQueryButton.jsx';
+import StreamingLoadingView from './StreamingLoadingView.jsx';
+import streamingAnalysisService from '../services/streamingAnalysisService.js';
 import './ConversationContainer.css';
 
 const ConversationContainer = ({ 
@@ -24,6 +26,13 @@ const ConversationContainer = ({
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [questionToSave, setQuestionToSave] = useState(null);
   const [resultsToSave, setResultsToSave] = useState(null);
+  const [streamingProgress, setStreamingProgress] = useState({
+    isVisible: false,
+    currentStep: 'discovering',
+    progress: 0,
+    estimatedTimeRemaining: 0,
+    statusMessage: ''
+  });
   const containerRef = useRef(null);
   const inputRef = useRef(null);
   
@@ -97,16 +106,19 @@ const ConversationContainer = ({
     }
 
     const question = currentQuestion.trim();
-    console.log('📝 Starting analysis for question:', question);
-    console.log('📊 Data to analyze:', {
-      hasCachedDataset: !!cachedDataset,
-      hasInitialData: !!initialData,
-      cachedDataRows: cachedDataset?.length,
-      initialDataRows: initialData?.length
-    });
+    console.log('📝 Starting streaming analysis for question:', question);
     
     setCurrentQuestion('');
     setIsAnalyzing(true);
+
+    // Show streaming loading view
+    setStreamingProgress({
+      isVisible: true,
+      currentStep: 'discovering',
+      progress: 0,
+      estimatedTimeRemaining: 15,
+      statusMessage: 'Initializing AI analysis...'
+    });
 
     // Add user message
     const userMessage = {
@@ -120,12 +132,6 @@ const ConversationContainer = ({
     try {
       const dataToAnalyze = cachedDataset || initialData;
       
-      console.log('🔍 Analyzing with data:', {
-        rows: dataToAnalyze?.length,
-        columns: dataToAnalyze?.length ? Object.keys(dataToAnalyze[0]).length : 0,
-        firstRowSample: dataToAnalyze?.[0]
-      });
-      
       // Build context from previous messages
       const conversationContext = messages
         .filter(m => m.type === 'user' || m.type === 'assistant')
@@ -136,20 +142,39 @@ const ConversationContainer = ({
       const contextPrompt = messages.length > 0 
         ? `Previous conversation:\n${conversationContext}\n\nCurrent question: ${question}`
         : null;
-        
-      console.log('🎯 Context prompt:', contextPrompt ? contextPrompt.substring(0, 200) + '...' : 'No context');
 
       // Get dataset ID for specialized AI context
       const datasetId = selectedDataSource?.toLowerCase() || null;
       
-      const result = await aiAnalysisService.analyzeData(
+      // Progress callback for streaming updates
+      const onProgress = (step, progress, estimatedTime, message) => {
+        setStreamingProgress({
+          isVisible: true,
+          currentStep: step,
+          progress: Math.round(progress),
+          estimatedTimeRemaining: estimatedTime,
+          statusMessage: message
+        });
+      };
+
+      // Cancel callback
+      const onCancel = () => {
+        setStreamingProgress({ ...streamingProgress, isVisible: false });
+        setIsAnalyzing(false);
+        console.log('🚫 Analysis cancelled by user');
+      };
+      
+      const result = await streamingAnalysisService.analyzeDataWithStreaming(
         dataToAnalyze,
         question,
-        'general',
-        sessionId,
-        'anthropic',
-        contextPrompt,
-        datasetId
+        {
+          analysisType: 'general',
+          sessionId,
+          onProgress,
+          onCancel,
+          contextPrompt,
+          datasetId
+        }
       );
       
       console.log('📊 Analysis result received:', {
@@ -184,11 +209,6 @@ const ConversationContainer = ({
 
     } catch (error) {
       console.error('❌ Analysis error:', error);
-      console.error('📋 Error details:', {
-        name: error.name,
-        message: error.message,
-        stack: error.stack
-      });
       
       const errorMessage = {
         id: Date.now() + 1,
@@ -198,6 +218,14 @@ const ConversationContainer = ({
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {
+      // Hide streaming progress and reset analyzing state
+      setStreamingProgress({
+        isVisible: false,
+        currentStep: 'discovering',
+        progress: 0,
+        estimatedTimeRemaining: 0,
+        statusMessage: ''
+      });
       setIsAnalyzing(false);
     }
   };
@@ -561,6 +589,19 @@ ${savedQuery.results?.pythonCode || 'No saved code available'}
           />
         </div>
       )}
+
+      {/* Streaming Loading View */}
+      <StreamingLoadingView
+        isVisible={streamingProgress.isVisible}
+        currentStep={streamingProgress.currentStep}
+        progress={streamingProgress.progress}
+        estimatedTimeRemaining={streamingProgress.estimatedTimeRemaining}
+        statusMessage={streamingProgress.statusMessage}
+        onCancel={() => {
+          setStreamingProgress({ ...streamingProgress, isVisible: false });
+          setIsAnalyzing(false);
+        }}
+      />
     </div>
   );
 };
