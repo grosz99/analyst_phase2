@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, MessageCircle, Database, CheckCircle, Search, List } from 'lucide-react';
 import aiAnalysisService from '../services/aiAnalysisService.js';
+import CompactDataStructure from './CompactDataStructure.jsx';
 import './DataSourceDiscovery.css';
 
 // Real business data semantic model mapped to actual Snowflake tables
@@ -608,35 +609,15 @@ const DataSourceDiscovery = ({
           </div>
         )}
         
-        <div className="fields-header">
-          <h3>Data Fields</h3>
-          {selectedDataSource && (
-            <div className="selected-source-badge">
-              <Database size={16} />
-              <span>{selectedDataSource}</span>
-            </div>
-          )}
-        </div>
-        
         {selectedDataSource ? (
-          <>
-            <div className="fields-summary">
-              {getFieldSummary() || 'Loading fields...'}
-            </div>
-            
-            <div className="fields-grid">
-              {availableFields && availableFields.length > 0 ? (
-                availableFields.map((field) => (
-                  <div key={field.name} className="field-card">
-                    <div className="field-name">{field.name}</div>
-                    <div className="field-type">{field.type}</div>
-                  </div>
-                ))
-              ) : (
-                <div className="no-fields">No fields available</div>
-              )}
-            </div>
-          </>
+          <CompactDataStructure 
+            dataSource={selectedDataSource}
+            fieldCounts={{
+              string: availableFields ? availableFields.filter(f => f.type === 'STRING').length : 0,
+              number: availableFields ? availableFields.filter(f => f.type === 'NUMBER').length : 0
+            }}
+            isCollapsed={false}
+          />
         ) : (
           <div className="no-source-selected">
             <Database size={48} className="empty-icon" />
