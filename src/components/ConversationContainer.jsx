@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import AIAnalysisResults from './AIAnalysisResults.jsx';
 import SavedQueries from './SavedQueries.jsx';
 import SaveQueryButton from './SaveQueryButton.jsx';
-import StreamingLoadingView from './StreamingLoadingView.jsx';
+import InlineProgressIndicator from './InlineProgressIndicator.jsx';
 import streamingAnalysisService from '../services/streamingAnalysisService.js';
 import './ConversationContainer.css';
 
@@ -523,10 +523,13 @@ ${savedQuery.results?.pythonCode || 'No saved code available'}
                   <img src="/logo.svg" alt="Beacon" className="beacon-logo-icon" />
                 </div>
                 <div className="message-content">
-                  <div className="loading-indicator">
-                    <div className="loading-spinner"></div>
-                    <span>Analyzing your data...</span>
-                  </div>
+                  <InlineProgressIndicator
+                    isVisible={streamingProgress.isVisible}
+                    currentStep={streamingProgress.currentStep}
+                    progress={streamingProgress.progress}
+                    estimatedTimeRemaining={streamingProgress.estimatedTimeRemaining}
+                    statusMessage={streamingProgress.statusMessage}
+                  />
                 </div>
               </div>
             )}
@@ -590,18 +593,6 @@ ${savedQuery.results?.pythonCode || 'No saved code available'}
         </div>
       )}
 
-      {/* Streaming Loading View */}
-      <StreamingLoadingView
-        isVisible={streamingProgress.isVisible}
-        currentStep={streamingProgress.currentStep}
-        progress={streamingProgress.progress}
-        estimatedTimeRemaining={streamingProgress.estimatedTimeRemaining}
-        statusMessage={streamingProgress.statusMessage}
-        onCancel={() => {
-          setStreamingProgress({ ...streamingProgress, isVisible: false });
-          setIsAnalyzing(false);
-        }}
-      />
     </div>
   );
 };
