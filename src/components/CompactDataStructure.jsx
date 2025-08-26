@@ -12,18 +12,18 @@ const CompactDataStructure = ({
     NCC: {
       title: "NCC Data Structure",
       description: "Net Cash Contribution financial data",
-      metrics: [
-        { name: "NCC", type: "$", description: "Key KPI - Net Cash Contribution" },
-        { name: "Timesheet_Charges", type: "$", description: "Revenue component" },
-        { name: "Adjustments", type: "$", description: "Variance component" }
+      keyMetrics: [
+        { name: "NCC", type: "$", isKey: true, description: "Primary profitability metric" },
+        { name: "Timesheet_Charges", type: "$", isKey: true, description: "Billable revenue" },
+        { name: "Adjustments", type: "$", isKey: true, description: "Revenue adjustments" }
       ],
-      dimensions: [
-        { name: "Month", type: "string", description: "Time period (2023-2024)" },
-        { name: "Office", type: "string", description: "Location (15 offices)" },
-        { name: "Region", type: "string", description: "Geographic area (4 regions)" },
-        { name: "Sector", type: "string", description: "Practice area (8 sectors)" },
-        { name: "Client", type: "string", description: "Client name (250+ active)" },
-        { name: "Project_ID", type: "string", description: "Unique identifier" }
+      aggregationDimensions: [
+        { name: "Month", type: "string", description: "Time-based analysis", priority: "high" },
+        { name: "Office", type: "string", description: "Location-based grouping", priority: "high" },
+        { name: "Region", type: "string", description: "Geographic aggregation", priority: "high" },
+        { name: "Sector", type: "string", description: "Practice-based segmentation", priority: "medium" },
+        { name: "Client", type: "string", description: "Client-level analysis", priority: "medium" },
+        { name: "Project_ID", type: "string", description: "Project-level detail", priority: "low" }
       ],
       suggestions: [
         "Show me NCC trends by region",
@@ -34,13 +34,12 @@ const CompactDataStructure = ({
   };
 
   const structure = dataStructures[dataSource] || dataStructures.NCC;
-  const totalFields = structure.metrics.length + structure.dimensions.length;
+  const totalFields = structure.keyMetrics.length + structure.aggregationDimensions.length;
 
   return (
     <div className="compact-data-structure">
       <div className="data-header" onClick={() => setExpanded(!expanded)}>
         <div className="header-content">
-          <span className="data-icon">📊</span>
           <span className="data-title">{structure.title}</span>
           <span className="field-count">({totalFields} fields)</span>
         </div>
@@ -55,15 +54,15 @@ const CompactDataStructure = ({
           <div className="data-grid">
             <div className="data-column">
               <h4 className="column-title">
-                Financial Metrics ({structure.metrics.length})
-                <span className="column-hint">Ask about: trends, performance, variances</span>
+                Key Metrics ({structure.keyMetrics.length})
+                <span className="column-hint">Core financial measures for analysis</span>
               </h4>
               <ul className="field-list">
-                {structure.metrics.map((field, index) => (
+                {structure.keyMetrics.map((field, index) => (
                   <li key={index} className="field-item primary-field">
                     <span className="field-name">{field.name}</span>
                     <span className="field-type">({field.type})</span>
-                    {field.name === "NCC" && <span className="key-indicator">KEY KPI</span>}
+                    {field.name === "NCC" && <span className="key-indicator">PRIMARY KPI</span>}
                   </li>
                 ))}
               </ul>
@@ -71,12 +70,12 @@ const CompactDataStructure = ({
 
             <div className="data-column">
               <h4 className="column-title">
-                Dimensions ({structure.dimensions.length})
-                <span className="column-hint">Ask about: breakdowns, comparisons, segments</span>
+                Aggregation Dimensions ({structure.aggregationDimensions.length})
+                <span className="column-hint">Group and segment data by these attributes</span>
               </h4>
               <ul className="field-list">
-                {structure.dimensions.map((field, index) => (
-                  <li key={index} className={`field-item ${index < 3 ? 'primary-field' : 'secondary-field'}`}>
+                {structure.aggregationDimensions.map((field, index) => (
+                  <li key={index} className={`field-item ${field.priority === 'high' ? 'primary-field' : field.priority === 'medium' ? 'medium-field' : 'secondary-field'}`}>
                     <span className="field-name">{field.name}</span>
                     <span className="field-type">({field.type})</span>
                   </li>
@@ -87,7 +86,6 @@ const CompactDataStructure = ({
 
           <div className="suggestions-section">
             <div className="suggestions-header">
-              <span className="suggestions-icon">💡</span>
               <span className="suggestions-title">Try asking:</span>
             </div>
             <div className="suggestions-list">

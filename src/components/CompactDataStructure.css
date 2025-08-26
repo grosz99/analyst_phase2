@@ -26,9 +26,6 @@
   gap: 10px;
 }
 
-.data-icon {
-  font-size: 18px;
-}
 
 .data-title {
   font-size: 16px;
@@ -161,8 +158,8 @@
 }
 
 .suggestions-section {
-  background: #f0f8ff;
-  border: 1px solid #cce7ff;
+  background: #f8fffe;
+  border: 1px solid #e0f2f1;
   border-radius: 6px;
   padding: 16px;
 }
@@ -174,14 +171,10 @@
   margin-bottom: 12px;
 }
 
-.suggestions-icon {
-  font-size: 16px;
-}
-
 .suggestions-title {
   font-size: 13px;
   font-weight: 600;
-  color: #0056b3;
+  color: #00695c;
 }
 
 .suggestions-list {
@@ -192,19 +185,23 @@
 
 .suggestion-btn {
   background: white;
-  border: 1px solid #cce7ff;
+  border: 1px solid #e0f2f1;
   border-radius: 4px;
   padding: 8px 12px;
   font-size: 12px;
-  color: #0056b3;
+  color: #00695c;
   cursor: pointer;
   text-align: left;
   transition: all 0.2s ease;
 }
 
 .suggestion-btn:hover {
-  background: #e7f3ff;
-  border-color: #99d3ff;
+  background: #e8f5e8;
+  border-color: #4caf50;
+}
+
+.medium-field .field-name {
+  color: #495057;
 }
 
 /* Responsive Design */
