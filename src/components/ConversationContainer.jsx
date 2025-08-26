@@ -31,7 +31,8 @@ const ConversationContainer = ({
     currentStep: 'discovering',
     progress: 0,
     estimatedTimeRemaining: 0,
-    statusMessage: ''
+    statusMessage: '',
+    currentQuestion: ''
   });
   const containerRef = useRef(null);
   const inputRef = useRef(null);
@@ -117,7 +118,8 @@ const ConversationContainer = ({
       currentStep: 'discovering',
       progress: 0,
       estimatedTimeRemaining: 15,
-      statusMessage: 'Initializing AI analysis...'
+      statusMessage: 'Initializing AI analysis...',
+      currentQuestion: question
     });
 
     // Add user message
@@ -153,7 +155,8 @@ const ConversationContainer = ({
           currentStep: step,
           progress: Math.round(progress),
           estimatedTimeRemaining: estimatedTime,
-          statusMessage: message
+          statusMessage: message,
+          currentQuestion: question
         });
       };
 
@@ -224,7 +227,8 @@ const ConversationContainer = ({
         currentStep: 'discovering',
         progress: 0,
         estimatedTimeRemaining: 0,
-        statusMessage: ''
+        statusMessage: '',
+        currentQuestion: ''
       });
       setIsAnalyzing(false);
     }
@@ -529,6 +533,8 @@ ${savedQuery.results?.pythonCode || 'No saved code available'}
                     progress={streamingProgress.progress}
                     estimatedTimeRemaining={streamingProgress.estimatedTimeRemaining}
                     statusMessage={streamingProgress.statusMessage}
+                    userQuestion={streamingProgress.currentQuestion}
+                    selectedFilters={null}
                   />
                 </div>
               </div>
