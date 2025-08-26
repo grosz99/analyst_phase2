@@ -44,7 +44,6 @@ const CompactDataStructure = ({
           <span className="field-count">({totalFields} fields)</span>
         </div>
         <div className="header-actions">
-          <button className="sample-data-btn">View Sample Data →</button>
           <button className="expand-btn">{expanded ? '▲' : '▼'}</button>
         </div>
       </div>
@@ -90,19 +89,9 @@ const CompactDataStructure = ({
             </div>
             <div className="suggestions-list">
               {structure.suggestions.map((suggestion, index) => (
-                <button 
-                  key={index} 
-                  className="suggestion-btn"
-                  onClick={() => {
-                    // Emit event for parent component to handle
-                    const event = new CustomEvent('suggestedQuestion', { 
-                      detail: suggestion 
-                    });
-                    window.dispatchEvent(event);
-                  }}
-                >
+                <div key={index} className="suggestion-item">
                   "{suggestion}"
-                </button>
+                </div>
               ))}
             </div>
           </div>
