@@ -43,7 +43,7 @@
 
 .beacon-logo {
   position: absolute;
-  top: -20px;
+  top: -18px;
   left: 0;
   width: 24px;
   height: 24px;
@@ -60,7 +60,7 @@
 
 .progress-track {
   width: 100%;
-  height: 8px;
+  height: 12px;
   background: var(--bcg-neutral-light);
   border-radius: 50px;
   position: relative;
