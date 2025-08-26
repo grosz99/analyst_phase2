@@ -8,9 +8,14 @@
 }
 
 .bcg-progress-container {
-  padding: 24px 16px;
+  padding: 24px;
   text-align: center;
   font-family: 'Helvetica Neue', Arial, sans-serif;
+  background: #fafbfc;
+  border: 1px solid #e9ecef;
+  border-radius: 12px;
+  margin: 16px 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
 }
 
 .progress-header {
@@ -108,7 +113,9 @@
 /* Responsive Design */
 @media (max-width: 768px) {
   .bcg-progress-container {
-    padding: 20px 12px;
+    padding: 20px 16px;
+    margin: 12px 0;
+    border-radius: 10px;
   }
   
   .progress-wrapper {
