@@ -1,40 +1,151 @@
-.inline-task-progress {
-  padding: 16px 0;
+/* BCG Brand Colors */
+:root {
+  --bcg-green-primary: #00c851;
+  --bcg-green-light: #00d455;
+  --bcg-neutral-light: #f8f9fa;
+  --bcg-text-secondary: #6c757d;
+  --bcg-text-primary: #212529;
+}
+
+.bcg-progress-container {
+  padding: 24px 16px;
   text-align: center;
+  font-family: 'Helvetica Neue', Arial, sans-serif;
 }
 
-.task-description {
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.progress-label {
   font-size: 14px;
-  color: #666;
-  font-style: italic;
+  font-weight: 500;
+  color: var(--bcg-text-primary);
+}
+
+.progress-percentage {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--bcg-green-primary);
+}
+
+.progress-wrapper {
+  position: relative;
   margin-bottom: 12px;
-  min-height: 20px;
-}
-
-.progress-bar-container {
   width: 100%;
-  height: 4px;
-  background: #f0f0f0;
-  border-radius: 2px;
-  overflow: hidden;
-  max-width: 300px;
-  margin: 0 auto;
+  max-width: 400px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
-.progress-bar-fill {
+.beacon-logo {
+  position: absolute;
+  top: -20px;
+  left: 0;
+  width: 24px;
+  height: 24px;
+  transition: transform 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+  z-index: 2;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+}
+
+.beacon-logo img {
+  width: 100%;
   height: 100%;
-  background: #00c851;
-  border-radius: 2px;
-  transition: width 0.4s ease;
+  object-fit: contain;
 }
 
-/* Responsive */
+.progress-track {
+  width: 100%;
+  height: 8px;
+  background: var(--bcg-neutral-light);
+  border-radius: 50px;
+  position: relative;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--bcg-green-primary) 0%, var(--bcg-green-light) 100%);
+  border-radius: 50px;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+
+.progress-description {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--bcg-text-secondary);
+  font-style: italic;
+  margin-top: 8px;
+  min-height: 16px;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+/* Accessibility: Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .progress-fill,
+  .beacon-logo {
+    transition: none;
+  }
+}
+
+/* Responsive Design */
 @media (max-width: 768px) {
-  .task-description {
+  .bcg-progress-container {
+    padding: 20px 12px;
+  }
+  
+  .progress-wrapper {
+    max-width: 300px;
+  }
+  
+  .progress-header {
+    margin-bottom: 12px;
+  }
+  
+  .progress-label,
+  .progress-percentage {
     font-size: 13px;
   }
   
-  .progress-bar-container {
-    max-width: 250px;
+  .progress-description {
+    font-size: 11px;
   }
+  
+  .beacon-logo {
+    width: 20px;
+    height: 20px;
+    top: -18px;
+  }
+}
+
+/* Animation for logo movement */
+.beacon-logo:hover {
+  transform: scale(1.05);
+}
+
+/* Subtle pulse animation for active state */
+@keyframes gentle-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.9; }
+}
+
+.progress-fill {
+  animation: gentle-pulse 2s ease-in-out infinite;
 }
