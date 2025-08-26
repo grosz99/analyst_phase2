@@ -18,45 +18,49 @@ const InlineProgressIndicator = ({
     return () => clearInterval(interval);
   }, []);
 
-  const stepIcons = {
-    discovering: '🔍',
-    loading: '📊',
-    analyzing: '🧠',
-    generating: '✨'
+  const stepTitles = {
+    discovering: 'Discovering relevant data sources',
+    loading: 'Loading and validating data',
+    analyzing: 'Processing analysis',
+    generating: 'Generating insights'
   };
 
-  const stepTitles = {
-    discovering: 'Finding data',
-    loading: 'Loading',
-    analyzing: 'Analyzing',
-    generating: 'Finalizing'
+  const stepNumbers = {
+    discovering: '1',
+    loading: '2',
+    analyzing: '3',
+    generating: '4'
   };
 
   if (!isVisible) return null;
 
   return (
     <div className="inline-progress-container">
+      {/* Status line */}
+      <div className="inline-status">
+        <span className="status-step">
+          Step {stepNumbers[currentStep]} of 4
+        </span>
+        <span className="status-divider">•</span>
+        <span className="status-text">
+          {stepTitles[currentStep]}{dots}
+        </span>
+        {estimatedTimeRemaining > 0 && (
+          <>
+            <span className="status-divider">•</span>
+            <span className="status-time">
+              {estimatedTimeRemaining}s remaining
+            </span>
+          </>
+        )}
+      </div>
+      
       {/* Minimal progress bar */}
       <div className="inline-progress-bar">
         <div 
           className="inline-progress-fill" 
           style={{ width: `${progress}%` }}
         />
-      </div>
-      
-      {/* Status line */}
-      <div className="inline-status">
-        <span className="status-icon">
-          {stepIcons[currentStep]}
-        </span>
-        <span className="status-text">
-          {stepTitles[currentStep]}{dots}
-        </span>
-        {estimatedTimeRemaining > 0 && (
-          <span className="status-time">
-            ~{estimatedTimeRemaining}s
-          </span>
-        )}
       </div>
     </div>
   );
