@@ -348,6 +348,14 @@
   }
 }
 
+.simple-loading {
+  padding: 12px 0;
+  color: #666;
+  font-size: 13px;
+  font-style: italic;
+  text-align: center;
+}
+
 .conversation-input-form {
   border-top: 1px solid rgba(24, 121, 85, 0.1);
   padding: 20px;

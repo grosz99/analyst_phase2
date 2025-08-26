@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import AIAnalysisResults from './AIAnalysisResults.jsx';
 import SavedQueries from './SavedQueries.jsx';
 import SaveQueryButton from './SaveQueryButton.jsx';
-import InlineProgressIndicator from './InlineProgressIndicator.jsx';
+import TopBarProgressIndicator from './TopBarProgressIndicator.jsx';
 import streamingAnalysisService from '../services/streamingAnalysisService.js';
 import './ConversationContainer.css';
 
@@ -377,7 +377,18 @@ ${savedQuery.results?.pythonCode || 'No saved code available'}
   };
 
   return (
-    <div className={`conversation-container ${isActive ? 'active' : ''} ${isCollapsed ? 'collapsed' : ''}`}>
+    <>
+      {/* Top Bar Progress Indicator */}
+      <TopBarProgressIndicator
+        isVisible={streamingProgress.isVisible}
+        currentStep={streamingProgress.currentStep}
+        progress={streamingProgress.progress}
+        estimatedTimeRemaining={streamingProgress.estimatedTimeRemaining}
+        userQuestion={streamingProgress.currentQuestion}
+        selectedDataSource={selectedDataSource}
+      />
+      
+      <div className={`conversation-container ${isActive ? 'active' : ''} ${isCollapsed ? 'collapsed' : ''}`}>
       <div className="conversation-header" onClick={() => onActivate(conversationId)}>
         <button 
           className="collapse-btn"
@@ -527,15 +538,9 @@ ${savedQuery.results?.pythonCode || 'No saved code available'}
                   <img src="/logo.svg" alt="Beacon" className="beacon-logo-icon" />
                 </div>
                 <div className="message-content">
-                  <InlineProgressIndicator
-                    isVisible={streamingProgress.isVisible}
-                    currentStep={streamingProgress.currentStep}
-                    progress={streamingProgress.progress}
-                    estimatedTimeRemaining={streamingProgress.estimatedTimeRemaining}
-                    statusMessage={streamingProgress.statusMessage}
-                    userQuestion={streamingProgress.currentQuestion}
-                    selectedFilters={null}
-                  />
+                  <div className="simple-loading">
+                    <span>Analysis in progress...</span>
+                  </div>
                 </div>
               </div>
             )}
@@ -600,6 +605,7 @@ ${savedQuery.results?.pythonCode || 'No saved code available'}
       )}
 
     </div>
+    </>
   );
 };
 
