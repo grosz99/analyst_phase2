@@ -1,5 +1,7 @@
 {
   "version": 2,
+  "buildCommand": "npm install --force && npm run build",
+  "installCommand": "npm ci --production=false --force",
   "functions": {
     "api/index.js": {
       "maxDuration": 30
@@ -29,5 +31,9 @@
         }
       ]
     }
-  ]
+  ],
+  "env": {
+    "NPM_CONFIG_OPTIONAL": "false",
+    "SKIP_INSTALL_DEPS": "false"
+  }
 }
