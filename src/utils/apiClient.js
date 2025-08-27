@@ -1,7 +1,7 @@
 class APIClient {
   constructor() {
-    this.baseURL = process.env.REACT_APP_API_URL || 
-      (process.env.NODE_ENV === 'production' 
+    this.baseURL = import.meta.env.VITE_API_URL || 
+      (import.meta.env.NODE_ENV === 'production' 
         ? window.location.origin 
         : 'http://localhost:3001');
     

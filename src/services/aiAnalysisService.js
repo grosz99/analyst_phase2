@@ -3,8 +3,8 @@ import apiClient from '../utils/apiClient.js';
 class AIAnalysisService {
   constructor() {
     // Use environment variable if available, otherwise fallback based on environment
-    this.baseURL = process.env.REACT_APP_API_URL || 
-      (process.env.NODE_ENV === 'production' 
+    this.baseURL = import.meta.env.VITE_API_URL || 
+      (import.meta.env.NODE_ENV === 'production' 
         ? window.location.origin // Use current domain in production
         : 'http://localhost:3001');
     

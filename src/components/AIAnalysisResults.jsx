@@ -576,6 +576,118 @@ const AIAnalysisResults = ({
     );
   };
 
+  // Render interpretation showing GPT-4.1's reasoning and methodology
+  const renderInterpretation = () => {
+    if (!analysis) {
+      return (
+        <div className="interpretation-container">
+          <div className="interpretation-placeholder">
+            <p>No analysis interpretation available.</p>
+          </div>
+        </div>
+      );
+    }
+
+    // Extract different sections from the analysis text
+    const extractInterpretationSections = (analysisText) => {
+      const sections = {
+        analytical_interpretation: '',
+        key_insights: '',
+        methodology_explanation: '',
+        business_implications: '',
+        raw_analysis: analysisText
+      };
+
+      // Try to extract structured sections
+      const analyticalMatch = analysisText.match(/## ANALYTICAL INTERPRETATION\s*([\s\S]*?)(?=##|$)/i);
+      if (analyticalMatch) sections.analytical_interpretation = analyticalMatch[1].trim();
+
+      const insightsMatch = analysisText.match(/## KEY INSIGHTS\s*([\s\S]*?)(?=##|$)/i);
+      if (insightsMatch) sections.key_insights = insightsMatch[1].trim();
+
+      const methodologyMatch = analysisText.match(/## METHODOLOGY EXPLANATION\s*([\s\S]*?)(?=##|$)/i);
+      if (methodologyMatch) sections.methodology_explanation = methodologyMatch[1].trim();
+
+      const businessMatch = analysisText.match(/## BUSINESS IMPLICATIONS\s*([\s\S]*?)(?=##|$)/i);
+      if (businessMatch) sections.business_implications = businessMatch[1].trim();
+
+      return sections;
+    };
+
+    const sections = extractInterpretationSections(analysis);
+    const hasStructuredSections = sections.analytical_interpretation || sections.key_insights || sections.methodology_explanation;
+
+    return (
+      <div className="interpretation-container">
+        <div className="interpretation-header">
+          <h3>🧠 AI Analysis Interpretation</h3>
+          <p>Understanding how GPT-4.1 approached this analysis</p>
+        </div>
+
+        {hasStructuredSections ? (
+          <div className="interpretation-sections">
+            {sections.analytical_interpretation && (
+              <div className="interpretation-section">
+                <h4>🔍 Analytical Reasoning</h4>
+                <div className="section-content">
+                  <p>{sections.analytical_interpretation}</p>
+                </div>
+              </div>
+            )}
+
+            {sections.methodology_explanation && (
+              <div className="interpretation-section">
+                <h4>⚙️ Methodology</h4>
+                <div className="section-content">
+                  <p>{sections.methodology_explanation}</p>
+                </div>
+              </div>
+            )}
+
+            {sections.key_insights && (
+              <div className="interpretation-section">
+                <h4>💡 Key Insights</h4>
+                <div className="section-content">
+                  <p>{sections.key_insights}</p>
+                </div>
+              </div>
+            )}
+
+            {sections.business_implications && (
+              <div className="interpretation-section">
+                <h4>📊 Business Impact</h4>
+                <div className="section-content">
+                  <p>{sections.business_implications}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="interpretation-fallback">
+            <h4>🤖 Analysis Approach</h4>
+            <div className="section-content">
+              <p>{analysis}</p>
+            </div>
+            <div className="interpretation-note">
+              <small>💡 This shows the complete analytical reasoning from GPT-4.1</small>
+            </div>
+          </div>
+        )}
+
+        {metadata && metadata.model && (
+          <div className="interpretation-footer">
+            <div className="ai-model-info">
+              <span className="model-badge">Powered by {metadata.model}</span>
+              {metadata.processing_time && (
+                <span className="processing-time">Analysis time: {metadata.processing_time}ms</span>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // Generate dynamic AI response text
   const getResponseText = (questionText) => {
     if (!questionText) return "Here are the analysis results:";
@@ -728,21 +840,19 @@ const AIAnalysisResults = ({
         >
           Visualization
         </button>
-        {python_code && (
-          <button 
-            className={`tab ${activeTab === 'python' ? 'active' : ''}`}
-            onClick={() => setActiveTab('python')}
-          >
-            Python Code
-          </button>
-        )}
+        <button 
+          className={`tab ${activeTab === 'interpretation' ? 'active' : ''}`}
+          onClick={() => setActiveTab('interpretation')}
+        >
+          Interpretation
+        </button>
       </div>
 
       {/* Tab Content */}
       <div className="tab-content">
         {activeTab === 'results' && renderResultsTable()}
         {activeTab === 'visualization' && renderVisualization()}
-        {activeTab === 'python' && renderPythonCode()}
+        {activeTab === 'interpretation' && renderInterpretation()}
       </div>
       </div>
 

@@ -8,8 +8,8 @@ import disambiguationService from './disambiguationService.js';
 
 class StreamingAnalysisService {
   constructor() {
-    this.baseURL = process.env.REACT_APP_API_URL || 
-      (process.env.NODE_ENV === 'production' 
+    this.baseURL = import.meta.env.VITE_API_URL || 
+      (import.meta.env.NODE_ENV === 'production' 
         ? window.location.origin 
         : 'http://localhost:3001');
     
@@ -177,7 +177,7 @@ class StreamingAnalysisService {
       analysisType: analysisType,
       userContext: question || `Perform ${analysisType} analysis on this business data`,
       sessionId: sessionId || `session-${Date.now()}`,
-      backend: 'anthropic',
+      backend: 'openai', // Default to OpenAI GPT-4.1
       contextPrompt: enhancedContextPrompt,
       datasetId: datasetId
     };

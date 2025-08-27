@@ -12,11 +12,11 @@ class SupabaseService {
     // Initialize Supabase client
     this.config = {
       url: process.env.SUPABASE_URL,
-      key: process.env.SUPABASE_KEY
+      key: process.env.SUPABASE_SERVICE_ROLE_KEY
     };
 
     if (!this.config.url || !this.config.key) {
-      console.error('❌ SUPABASE_URL and SUPABASE_KEY must be set in environment variables');
+      console.error('❌ SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set in environment variables');
       this.connectionError = 'Missing Supabase configuration';
       return;
     }
@@ -211,10 +211,12 @@ class SupabaseService {
         throw new Error('Supabase client not initialized');
       }
 
-      console.log(`Querying Supabase table ${tableName} with limit ${limit}`);
+      console.log(`🔍 Querying Supabase table "${tableName}" with limit ${limit}`);
+      console.log(`🔍 Columns requested:`, columns);
+      console.log(`🔍 Filters:`, filters);
       
-      // Convert tableName to uppercase as that's how it's stored
-      const actualTableName = tableName.toUpperCase();
+      // First, try the exact table name as provided, then try uppercase
+      let actualTableName = tableName;
       
       let query = this.client.from(actualTableName);
       
@@ -242,6 +244,45 @@ class SupabaseService {
       const { data, error } = await query;
 
       if (error) {
+        // If table not found, try with uppercase name
+        if (error.code === '42P01' || error.message.includes('does not exist')) {
+          console.log(`Table ${actualTableName} not found, trying uppercase: ${tableName.toUpperCase()}`);
+          actualTableName = tableName.toUpperCase();
+          query = this.client.from(actualTableName);
+          
+          if (columns && columns.length > 0) {
+            query = query.select(columns.join(', '));
+          } else {
+            query = query.select('*');
+          }
+          
+          Object.entries(filters).forEach(([key, value]) => {
+            if (value && value !== '') {
+              if (Array.isArray(value)) {
+                query = query.in(key, value);
+              } else {
+                query = query.eq(key, value);
+              }
+            }
+          });
+          
+          query = query.limit(limit);
+          const { data: retryData, error: retryError } = await query;
+          
+          if (retryError) {
+            console.error(`Failed to sample data from ${tableName}:`, retryError);
+            throw retryError;
+          }
+          
+          if (!retryData || retryData.length === 0) {
+            console.warn(`No data returned from ${actualTableName} (uppercase retry)`);
+            return [];
+          }
+          
+          return retryData;
+        }
+        
+        console.error(`Failed to sample data from ${tableName}:`, error);
         throw error;
       }
 
@@ -329,6 +370,49 @@ class SupabaseService {
         error: err.message,
         latency: Date.now() - startTime
       };
+    }
+  }
+
+  // List all tables in the database (for debugging)
+  async listTables() {
+    try {
+      if (!this.client) {
+        throw new Error('Supabase client not initialized');
+      }
+      
+      // Try to query information_schema to get table names
+      const { data, error } = await this.client
+        .from('information_schema.tables')
+        .select('table_name')
+        .eq('table_schema', 'public');
+        
+      if (error) {
+        console.warn('Could not query information_schema, trying common table names...');
+        // Try common variations
+        const testTables = ['ncc', 'NCC', 'Net_Cash_Contribution'];
+        const existingTables = [];
+        
+        for (const tableName of testTables) {
+          try {
+            const { data: testData, error: testError } = await this.client
+              .from(tableName)
+              .select('*')
+              .limit(1);
+            if (!testError) {
+              existingTables.push(tableName);
+            }
+          } catch (e) {
+            // Table doesn't exist
+          }
+        }
+        
+        return existingTables;
+      }
+      
+      return data?.map(row => row.table_name) || [];
+    } catch (error) {
+      console.error('Error listing tables:', error);
+      return [];
     }
   }
 

@@ -12,43 +12,25 @@ const ConversationManager = ({
   selectedDataSource,
   onReset
 }) => {
-  const [conversations, setConversations] = useState([]);
-  const [activeConversationId, setActiveConversationId] = useState(null);
+  const [conversation, setConversation] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Initialize with first conversation if we have data
+  // Initialize with single conversation if we have data
   useEffect(() => {
-    if ((initialData || cachedDataset) && conversations.length === 0) {
-      createNewConversation();
+    if ((initialData || cachedDataset) && !conversation) {
+      createConversation();
     }
   }, [initialData, cachedDataset]);
 
-  // No longer needed - suggested questions are handled per conversation
-
-  const createNewConversation = () => {
+  const createConversation = () => {
     const newConversation = {
       id: Date.now(),
-      title: 'New Conversation',
+      title: 'Analysis Conversation',
       createdAt: new Date().toISOString(),
       messageCount: 0
     };
     
-    setConversations(prev => [...prev, newConversation]);
-    setActiveConversationId(newConversation.id);
-  };
-
-  const closeConversation = (conversationId) => {
-    setConversations(prev => prev.filter(c => c.id !== conversationId));
-    
-    // If we closed the active conversation, switch to another one
-    if (activeConversationId === conversationId) {
-      const remainingConversations = conversations.filter(c => c.id !== conversationId);
-      if (remainingConversations.length > 0) {
-        setActiveConversationId(remainingConversations[0].id);
-      } else {
-        setActiveConversationId(null);
-      }
-    }
+    setConversation(newConversation);
   };
 
   // No longer needed - suggested questions are handled within each conversation
@@ -76,26 +58,25 @@ const ConversationManager = ({
   return (
     <div className="conversation-manager">
       <div className="conversations-container">
-        {conversations.length === 0 ? (
+        {!conversation ? (
           <div className="empty-state">
-            <h3>Start Your First Conversation</h3>
-            <p>Click "New Conversation" to begin analyzing your data.</p>
+            <h3>Loading Conversation...</h3>
+            <p>Preparing your analysis workspace.</p>
           </div>
         ) : (
-          conversations.map((conversation) => (
-            <ConversationContainer
-              key={conversation.id}
-              conversationId={conversation.id}
-              initialData={initialData}
-              cachedDataset={cachedDataset}
-              sessionId={sessionId}
-              aiAnalysisService={aiAnalysisService}
-              onClose={closeConversation}
-              isActive={activeConversationId === conversation.id}
-              onActivate={setActiveConversationId}
-              selectedDataSource={selectedDataSource}
-            />
-          ))
+          <ConversationContainer
+            key={conversation.id}
+            conversationId={conversation.id}
+            initialData={initialData}
+            cachedDataset={cachedDataset}
+            sessionId={sessionId}
+            aiAnalysisService={aiAnalysisService}
+            onClose={() => {}} // Remove close functionality for single conversation
+            isActive={true} // Always active since it's the only one
+            onActivate={() => {}} // No need to activate
+            selectedDataSource={selectedDataSource}
+            showCloseButton={false} // Hide close button
+          />
         )}
       </div>
 
@@ -105,7 +86,7 @@ const ConversationManager = ({
           onClick={onReset}
           disabled={isLoading}
         >
-          🔄 Ask Question On Another Source
+          🔄 Reset & Ask Question On Another Source
         </button>
       </div>
 

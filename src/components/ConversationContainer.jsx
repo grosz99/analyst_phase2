@@ -17,7 +17,8 @@ const ConversationContainer = ({
   onClose,
   isActive,
   onActivate,
-  selectedDataSource
+  selectedDataSource,
+  showCloseButton = true
 }) => {
   const [messages, setMessages] = useState([]);
   const [currentQuestion, setCurrentQuestion] = useState('');
@@ -451,17 +452,19 @@ ${savedQuery.results?.pythonCode || 'No saved code available'}
         </button>
         <h3 className="conversation-title">{getConversationTitle()}</h3>
         <span className="message-count">{messages.length} messages</span>
-        <button 
-          className="close-btn"
-          onClick={(e) => {
-            e.stopPropagation();
-            if (window.confirm('Close this conversation?')) {
-              onClose(conversationId);
-            }
-          }}
-        >
-          ✕
-        </button>
+        {showCloseButton && (
+          <button 
+            className="close-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (window.confirm('Close this conversation?')) {
+                onClose(conversationId);
+              }
+            }}
+          >
+            ✕
+          </button>
+        )}
       </div>
 
       {!isCollapsed && (

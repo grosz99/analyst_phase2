@@ -1,3 +1,118 @@
+/* Interpretation Tab Styles */
+.interpretation-container {
+  padding: 20px;
+  background: #f8fafc;
+  border-radius: 12px;
+  margin: 16px 0;
+}
+
+.interpretation-header {
+  margin-bottom: 24px;
+  text-align: center;
+  border-bottom: 2px solid #e2e8f0;
+  padding-bottom: 16px;
+}
+
+.interpretation-header h3 {
+  margin: 0 0 8px 0;
+  color: #1e293b;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.interpretation-header p {
+  margin: 0;
+  color: #64748b;
+  font-size: 16px;
+}
+
+.interpretation-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.interpretation-section {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  border-left: 4px solid var(--primary-color);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.interpretation-section h4 {
+  margin: 0 0 12px 0;
+  color: var(--primary-color);
+  font-size: 18px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.section-content {
+  line-height: 1.6;
+  color: #374151;
+}
+
+.section-content p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.interpretation-fallback {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  border-left: 4px solid #10b981;
+}
+
+.interpretation-fallback h4 {
+  margin: 0 0 12px 0;
+  color: #10b981;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.interpretation-note {
+  margin-top: 16px;
+  padding: 12px;
+  background: #f0f9ff;
+  border-radius: 6px;
+  border: 1px solid #e0f2fe;
+}
+
+.interpretation-note small {
+  color: #0369a1;
+  font-style: italic;
+}
+
+.interpretation-footer {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.ai-model-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+}
+
+.model-badge {
+  background: var(--primary-color);
+  color: white;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-weight: 500;
+}
+
+.processing-time {
+  color: #64748b;
+  font-family: 'Courier New', monospace;
+}
+
 /* Analysis Results Container */
 .analysis-results-container {
   max-width: 100%;

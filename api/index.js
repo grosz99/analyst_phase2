@@ -6,7 +6,8 @@ const statelessCSRF = require('./utils/statelessCSRF');
 require('dotenv').config();
 const supabaseService = require('./services/supabaseService');
 const anthropicService = require('./services/anthropicService');
-const fallbackDataService = require('./services/fallbackDataService');
+const openaiService = require('./services/openai/openaiService');
+// const fallbackDataService = require('./services/fallbackDataService'); // REMOVED: Violates CLAUDE.md No Fake Data Policy
 const fixedMetadata = require('./config/fixedMetadata');
 
 const app = express();
@@ -135,16 +136,75 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Debug: List available tables
+app.get('/api/debug/tables', async (req, res) => {
+  try {
+    const tables = await supabaseService.listTables();
+    res.json({
+      success: true,
+      tables: tables,
+      message: `Found ${tables.length} tables`,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Debug: Check table structure
+app.get('/api/debug/table/:name', async (req, res) => {
+  try {
+    const tableName = req.params.name;
+    const { data, error } = await supabaseService.client
+      .from(tableName)
+      .select('*')
+      .limit(1);
+    
+    if (error) {
+      return res.status(400).json({
+        success: false,
+        error: error.message,
+        table_name: tableName
+      });
+    }
+    
+    const columns = data && data.length > 0 ? Object.keys(data[0]) : [];
+    const sampleRow = data && data.length > 0 ? data[0] : null;
+    
+    res.json({
+      success: true,
+      table_name: tableName,
+      columns: columns,
+      sample_row: sampleRow,
+      row_count: data?.length || 0,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // System status endpoint
 app.get('/api/status', async (req, res) => {
   try {
     const supabaseStatus = supabaseService.getStatus();
-    const fallbackAvailable = fallbackDataService.getAvailableDatasets();
+    // const fallbackAvailable = fallbackDataService.getAvailableDatasets(); // REMOVED: No fake data allowed
     
     res.json({
       server: 'online',
       database: supabaseStatus.connected ? 'connected' : 'disconnected',
-      ai: process.env.ANTHROPIC_API_KEY ? 'configured' : 'missing_api_key',
+      ai: {
+        anthropic: process.env.ANTHROPIC_API_KEY ? 'configured' : 'missing_api_key',
+        openai: process.env.OPENAI_API_KEY ? 'configured' : 'missing_api_key'
+      },
       cache: `${supabaseStatus.cache_size} items cached`,
       fallback: {
         available: fallbackAvailable.length > 0,
@@ -368,26 +428,8 @@ app.post('/api/load-dataset', async (req, res) => {
     } catch (supabaseError) {
       console.error(`Supabase dataset loading failed for ${datasetId}:`, supabaseError.message);
       
-      // Try fallback using dedicated fallback service
-      try {
-        if (fallbackDataService.hasFallbackData(datasetId)) {
-          const fallbackSchema = fixedMetadata.schemas[datasetId.toLowerCase()];
-          const duration = Date.now() - startTime;
-          
-          console.log(`Using fallback service for ${datasetId}`);
-          
-          const fallbackResponse = fallbackDataService.createFallbackResponse(
-            datasetId,
-            fallbackSchema,
-            userSelections,
-            duration
-          );
-          
-          return res.json(fallbackResponse);
-        }
-      } catch (fallbackError) {
-        console.error('Fallback service also failed:', fallbackError.message);
-      }
+      // ❌ REMOVED: No fallback/fake data allowed per CLAUDE.md
+      // Only use real data sources - fail fast when unavailable
       
       // Only return 503 if all fallbacks fail
       res.status(503).json({
@@ -757,12 +799,16 @@ app.get('/api/dataset/:datasetId/schema', async (req, res) => {
 // AI Analysis Health Check (Both Backends)
 app.get('/api/ai/health', async (req, res) => {
   try {
-    const anthropicHealth = await anthropicService.healthCheck();
+    const [anthropicHealth, openaiHealth] = await Promise.allSettled([
+      anthropicService.healthCheck(),
+      openaiService.healthCheck()
+    ]);
     
     res.json({
       success: true,
       backends: {
-        anthropic: anthropicHealth,
+        anthropic: anthropicHealth.status === 'fulfilled' ? anthropicHealth.value : { healthy: false, error: anthropicHealth.reason?.message },
+        openai: openaiHealth.status === 'fulfilled' ? openaiHealth.value : { healthy: false, error: openaiHealth.reason?.message }
       },
       timestamp: new Date().toISOString()
     });
@@ -780,11 +826,13 @@ app.get('/api/ai/health', async (req, res) => {
 app.get('/api/ai/status', (req, res) => {
   try {
     const anthropicStatus = anthropicService.getStatus();
+    const openaiStatus = openaiService.getStatus();
     
     res.json({
       success: true,
       backends: {
         anthropic: anthropicStatus,
+        openai: openaiStatus
       },
       timestamp: new Date().toISOString()
     });
@@ -812,14 +860,28 @@ app.get('/api/ai/backends', (req, res) => {
           'Intelligent data analysis',
           'Custom execution engine'
         ],
-        status: anthropicService.getStatus().initialized ? 'available' : 'unavailable'
+        status: anthropicService.getStatus().api_key_configured ? 'available' : 'unavailable'
+      },
+      {
+        id: 'openai',
+        name: 'OpenAI GPT-4.1',
+        description: 'Latest GPT-4.1 with enhanced reasoning and function calling capabilities',
+        features: [
+          'GPT-4.1 advanced reasoning',
+          'Function calling & tools',
+          'Structured outputs',
+          'Large context window (1M tokens)',
+          'Enhanced data analysis',
+          'Better instruction following'
+        ],
+        status: openaiService.getStatus().api_key_configured ? 'available' : 'unavailable'
       }
     ];
     
     res.json({
       success: true,
       backends: backends,
-      default: 'anthropic',
+      default: 'openai', // Default to GPT-4.1
       timestamp: new Date().toISOString()
     });
   } catch (error) {
@@ -939,24 +1001,40 @@ app.post('/api/ai/analyze', async (req, res) => {
     const identifier = sessionId || req.ip || 'anonymous';
     
     const questionText = question || userContext || '';
-    const selectedBackend = backend || 'anthropic'; // Default to Anthropic
+    const selectedBackend = backend || 'openai'; // Default to OpenAI GPT-4.1
     
     console.log(`🤖 AI Analysis request: ${data.length} rows, question: "${questionText}", backend: ${selectedBackend}, type: ${analysisType || 'general'}`);
-    
-    // Use Anthropic Claude backend
-    console.log('🤖 Using Anthropic Claude backend');
     
     // Prepare context-enhanced question if context prompt provided
     const enhancedQuestion = contextPrompt 
       ? `${contextPrompt}\n\nUSER QUESTION: ${questionText}`
       : questionText;
-      
-    const result = await anthropicService.analyzeData(
-      data, 
-      analysisType || 'general',
-      enhancedQuestion,
-      identifier
-    );
+    
+    let result;
+    
+    if (selectedBackend === 'openai') {
+      console.log('🤖 Using OpenAI GPT-4.1 backend');
+      result = await openaiService.analyzeData(
+        data, 
+        analysisType || 'general',
+        enhancedQuestion,
+        identifier
+      );
+    } else if (selectedBackend === 'anthropic') {
+      console.log('🤖 Using Anthropic Claude backend');
+      result = await anthropicService.analyzeData(
+        data, 
+        analysisType || 'general',
+        enhancedQuestion,
+        identifier
+      );
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: `Unsupported backend: ${selectedBackend}. Available: openai, anthropic`,
+        timestamp: new Date().toISOString()
+      });
+    }
     
     const totalDuration = Date.now() - startTime;
     
@@ -971,6 +1049,7 @@ app.post('/api/ai/analyze', async (req, res) => {
         refined_questions: result.refined_questions,
         metadata: {
           ...result.metadata,
+          backend: selectedBackend,
           total_duration: totalDuration,
           data_rows: data.length,
           session_id: sessionId
