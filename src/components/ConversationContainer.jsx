@@ -3,7 +3,9 @@ import AIAnalysisResults from './AIAnalysisResults.jsx';
 import SavedQueries from './SavedQueries.jsx';
 import SaveQueryButton from './SaveQueryButton.jsx';
 import InlineTaskProgress from './InlineTaskProgress.jsx';
+import ClarificationModal from './ClarificationModal.jsx';
 import streamingAnalysisService from '../services/streamingAnalysisService.js';
+import disambiguationService from '../services/disambiguationService.js';
 import './ConversationContainer.css';
 
 const ConversationContainer = ({ 
@@ -34,6 +36,9 @@ const ConversationContainer = ({
     statusMessage: '',
     currentQuestion: ''
   });
+  const [disambiguation, setDisambiguation] = useState(null);
+  const [showClarificationModal, setShowClarificationModal] = useState(false);
+  const [pendingQuestion, setPendingQuestion] = useState('');
   const containerRef = useRef(null);
   const inputRef = useRef(null);
   
@@ -107,7 +112,28 @@ const ConversationContainer = ({
     }
 
     const question = currentQuestion.trim();
-    console.log('📝 Starting streaming analysis for question:', question);
+    console.log('📝 Starting analysis for question:', question);
+    
+    // Check for disambiguation needs before proceeding
+    const dataToAnalyze = cachedDataset || initialData;
+    const availableColumns = dataToAnalyze && dataToAnalyze.length > 0 ? Object.keys(dataToAnalyze[0]) : [];
+    
+    const disambiguationNeeded = disambiguationService.analyzeQuery(question, availableColumns);
+    
+    if (disambiguationNeeded) {
+      console.log('🤔 Disambiguation needed for:', disambiguationNeeded);
+      setDisambiguation(disambiguationNeeded);
+      setShowClarificationModal(true);
+      setPendingQuestion(question);
+      return;
+    }
+
+    // Proceed with analysis if no disambiguation needed
+    await executeAnalysis(question);
+  };
+
+  const executeAnalysis = async (question) => {
+    console.log('📝 Executing streaming analysis for question:', question);
     
     setCurrentQuestion('');
     setIsAnalyzing(true);
@@ -232,6 +258,41 @@ const ConversationContainer = ({
       });
       setIsAnalyzing(false);
     }
+  };
+
+  const handleClarificationConfirm = (selectedOption) => {
+    console.log('✅ User clarified:', { 
+      ambiguousTerm: disambiguation.ambiguousTerm, 
+      selectedOption, 
+      originalQuery: pendingQuestion 
+    });
+    
+    // Create clarified query
+    const clarifiedQuery = disambiguationService.createClarifiedQuery(
+      pendingQuestion,
+      disambiguation.ambiguousTerm,
+      selectedOption
+    );
+    
+    console.log('🔄 Proceeding with clarified query:', clarifiedQuery);
+    
+    // Close modal and execute analysis
+    setShowClarificationModal(false);
+    setDisambiguation(null);
+    setPendingQuestion('');
+    
+    // Execute analysis with clarified query
+    executeAnalysis(clarifiedQuery);
+  };
+
+  const handleClarificationCancel = () => {
+    console.log('❌ User cancelled disambiguation');
+    setShowClarificationModal(false);
+    setDisambiguation(null);
+    setPendingQuestion('');
+    
+    // Restore the original question to input field
+    setCurrentQuestion(pendingQuestion);
   };
 
   const handleKeyDown = (e) => {
@@ -596,6 +657,14 @@ ${savedQuery.results?.pythonCode || 'No saved code available'}
           />
         </div>
       )}
+
+      {/* Clarification Modal */}
+      <ClarificationModal
+        disambiguation={disambiguation}
+        isVisible={showClarificationModal}
+        onClarify={handleClarificationConfirm}
+        onCancel={handleClarificationCancel}
+      />
 
     </div>
   );

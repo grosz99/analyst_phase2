@@ -231,7 +231,13 @@ class AnthropicService {
     const dataStructure = this.analyzeDataStructure(data);
     const sampleData = data.slice(0, 5);
     
-    return `You are a data analyst. Analyze this dataset and provide insights for the user's question.
+    // Check if this is a disambiguated query
+    const isDisambiguated = userContext.includes('(specifically:');
+    const disambiguationNote = isDisambiguated 
+      ? '\n\n🎯 DISAMBIGUATION CONTEXT: This user query has been clarified to remove ambiguity. Please follow their specific intent exactly as stated.\n'
+      : '';
+    
+    return `You are a data analyst. Analyze this dataset and provide insights for the user's question.${disambiguationNote}
 
 🚨 CRITICAL CONSTRAINT: You can ONLY use these exact column names in your code: ${dataStructure.columns.join(', ')}
 

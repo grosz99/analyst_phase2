@@ -4,6 +4,7 @@
  */
 
 import apiClient from '../utils/apiClient.js';
+import disambiguationService from './disambiguationService.js';
 
 class StreamingAnalysisService {
   constructor() {
@@ -164,7 +165,12 @@ class StreamingAnalysisService {
 
     // Generate dataset-specific context if datasetId is provided
     const datasetContext = this.getDatasetSpecificContext(datasetId, data);
-    const enhancedContextPrompt = contextPrompt || datasetContext;
+    let enhancedContextPrompt = contextPrompt || datasetContext;
+    
+    // Add disambiguation context if the question was clarified
+    if (question.includes('(specifically:')) {
+      enhancedContextPrompt = (enhancedContextPrompt || '') + `\n\nIMPORTANT: This question has been disambiguated by the user. Please respect their specific clarification and provide analysis accordingly.`;
+    }
     
     const payload = {
       data: data,
