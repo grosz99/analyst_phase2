@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "npm install --no-package-lock && npm run build",
+  "buildCommand": "rm -rf node_modules package-lock.json && npm install && npm run build",
   "functions": {
     "api/index.js": {
       "maxDuration": 30
@@ -30,6 +30,5 @@
         }
       ]
     }
-  ],
-  "installCommand": "npm install --no-package-lock --force"
+  ]
 }
