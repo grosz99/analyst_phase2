@@ -129,8 +129,27 @@ const AIAnalysisResults = ({
     isValid
   });
 
+  // Helper function to get properly formatted table data
+  const getTableData = () => {
+    const rawTableData = results_table?.data || results_table?.rows;
+    if (!rawTableData) return { data: [], columns: [] };
+    
+    const columns = results_table.columns || results_table.headers || Object.keys(rawTableData[0] || {});
+    const data = results_table.rows ? 
+      rawTableData.map(row => {
+        const obj = {};
+        columns.forEach((col, index) => {
+          obj[col] = row[index];
+        });
+        return obj;
+      }) : rawTableData;
+      
+    return { data, columns };
+  };
+
   const handleExportResults = async (format) => {
-    if (!results_table?.data) return;
+    const { data: exportData } = getTableData();
+    if (!exportData.length) return;
     
     try {
       setExportLoading(true);
@@ -138,7 +157,7 @@ const AIAnalysisResults = ({
       const filename = `analysis_results_${question?.replace(/[^a-zA-Z0-9]/g, '_') || 'data'}_${timestamp}`;
       
       if (format === 'csv') {
-        exportToCSV(results_table.data, filename);
+        exportToCSV(exportData, filename);
       }
     } catch (error) {
       console.error('Export error:', error);
@@ -241,7 +260,8 @@ const AIAnalysisResults = ({
       }
       
       // Add results summary slide if we have table data
-      if (results_table && results_table.data && results_table.data.length > 0) {
+      const { data: pptData, columns: pptColumns } = getTableData();
+      if (pptData.length > 0) {
         const dataSlide = pptx.addSlide();
         
         dataSlide.addText('Key Results', {
@@ -256,7 +276,7 @@ const AIAnalysisResults = ({
         
         // Create table data
         const tableData = [];
-        const headers = results_table.headers || Object.keys(results_table.data[0]);
+        const headers = pptColumns;
         
         // Add headers
         tableData.push(headers.map(h => ({ 
@@ -265,7 +285,7 @@ const AIAnalysisResults = ({
         })));
         
         // Add data rows (limit to 10 for PowerPoint)
-        results_table.data.slice(0, 10).forEach(row => {
+        pptData.slice(0, 10).forEach(row => {
           tableData.push(headers.map(h => String(row[h] || '')));
         });
         
@@ -279,8 +299,8 @@ const AIAnalysisResults = ({
           fontSize: 12
         });
         
-        if (results_table.data.length > 10) {
-          dataSlide.addText(`Showing top 10 of ${results_table.data.length} results`, {
+        if (pptData.length > 10) {
+          dataSlide.addText(`Showing top 10 of ${pptData.length} results`, {
             x: 0.5,
             y: 6.8,
             w: '90%',
@@ -370,18 +390,17 @@ const AIAnalysisResults = ({
   };
 
   const renderResultsTable = () => {
-    console.log('🔍 Debug renderResultsTable:', { results_table, hasData: results_table?.data?.length > 0 });
+    console.log('🔍 Debug renderResultsTable:', { 
+      results_table, 
+      hasData: results_table?.data?.length > 0,
+      hasRows: results_table?.rows?.length > 0,
+      structure: results_table ? Object.keys(results_table) : 'no_table'
+    });
     
-    if (!results_table || !results_table.data || results_table.data.length === 0) {
+    const { data, columns } = getTableData();
+    
+    if (!results_table || !data.length || !columns.length) {
       return <p className="no-items">No analysis results available</p>;
-    }
-
-    const data = results_table.data;
-    // Generate columns from data if not provided
-    const columns = results_table.columns || results_table.headers || Object.keys(data[0] || {});
-
-    if (!columns || columns.length === 0) {
-      return <p className="no-items">No table structure available</p>;
     }
 
     return (
