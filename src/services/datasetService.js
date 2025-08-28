@@ -6,10 +6,10 @@ class DatasetService {
     this.currentDataset = null;
     this.datasetInfo = null;
     this.datasetSession = null;
-    // Use environment variable if available, otherwise fallback to localhost in dev
+    // Use environment variable if available, otherwise detect production by domain
     this.baseURL = import.meta.env.VITE_API_URL || 
-      (import.meta.env.NODE_ENV === 'production' 
-        ? '' // Use relative URLs in production
+      (window.location.hostname.includes('vercel.app') || import.meta.env.NODE_ENV === 'production'
+        ? '' // Use relative URLs in production/Vercel
         : 'http://localhost:3001');
   }
 
