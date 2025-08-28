@@ -270,7 +270,7 @@ Focus on providing business value and actionable insights. Ensure all analysis i
     
     if (numericColumns.length > 0) {
       return {
-        type: 'bar',
+        type: 'bar_chart',
         title: title,
         data: data.slice(0, 10).map((row, index) => ({
           label: `Row ${index + 1}`,

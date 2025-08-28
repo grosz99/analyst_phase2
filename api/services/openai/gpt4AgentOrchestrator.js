@@ -215,7 +215,7 @@ Provide integrated findings from all agents with actionable business recommendat
     
     if (numericColumns.length > 0) {
       return {
-        type: 'bar',
+        type: 'bar_chart',
         title: title,
         data: data.slice(0, 10).map((row, index) => ({
           label: `Row ${index + 1}`,
