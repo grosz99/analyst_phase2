@@ -57,8 +57,8 @@ const DataAnalysisApp = () => {
         console.log('Loaded data sources:', sourceNames);
       } catch (error) {
         console.error('Failed to load data sources:', error);
-        // Fallback to mock data sources
-        setAvailableDataSources(['Sales Data', 'Customer Data', 'Product Data']);
+        setError('Failed to connect to data sources. Please check your connection and try again.');
+        setAvailableDataSources([]);
       } finally {
         setIsLoadingDataSources(false);
       }
@@ -102,8 +102,8 @@ const DataAnalysisApp = () => {
     } catch (error) {
       console.error(`Failed to get fields for ${source}:`, error);
       
-      // Fallback: return empty array if API fails
-      console.warn('No fallback fields available - API required for field discovery');
+      // No fallback data allowed per CLAUDE.md policy
+      console.error('API connection required for field discovery - no fallback data allowed');
       return [];
     }
   }, []);
