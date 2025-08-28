@@ -416,14 +416,58 @@ app.post('/api/load-dataset', async (req, res) => {
       });
     }
 
-    // Query Supabase for both schema and actual data (real analysis needs real schema)
-    try {
-      // Get both schema and actual data from Supabase for real analysis
-      const analysisRowLimit = userSelections.analysisMode ? 5000 : 1000;
-      const filters = userSelections.filters || {};
+    // Use SQLite for NCC dataset, Supabase for others
+    if (datasetId === 'ncc') {
+      console.log('🔍 Using SQLite for NCC dataset analysis');
       
-      const [schema, analysisData] = await Promise.all([
-        supabaseService.discoverColumns(datasetId),
+      // Get table info from SQLite
+      const tableInfo = sqliteService.getTableInfo();
+      if (!tableInfo || !tableInfo.NCC) {
+        return res.status(500).json({
+          success: false,
+          error: 'SQLite NCC data not available. Please contact support.',
+          help: 'The analysis database needs to be initialized.'
+        });
+      }
+
+      // Get sample data from SQLite
+      const sampleResult = sqliteService.executeQuery('SELECT * FROM NCC LIMIT 100', 'sample data');
+      
+      if (!sampleResult.success) {
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to query SQLite database: ' + sampleResult.error,
+        });
+      }
+
+      // Format response to match existing structure
+      const duration = Date.now() - startTime;
+      
+      res.json({
+        success: true,
+        data: sampleResult.results,
+        columns: sampleResult.columns,
+        preview: sampleResult.results.slice(0, 10),
+        metadata: {
+          total_rows: tableInfo.NCC.row_count,
+          columns_analyzed: sampleResult.columns.length,
+          dataset_id: datasetId,
+          source: 'sqlite',
+          analysis_ready: true
+        },
+        timestamp: new Date().toISOString(),
+        processing_time: duration
+      });
+      
+    } else {
+      // Query Supabase for other datasets
+      try {
+        // Get both schema and actual data from Supabase for real analysis
+        const analysisRowLimit = userSelections.analysisMode ? 5000 : 1000;
+        const filters = userSelections.filters || {};
+        
+        const [schema, analysisData] = await Promise.all([
+          supabaseService.discoverColumns(datasetId),
         supabaseService.sampleData(datasetId, userSelections.columns, analysisRowLimit, filters)
       ]);
       
@@ -451,10 +495,10 @@ app.post('/api/load-dataset', async (req, res) => {
         }
       };
 
-      res.json(result);
-      
-    } catch (supabaseError) {
-      console.error(`Supabase dataset loading failed for ${datasetId}:`, supabaseError.message);
+        res.json(result);
+        
+      } catch (supabaseError) {
+        console.error(`Supabase dataset loading failed for ${datasetId}:`, supabaseError.message);
       
       // ❌ REMOVED: No fallback/fake data allowed per CLAUDE.md
       // Only use real data sources - fail fast when unavailable
@@ -478,6 +522,7 @@ app.post('/api/load-dataset', async (req, res) => {
         retry_after: 30, // Suggest retry after 30 seconds
         timestamp: new Date().toISOString()
       });
+      }
     }
     
   } catch (error) {

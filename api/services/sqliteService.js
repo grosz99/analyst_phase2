@@ -10,7 +10,21 @@ const fs = require('fs');
 class SQLiteService {
   constructor() {
     this.db = null;
-    this.dbPath = path.join(__dirname, '..', 'data', 'analysis.db');
+    // Try multiple paths for SQLite database
+    const possiblePaths = [
+      path.join(__dirname, '..', 'data', 'analysis.db'),
+      path.join(__dirname, '..', '..', 'analysis.db'),
+      path.join(process.cwd(), 'analysis.db'),
+      '/tmp/analysis.db'
+    ];
+    
+    this.dbPath = possiblePaths.find(dbPath => {
+      try {
+        return require('fs').existsSync(dbPath);
+      } catch {
+        return false;
+      }
+    }) || possiblePaths[0];
     this.isInitialized = false;
     this.supabaseClient = null;
     this.tableSchemas = new Map();
