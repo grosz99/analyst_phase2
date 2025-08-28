@@ -3,7 +3,9 @@ const cors = require('cors');
 const session = require('express-session');
 const csrf = require('csrf');
 const statelessCSRF = require('./utils/statelessCSRF');
-require('dotenv').config();
+// Load environment variables from .env file for local development
+// In production (Vercel), environment variables are set in Vercel Dashboard
+require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 const supabaseService = require('./services/supabaseService');
 const openaiService = require('./services/openai/openaiService');
 const gpt4AgentOrchestrator = require('./services/openai/gpt4AgentOrchestrator');
@@ -134,6 +136,26 @@ app.get('/api/health', (req, res) => {
     version: '1.0.0',
     environment: process.env.NODE_ENV || 'development',
     milestone: 'M1 - Backend Foundation'
+  });
+});
+
+// Environment debug endpoint (only show availability, not actual values)
+app.get('/api/debug/env', (req, res) => {
+  res.json({
+    environment: process.env.NODE_ENV || 'development',
+    env_vars_status: {
+      SUPABASE_URL: !!process.env.SUPABASE_URL,
+      VITE_SUPABASE_URL: !!process.env.VITE_SUPABASE_URL,
+      SUPABASE_SERVICE_ROLE_KEY: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+      SUPABASE_KEY: !!process.env.SUPABASE_KEY,
+      OPENAI_API_KEY: !!process.env.OPENAI_API_KEY,
+      SESSION_SECRET: !!process.env.SESSION_SECRET
+    },
+    supabase_service: {
+      initialized: supabaseService.isConnected,
+      error: supabaseService.connectionError
+    },
+    timestamp: new Date().toISOString()
   });
 });
 

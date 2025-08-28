@@ -9,15 +9,24 @@ class SupabaseService {
     this.cacheExpiry = new Map();
     this.cacheTTL = 5 * 60 * 1000; // 5 minutes cache
     
-    // Initialize Supabase client
+    // Initialize Supabase client - handle both local and Vercel environments
     this.config = {
-      url: process.env.SUPABASE_URL,
-      key: process.env.SUPABASE_SERVICE_ROLE_KEY
+      url: process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL,
+      key: process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY
     };
 
     if (!this.config.url || !this.config.key) {
-      console.error('❌ SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set in environment variables');
-      this.connectionError = 'Missing Supabase configuration';
+      console.error('❌ Supabase configuration missing:', {
+        url_available: !!this.config.url,
+        key_available: !!this.config.key,
+        env_vars_checked: [
+          'SUPABASE_URL', 
+          'VITE_SUPABASE_URL', 
+          'SUPABASE_SERVICE_ROLE_KEY', 
+          'SUPABASE_KEY'
+        ]
+      });
+      this.connectionError = 'Missing Supabase configuration in environment variables';
       return;
     }
 
