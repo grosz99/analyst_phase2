@@ -4,8 +4,8 @@ class AIAnalysisService {
   constructor() {
     // Use environment variable if available, otherwise fallback based on environment
     this.baseURL = import.meta.env.VITE_API_URL || 
-      (import.meta.env.NODE_ENV === 'production' 
-        ? window.location.origin // Use current domain in production
+      (window.location.hostname.includes('vercel.app') || import.meta.env.NODE_ENV === 'production'
+        ? '' // Use relative URLs in production/Vercel
         : 'http://localhost:3001');
     
     console.log(`🔗 AI Analysis Service initialized with baseURL: ${this.baseURL}`);

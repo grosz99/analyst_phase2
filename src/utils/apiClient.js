@@ -1,8 +1,8 @@
 class APIClient {
   constructor() {
     this.baseURL = import.meta.env.VITE_API_URL || 
-      (import.meta.env.NODE_ENV === 'production' 
-        ? window.location.origin 
+      (window.location.hostname.includes('vercel.app') || import.meta.env.NODE_ENV === 'production'
+        ? '' // Use relative URLs in production/Vercel
         : 'http://localhost:3001');
     
     this.csrfToken = null;
