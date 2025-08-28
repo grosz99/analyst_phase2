@@ -1,7 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "npm install --force --no-optional=false && npm run build",
-  "installCommand": "npm ci --production=false --force --no-optional=false",
+  "buildCommand": "npm install --no-package-lock && npm run build",
   "functions": {
     "api/index.js": {
       "maxDuration": 30
@@ -32,24 +31,5 @@
       ]
     }
   ],
-  "build": {
-    "env": {
-      "NPM_CONFIG_OPTIONAL": "false",
-      "NPM_CONFIG_FORCE": "true",
-      "NODE_ENV": "production",
-      "SKIP_INSTALL_DEPS": "false",
-      "NPM_CONFIG_FUND": "false",
-      "NPM_CONFIG_AUDIT": "false",
-      "NPM_CONFIG_UPDATE_NOTIFIER": "false",
-      "NPM_CONFIG_PROGRESS": "false",
-      "ROLLUP_WATCH": "false",
-      "VITE_BUILD_MODE": "production",
-      "CI": "true"
-    }
-  },
-  "env": {
-    "NPM_CONFIG_OPTIONAL": "false",
-    "SKIP_INSTALL_DEPS": "false",
-    "NODE_ENV": "production"
-  }
+  "installCommand": "npm install --no-package-lock --force"
 }
