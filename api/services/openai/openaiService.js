@@ -1,6 +1,4 @@
 const OpenAIClient = require('./openaiClient');
-const CodeExecutor = require('../anthropic/codeExecutor'); // Reuse existing code executor
-const ResultFormatter = require('../anthropic/resultFormatter'); // Reuse existing result formatter
 
 /**
  * OpenAI GPT-4.1 Service - Main orchestrator for AI analysis
@@ -10,8 +8,6 @@ const ResultFormatter = require('../anthropic/resultFormatter'); // Reuse existi
 class OpenAIService {
   constructor() {
     this.client = new OpenAIClient();
-    this.codeExecutor = new CodeExecutor();
-    this.resultFormatter = new ResultFormatter();
   }
 
   // Main analysis method - orchestrates the entire workflow with GPT-4.1
@@ -44,22 +40,9 @@ class OpenAIService {
       const analysisText = response.choices[0].message.content;
       console.log('📝 Received analysis from OpenAI GPT-4.1');
 
-      // Extract Python code from response
-      const pythonCode = this.resultFormatter.extractPythonCode(analysisText);
+      // Extract Python code from response (simple extraction)
+      const pythonCode = this.extractPythonCode(analysisText);
       
-      let executedResults = null;
-
-      // Try to execute the AI's analysis on our cached data
-      if (pythonCode && pythonCode.executable) {
-        console.log('🔬 Attempting to execute GPT-4.1 analysis on cached data...');
-        executedResults = this.codeExecutor.executeAnalysisOnCachedData(
-          sanitizedData, 
-          sanitizedContext, 
-          analysisText, 
-          pythonCode
-        );
-      }
-
       // Generate refined question suggestions
       const refinedQuestions = this.generateRefinedQuestions(sanitizedData, sanitizedContext, analysisText);
       
@@ -69,12 +52,8 @@ class OpenAIService {
         success: true,
         analysis: analysisText,
         python_code: pythonCode,
-        results_table: executedResults ? 
-          this.resultFormatter.formatResultsAsTable(executedResults, sanitizedContext) :
-          this.resultFormatter.createSummaryTable(sanitizedData, "Analysis Summary"),
-        visualization: executedResults ?
-          this.resultFormatter.createVisualizationFromResults(executedResults, sanitizedContext) :
-          this.resultFormatter.createBasicVisualization(sanitizedData, "Data Overview"),
+        results_table: this.createSummaryTable(sanitizedData, "Analysis Summary"),
+        visualization: this.createBasicVisualization(sanitizedData, "Data Overview"),
         refined_questions: refinedQuestions,
         metadata: {
           model: 'gpt-4-1106-preview',
@@ -87,8 +66,7 @@ class OpenAIService {
             completion_tokens: response.usage?.completion_tokens || 0,
             total_tokens: response.usage?.total_tokens || 0
           },
-          cached_analysis: true,
-          executed_real_analysis: !!executedResults
+          cached_analysis: true
         }
       };
 
@@ -254,6 +232,58 @@ Focus on providing business value and actionable insights. Ensure all analysis i
     });
     
     return refinedQuestions.slice(0, 4); // Return max 4 suggestions
+  }
+
+  // Simple Python code extraction
+  extractPythonCode(text) {
+    const codeBlocks = text.match(/```python\n([\s\S]*?)\n```/g);
+    if (codeBlocks && codeBlocks.length > 0) {
+      const code = codeBlocks[0].replace(/```python\n/, '').replace(/\n```/, '');
+      return {
+        code: code,
+        executable: code.length > 0
+      };
+    }
+    return null;
+  }
+
+  // Create simple summary table
+  createSummaryTable(data, title) {
+    if (!data || data.length === 0) return null;
+    
+    return {
+      title: title,
+      columns: Object.keys(data[0]),
+      rows: data.slice(0, 10).map(row => Object.values(row)),
+      totalRows: data.length
+    };
+  }
+
+  // Create basic visualization config
+  createBasicVisualization(data, title) {
+    if (!data || data.length === 0) return null;
+    
+    const columns = Object.keys(data[0]);
+    const numericColumns = columns.filter(col => 
+      typeof data[0][col] === 'number' || !isNaN(parseFloat(data[0][col]))
+    );
+    
+    if (numericColumns.length > 0) {
+      return {
+        type: 'bar',
+        title: title,
+        data: data.slice(0, 10).map((row, index) => ({
+          label: `Row ${index + 1}`,
+          value: parseFloat(row[numericColumns[0]]) || 0
+        }))
+      };
+    }
+    
+    return {
+      type: 'table',
+      title: title,
+      message: 'Data visualization available with numeric data'
+    };
   }
 
   // Health check method
