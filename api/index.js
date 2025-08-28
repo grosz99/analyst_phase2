@@ -9,7 +9,6 @@ const openaiService = require('./services/openai/openaiService');
 const gpt4AgentOrchestrator = require('./services/openai/gpt4AgentOrchestrator');
 // const anthropicService = require('./services/anthropicService'); // REPLACED with OpenAI GPT-4.1
 // const agentOrchestrator = require('./services/anthropic/agentOrchestrator'); // REPLACED with GPT-4.1 Agent Orchestrator
-// const fallbackDataService = require('./services/fallbackDataService'); // REMOVED: Violates CLAUDE.md No Fake Data Policy
 const fixedMetadata = require('./config/fixedMetadata');
 
 const app = express();
@@ -198,7 +197,6 @@ app.get('/api/debug/table/:name', async (req, res) => {
 app.get('/api/status', async (req, res) => {
   try {
     const supabaseStatus = supabaseService.getStatus();
-    // const fallbackAvailable = fallbackDataService.getAvailableDatasets(); // REMOVED: No fake data allowed
     
     res.json({
       server: 'online',
@@ -208,11 +206,6 @@ app.get('/api/status', async (req, res) => {
         gpt4AgentOrchestration: 'enabled'
       },
       cache: `${supabaseStatus.cache_size} items cached`,
-      fallback: {
-        available: fallbackAvailable.length > 0,
-        datasets: fallbackAvailable,
-        status: 'ready'
-      },
       uptime: process.uptime(),
       memory: process.memoryUsage(),
       supabase: {
