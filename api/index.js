@@ -417,42 +417,47 @@ app.post('/api/load-dataset', async (req, res) => {
 
     // Use SQLite for NCC dataset, Supabase for others
     if (datasetId === 'ncc') {
-      console.log('🔍 Using SQLite for NCC dataset analysis');
+      console.log('🔍 Loading NCC dataset');
       
-      // Get table info from JavaScript SQL Executor
-      const tableInfo = javascriptSQLExecutor.getTableInfo();
-      if (!tableInfo || !tableInfo.NCC) {
+      // Use the NCC data directly
+      const nccDataset = require('./data/nccData');
+      
+      if (!nccDataset.data || nccDataset.data.length === 0) {
         return res.status(500).json({
           success: false,
           error: 'NCC data not available. Please contact support.',
-          help: 'The analysis database needs to be initialized.'
+          help: 'The NCC dataset is empty or not loaded properly.'
         });
       }
 
-      // Get sample data from JavaScript SQL Executor
-      const sampleResult = javascriptSQLExecutor.executeQuery('SELECT * FROM NCC LIMIT 100', 'sample data');
+      // Get the data
+      const data = nccDataset.data;
+      const columns = Object.keys(data[0]);
       
-      if (!sampleResult.success) {
-        return res.status(500).json({
-          success: false,
-          error: 'Failed to query SQLite database: ' + sampleResult.error,
-        });
-      }
-
       // Format response to match existing structure
       const duration = Date.now() - startTime;
       
       res.json({
         success: true,
-        data: sampleResult.results,
-        columns: sampleResult.columns,
-        preview: sampleResult.results.slice(0, 10),
+        data: data,
+        columns: columns,
+        preview: data.slice(0, 10),
+        sample_data: data.slice(0, 10),
+        analysis_data: data, // Full data for AI analysis
         metadata: {
-          total_rows: tableInfo.NCC.row_count,
-          columns_analyzed: sampleResult.columns.length,
+          total_rows: data.length,
+          columns_analyzed: columns.length,
           dataset_id: datasetId,
-          source: 'sqlite',
+          source: 'embedded',
           analysis_ready: true
+        },
+        schema: {
+          columns: columns.map(col => ({
+            name: col,
+            type: typeof data[0][col] === 'number' ? 'number' : 'string'
+          })),
+          total_columns: columns.length,
+          row_count: data.length
         },
         timestamp: new Date().toISOString(),
         processing_time: duration
