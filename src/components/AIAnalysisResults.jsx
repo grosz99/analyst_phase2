@@ -109,7 +109,8 @@ const AIAnalysisResults = ({
   // Extract with safe defaults
   const {
     analysis = 'No analysis text available',
-    python_code = null,
+    sql_query = null,
+    python_code = null, // Keep for backward compatibility
     metadata = {},
     results_table = null,
     visualization = null,
@@ -540,53 +541,58 @@ const AIAnalysisResults = ({
   };
 
   const renderPythonCode = () => {
-    console.log('🔍 Debug renderPythonCode:', {
+    const codeToRender = sql_query || python_code; // Prefer SQL query, fallback to python for compatibility
+    const isSQL = !!sql_query;
+    
+    console.log('🔍 Debug renderCode:', {
+      sql_query,
       python_code,
-      hasCode: !!python_code?.code,
-      isExecutable: python_code?.executable,
-      codeType: typeof python_code
+      isSQL,
+      hasCode: !!codeToRender?.code,
+      isExecutable: codeToRender?.executable,
+      codeType: typeof codeToRender
     });
     
-    if (!python_code) {
-      console.warn('⚠️ No python_code provided');
-      return <p className="no-items">No Python code generated</p>;
+    if (!codeToRender) {
+      console.warn('⚠️ No code provided');
+      return <p className="no-items">{isSQL ? 'No SQL query generated' : 'No Python code generated'}</p>;
     }
     
     // Handle both object and string formats
-    const codeString = python_code.code || python_code;
+    const codeString = codeToRender.code || codeToRender;
     
     if (!codeString || (typeof codeString !== 'string' && typeof codeString !== 'object')) {
-      console.warn('⚠️ Invalid python code format:', typeof codeString);
-      return <p className="no-items">Invalid Python code format</p>;
+      console.warn('⚠️ Invalid code format:', typeof codeString);
+      return <p className="no-items">Invalid code format</p>;
     }
     
     const displayCode = typeof codeString === 'string' ? codeString : JSON.stringify(codeString, null, 2);
     
-    console.log('✅ Rendering Python code, length:', displayCode.length);
+    console.log(`✅ Rendering ${isSQL ? 'SQL' : 'Python'} code, length:`, displayCode.length);
 
     return (
       <div className="python-code-container">
         <div className="code-header">
-          <h4>Generated Python Analysis Code</h4>
-          <p className="code-subtitle">AI-generated code to analyze your cached dataset</p>
+          <h4>Generated {isSQL ? 'SQL Query' : 'Python Analysis Code'}</h4>
+          <p className="code-subtitle">AI-generated {isSQL ? 'SQL query to analyze your SQLite database' : 'code to analyze your cached dataset'}</p>
         </div>
         <pre className="python-code">
           <code>{displayCode}</code>
         </pre>
-        {python_code.executable && (
+        {codeToRender.executable && (
           <div className="code-info">
             <span className="code-status">
-              {python_code.optimized ? '⚡ Optimized pre-written code' : '✅ Executable code generated'}
+              {codeToRender.optimized ? '⚡ Optimized query' : '✅ Executable code generated'}
             </span>
             <span className="code-note">
-              {python_code.optimized 
-                ? 'This is performance-optimized pandas code for common questions' 
+              {isSQL 
+                ? 'This SQL query was executed against the SQLite database' 
                 : 'This code operates on the cached DataFrame \'df\''
               }
             </span>
           </div>
         )}
-        {python_code.executable === false && (
+        {codeToRender.executable === false && (
           <div className="code-warning">
             <span className="code-status">⚠️ Non-executable code</span>
             <span className="code-note">This code could not be executed automatically</span>

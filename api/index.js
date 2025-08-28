@@ -9,7 +9,8 @@ require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 const supabaseService = require('./services/supabaseService');
 const openaiService = require('./services/openai/openaiService');
 const gpt4AgentOrchestrator = require('./services/openai/gpt4AgentOrchestrator');
-const sqliteService = require('./services/sqliteService');
+const nccDataset = require('./data/nccData');
+const javascriptSQLExecutor = require('./services/javascriptSQLExecutor');
 // const anthropicService = require('./services/anthropicService'); // REPLACED with OpenAI GPT-4.1
 // const agentOrchestrator = require('./services/anthropic/agentOrchestrator'); // REPLACED with GPT-4.1 Agent Orchestrator
 const fixedMetadata = require('./config/fixedMetadata');
@@ -319,84 +320,82 @@ app.get('/api', (req, res) => {
 
 // Only real Snowflake data - no mock fallbacks
 
-// Get available datasets - Now using fixed metadata to reduce costs
+// Get available datasets - Always include NCC dataset
 app.get('/api/available-datasets', async (req, res) => {
   try {
     console.log('Fetching available datasets...');
     const startTime = Date.now();
     
-    // Check if we should use live data (only when explicitly requested)
+    // Always include the NCC dataset which is stored locally
+    const datasets = [
+      {
+        id: 'ncc',
+        name: 'NCC',
+        description: 'Project revenue and performance data',
+        source: 'sqlite',
+        columns: ['Office', 'Client', 'Sector', 'Month', 'NCC', 'Project_ID'],
+        row_count: nccDataset.data ? nccDataset.data.length : 1000,
+        available: true
+      }
+    ];
+    
+    // Check if we should also query Supabase
     const useLiveData = req.query.live === 'true';
     
     if (useLiveData) {
-      // Only query Supabase when explicitly requested
+      // Try to add Supabase datasets
       try {
         const allSupabaseTables = await supabaseService.discoverTables();
-        const duration = Date.now() - startTime;
         
-        // Filter to only show the three real business datasets
+        // Filter to only show the business datasets
         const businessDatasets = allSupabaseTables.filter(table => 
-          ['ATTENDANCE', 'NCC', 'PIPELINE'].includes(table.name)
+          ['ATTENDANCE', 'PIPELINE'].includes(table.name)
         );
         
-        console.log(`Retrieved ${allSupabaseTables.length} Supabase tables, filtered to ${businessDatasets.length} business datasets in ${duration}ms`);
+        datasets.push(...businessDatasets);
         
-        res.json({
-          success: true,
-          datasets: businessDatasets,
-          total_count: businessDatasets.length,
-          timestamp: new Date().toISOString(),
-          source: 'supabase',
-          performance: {
-            duration: duration,
-            cached: duration < 1000
-          }
-        });
+        console.log(`Retrieved ${datasets.length} total datasets`);
       } catch (supabaseError) {
         console.error('Supabase unavailable:', supabaseError.message);
-        
-        // Fallback to fixed metadata
-        console.log('Falling back to fixed metadata due to Supabase error');
-        const duration = Date.now() - startTime;
-        
-        res.json({
-          success: true,
-          datasets: fixedMetadata.tables,
-          total_count: fixedMetadata.tables.length,
-          timestamp: new Date().toISOString(),
-          source: 'fixed_metadata',
-          performance: {
-            duration: duration,
-            cached: true
-          },
-          notice: 'Using cached metadata due to connection issues'
-        });
+        // Continue with just NCC dataset
       }
-    } else {
-      // DEFAULT: Use fixed metadata to avoid expensive queries
-      const duration = Date.now() - startTime;
-      
-      console.log('Using fixed metadata for datasets', { duration: `${duration}ms` });
-      
-      res.json({
-        success: true,
-        datasets: fixedMetadata.tables,
-        total_count: fixedMetadata.tables.length,
-        timestamp: new Date().toISOString(),
-        source: 'fixed_metadata',
-        performance: {
-          duration: duration,
-          cached: true
-        }
-      });
     }
+    
+    const duration = Date.now() - startTime;
+    
+    res.json({
+      success: true,
+      datasets: datasets,
+      total_count: datasets.length,
+      timestamp: new Date().toISOString(),
+      source: 'mixed',
+      performance: {
+        duration: duration,
+        cached: false
+      }
+    });
     
   } catch (error) {
     console.error('Available datasets endpoint error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-      timestamp: new Date().toISOString()
+    
+    // Even on error, return the NCC dataset
+    res.json({
+      success: true,
+      datasets: [
+        {
+          id: 'ncc',
+          name: 'NCC',
+          description: 'Project revenue and performance data',
+          source: 'sqlite',
+          columns: ['Office', 'Client', 'Sector', 'Month', 'NCC', 'Project_ID'],
+          row_count: 1000,
+          available: true
+        }
+      ],
+      total_count: 1,
+      timestamp: new Date().toISOString(),
+      source: 'fallback',
+      error_handled: error.message
     });
   }
 });
@@ -420,18 +419,18 @@ app.post('/api/load-dataset', async (req, res) => {
     if (datasetId === 'ncc') {
       console.log('🔍 Using SQLite for NCC dataset analysis');
       
-      // Get table info from SQLite
-      const tableInfo = sqliteService.getTableInfo();
+      // Get table info from JavaScript SQL Executor
+      const tableInfo = javascriptSQLExecutor.getTableInfo();
       if (!tableInfo || !tableInfo.NCC) {
         return res.status(500).json({
           success: false,
-          error: 'SQLite NCC data not available. Please contact support.',
+          error: 'NCC data not available. Please contact support.',
           help: 'The analysis database needs to be initialized.'
         });
       }
 
-      // Get sample data from SQLite
-      const sampleResult = sqliteService.executeQuery('SELECT * FROM NCC LIMIT 100', 'sample data');
+      // Get sample data from JavaScript SQL Executor
+      const sampleResult = javascriptSQLExecutor.executeQuery('SELECT * FROM NCC LIMIT 100', 'sample data');
       
       if (!sampleResult.success) {
         return res.status(500).json({
@@ -933,43 +932,19 @@ Rules:
   }
 });
 
-// Ingest data into SQLite endpoint
-app.post('/api/sqlite/ingest', async (req, res) => {
+// JavaScript SQL executor health check
+app.get('/api/sql/health', (req, res) => {
   try {
-    console.log('📥 Starting SQLite data ingestion...');
-    
-    const result = await sqliteService.ingestNCCData();
+    const health = javascriptSQLExecutor.healthCheck();
     
     res.json({
-      success: true,
-      message: 'Data ingested successfully into SQLite',
-      ...result,
-      timestamp: new Date().toISOString()
-    });
-    
-  } catch (error) {
-    console.error('❌ SQLite ingestion failed:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-      timestamp: new Date().toISOString()
-    });
-  }
-});
-
-// SQLite health check
-app.get('/api/sqlite/health', (req, res) => {
-  try {
-    const health = sqliteService.healthCheck();
-    
-    res.json({
-      service: 'SQLite Analysis Database',
+      service: 'JavaScript SQL Analysis Engine',
       ...health,
       timestamp: new Date().toISOString()
     });
   } catch (error) {
     res.status(500).json({
-      service: 'SQLite Analysis Database',
+      service: 'JavaScript SQL Analysis Engine',
       status: 'error',
       error: error.message,
       timestamp: new Date().toISOString()
