@@ -113,7 +113,8 @@ const AIAnalysisResults = ({
     metadata = {},
     results_table = null,
     visualization = null,
-    refined_questions = []
+    refined_questions = [],
+    python_execution = null
   } = analysisResult || {};
   
   console.log('🔍 Debug AIAnalysisResults extracted data:', { 
@@ -640,8 +641,44 @@ const AIAnalysisResults = ({
       <div className="interpretation-container">
         <div className="interpretation-header">
           <h3>🧠 AI Analysis Interpretation</h3>
-          <p>Understanding how Claude Agent Orchestration approached this analysis</p>
+          <p>Understanding how GPT-4.1 Agent Orchestration approached this analysis</p>
         </div>
+
+        {/* Python Execution Section */}
+        {python_execution && (
+          <div className="interpretation-section">
+            <h4>🐍 Python Code Execution</h4>
+            <div className="section-content">
+              {python_execution.success ? (
+                <div className="python-execution-success">
+                  <p><strong>✅ Code executed successfully in {python_execution.execution_time}ms</strong></p>
+                  {python_execution.results && (
+                    <div className="execution-details">
+                      {python_execution.results.type === 'dataframe' && (
+                        <p>Generated a {python_execution.results.shape?.[0] || 'unknown'} row × {python_execution.results.shape?.[1] || 'unknown'} column DataFrame with the results shown in the Results tab.</p>
+                      )}
+                      {python_execution.results.type === 'value' && (
+                        <p>Computed result: <code>{python_execution.results.data}</code></p>
+                      )}
+                    </div>
+                  )}
+                  <p><em>The Python code analyzed your dataset to generate the specific results you requested, which are displayed in the Results and Visualization tabs above.</em></p>
+                </div>
+              ) : (
+                <div className="python-execution-error">
+                  <p><strong>⚠️ Python execution encountered an issue</strong></p>
+                  <p><em>Displaying analysis based on data overview instead.</em></p>
+                  {python_execution.error && (
+                    <details>
+                      <summary>Error details</summary>
+                      <code>{python_execution.error}</code>
+                    </details>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {hasStructuredSections ? (
           <div className="interpretation-sections">
@@ -688,7 +725,7 @@ const AIAnalysisResults = ({
               <p>{analysis}</p>
             </div>
             <div className="interpretation-note">
-              <small>💡 This shows the complete analytical reasoning from Claude Agent Orchestration</small>
+              <small>💡 This shows the complete analytical reasoning from GPT-4.1 Agent Orchestration</small>
             </div>
           </div>
         )}
