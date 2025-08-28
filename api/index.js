@@ -9,6 +9,7 @@ require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 const supabaseService = require('./services/supabaseService');
 const openaiService = require('./services/openai/openaiService');
 const gpt4AgentOrchestrator = require('./services/openai/gpt4AgentOrchestrator');
+const sqliteService = require('./services/sqliteService');
 // const anthropicService = require('./services/anthropicService'); // REPLACED with OpenAI GPT-4.1
 // const agentOrchestrator = require('./services/anthropic/agentOrchestrator'); // REPLACED with GPT-4.1 Agent Orchestrator
 const fixedMetadata = require('./config/fixedMetadata');
@@ -881,6 +882,50 @@ Rules:
     console.error('Data source recommendation error:', error);
     res.status(500).json({
       success: false,
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Ingest data into SQLite endpoint
+app.post('/api/sqlite/ingest', async (req, res) => {
+  try {
+    console.log('📥 Starting SQLite data ingestion...');
+    
+    const result = await sqliteService.ingestNCCData();
+    
+    res.json({
+      success: true,
+      message: 'Data ingested successfully into SQLite',
+      ...result,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('❌ SQLite ingestion failed:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// SQLite health check
+app.get('/api/sqlite/health', (req, res) => {
+  try {
+    const health = sqliteService.healthCheck();
+    
+    res.json({
+      service: 'SQLite Analysis Database',
+      ...health,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      service: 'SQLite Analysis Database',
+      status: 'error',
       error: error.message,
       timestamp: new Date().toISOString()
     });

@@ -24,9 +24,12 @@ class SupabaseService {
           'VITE_SUPABASE_URL', 
           'SUPABASE_SERVICE_ROLE_KEY', 
           'SUPABASE_KEY'
-        ]
+        ],
+        current_env: process.env.NODE_ENV,
+        is_vercel: !!process.env.VERCEL
       });
-      this.connectionError = 'Missing Supabase configuration in environment variables';
+      this.connectionError = 'Missing Supabase configuration in environment variables. Check Vercel Dashboard → Settings → Environment Variables.';
+      this.isConnected = false;
       return;
     }
 

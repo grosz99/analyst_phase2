@@ -9,8 +9,8 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
-    "openai": "^4.28.4",
     "@supabase/supabase-js": "^2.53.0",
+    "better-sqlite3": "^12.2.0",
     "cors": "^2.8.5",
     "crypto": "^1.0.1",
     "csrf": "^3.1.0",
@@ -20,7 +20,9 @@
     "jsonwebtoken": "^9.0.2",
     "node-fetch": "^2.7.0",
     "node-rsa": "^1.1.1",
-    "snowflake-sdk": "^1.15.0"
+    "openai": "^4.28.4",
+    "snowflake-sdk": "^1.15.0",
+    "sqlite3": "^5.1.7"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"

@@ -30,10 +30,31 @@ class PythonExecutor {
   async executePythonCode(pythonCode, data, userQuestion = '') {
     const startTime = Date.now();
     
+    // PRODUCTION FIX: Disable Python execution in serverless environment
+    if (process.env.NODE_ENV === 'production' || process.env.VERCEL) {
+      console.log('⚠️ Python execution disabled in production/serverless environment');
+      
+      return {
+        success: false,
+        results: null,
+        output: 'Python execution is disabled in production environment for security and compatibility reasons.',
+        error: 'Python execution not available in serverless environment',
+        execution_time: Date.now() - startTime,
+        code_executed: pythonCode,
+        fallback_used: true
+      };
+    }
+    
     try {
       console.log('🐍 Starting Python code execution...');
       console.log('📊 Dataset size:', data.length, 'rows');
       console.log('❓ Question:', userQuestion);
+      
+      // Check if Python is available before attempting execution
+      const pythonAvailable = await this.checkPythonAvailability();
+      if (!pythonAvailable) {
+        throw new Error('Python3 not available in this environment');
+      }
       
       // Prepare the Python script
       const scriptContent = this.buildPythonScript(pythonCode, data);
