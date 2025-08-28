@@ -588,9 +588,9 @@ for idx, (client, row) in enumerate(client_analysis.iterrows(), 1):
     results.append({
         'Rank': idx,
         'Client': client,
-        'Total_Revenue': f"${row['Total_Revenue']:,.0f}",
+        'Total_Revenue': '$' + '{:,.0f}'.format(row['Total_Revenue']),
         'Projects': int(row['Projects']),
-        'Avg_Value': f"${row['Avg_Project_Value']:,.0f}"
+        'Avg_Value': '$' + '{:,.0f}'.format(row['Avg_Project_Value'])
     })
 
 # Create visualization data
@@ -626,9 +626,9 @@ for idx, (office, row) in enumerate(office_analysis.iterrows(), 1):
     results.append({
         'Rank': idx,
         'Office': office,
-        'Total_NCC': f"${row['Total_NCC']:,.0f}",
+        'Total_NCC': '$' + '{:,.0f}'.format(row['Total_NCC']),
         'Projects': int(row['Projects']),
-        'Avg_NCC': f"${row['Avg_NCC']:,.0f}"
+        'Avg_NCC': '$' + '{:,.0f}'.format(row['Avg_NCC'])
     })
 
 # Create visualization data
@@ -662,7 +662,7 @@ if 'Office' in df.columns:
         results.append({
             'Category': 'Top Office',
             'Name': office,
-            'Value': f"${value:,.0f}"
+            'Value': '$' + '{:,.0f}'.format(value)
         })
 
 if 'Client' in df.columns:
@@ -671,7 +671,7 @@ if 'Client' in df.columns:
         results.append({
             'Category': 'Top Client', 
             'Name': client,
-            'Value': f"${value:,.0f}"
+            'Value': '$' + '{:,.0f}'.format(value)
         })
 
 # Visualization data
