@@ -5,8 +5,10 @@ const csrf = require('csrf');
 const statelessCSRF = require('./utils/statelessCSRF');
 require('dotenv').config();
 const supabaseService = require('./services/supabaseService');
-const anthropicService = require('./services/anthropicService');
 const openaiService = require('./services/openai/openaiService');
+const gpt4AgentOrchestrator = require('./services/openai/gpt4AgentOrchestrator');
+// const anthropicService = require('./services/anthropicService'); // REPLACED with OpenAI GPT-4.1
+// const agentOrchestrator = require('./services/anthropic/agentOrchestrator'); // REPLACED with GPT-4.1 Agent Orchestrator
 // const fallbackDataService = require('./services/fallbackDataService'); // REMOVED: Violates CLAUDE.md No Fake Data Policy
 const fixedMetadata = require('./config/fixedMetadata');
 
@@ -202,8 +204,8 @@ app.get('/api/status', async (req, res) => {
       server: 'online',
       database: supabaseStatus.connected ? 'connected' : 'disconnected',
       ai: {
-        anthropic: process.env.ANTHROPIC_API_KEY ? 'configured' : 'missing_api_key',
-        openai: process.env.OPENAI_API_KEY ? 'configured' : 'missing_api_key'
+        openai: process.env.OPENAI_API_KEY ? 'configured' : 'missing_api_key',
+        gpt4AgentOrchestration: 'enabled'
       },
       cache: `${supabaseStatus.cache_size} items cached`,
       fallback: {
@@ -268,8 +270,8 @@ app.get('/api/supabase/test', async (req, res) => {
 // Root endpoint
 app.get('/api', (req, res) => {
   res.json({
-    message: 'Data Analysis API - Milestone 4: Dual AI Backend',
-    version: '1.4.1',
+    message: 'Data Analysis API - Agent Orchestration Platform',
+    version: '2.0.0',
     endpoints: {
       health: '/api/health',
       status: '/api/status',
@@ -280,11 +282,21 @@ app.get('/api', (req, res) => {
       ai_health: '/api/ai/health',
       ai_status: '/api/ai/status',
       ai_backends: '/api/ai/backends',
-      ai_analyze: 'POST /api/ai/analyze'
+      ai_analyze: 'POST /api/ai/analyze',
+      ai_recommend: 'POST /api/ai/recommend-datasource'
     },
     ai_backends: {
-      anthropic: 'Anthropic Claude with intelligent pandas execution',
+      openai: 'OpenAI GPT-4.1 with advanced reasoning and intelligent pandas execution',
+      gpt4AgentOrchestration: 'GPT-4.1 Agent Orchestration with function calling, structured outputs, and semantic models'
     },
+    features: [
+      'GPT-4.1 advanced reasoning and analysis',
+      'Function calling for agent coordination',
+      'Structured outputs for semantic models',
+      'Multi-agent data source coordination',
+      'Predictive analytics and forecasting',
+      'Strategic business intelligence'
+    ],
     documentation: 'https://github.com/grosz99/analyst_phase2'
   });
 });
@@ -796,19 +808,19 @@ app.get('/api/dataset/:datasetId/schema', async (req, res) => {
 // AI ANALYSIS ENDPOINTS (SECURE)
 // ========================================
 
-// AI Analysis Health Check (Both Backends)
+// AI Analysis Health Check (OpenAI GPT-4.1 Agent Orchestration)
 app.get('/api/ai/health', async (req, res) => {
   try {
-    const [anthropicHealth, openaiHealth] = await Promise.allSettled([
-      anthropicService.healthCheck(),
-      openaiService.healthCheck()
+    const [openaiHealth, orchestratorHealth] = await Promise.allSettled([
+      openaiService.healthCheck(),
+      gpt4AgentOrchestrator.healthCheck()
     ]);
     
     res.json({
       success: true,
       backends: {
-        anthropic: anthropicHealth.status === 'fulfilled' ? anthropicHealth.value : { healthy: false, error: anthropicHealth.reason?.message },
-        openai: openaiHealth.status === 'fulfilled' ? openaiHealth.value : { healthy: false, error: openaiHealth.reason?.message }
+        openai: openaiHealth.status === 'fulfilled' ? openaiHealth.value : { healthy: false, error: openaiHealth.reason?.message },
+        gpt4AgentOrchestration: orchestratorHealth.status === 'fulfilled' ? orchestratorHealth.value : { healthy: false, error: orchestratorHealth.reason?.message }
       },
       timestamp: new Date().toISOString()
     });
@@ -822,17 +834,17 @@ app.get('/api/ai/health', async (req, res) => {
   }
 });
 
-// AI Analysis Status (Both Backends)
+// AI Analysis Status (OpenAI GPT-4.1 Agent Orchestration)
 app.get('/api/ai/status', (req, res) => {
   try {
-    const anthropicStatus = anthropicService.getStatus();
     const openaiStatus = openaiService.getStatus();
+    const orchestratorStatus = gpt4AgentOrchestrator.getStatus();
     
     res.json({
       success: true,
       backends: {
-        anthropic: anthropicStatus,
-        openai: openaiStatus
+        openai: openaiStatus,
+        gpt4AgentOrchestration: orchestratorStatus
       },
       timestamp: new Date().toISOString()
     });
@@ -851,37 +863,41 @@ app.get('/api/ai/backends', (req, res) => {
   try {
     const backends = [
       {
-        id: 'anthropic',
-        name: 'Anthropic Claude',
-        description: 'Advanced AI analysis with custom pandas execution on cached data',
-        features: [
-          'Natural language understanding',
-          'Python code generation',
-          'Intelligent data analysis',
-          'Custom execution engine'
-        ],
-        status: anthropicService.getStatus().api_key_configured ? 'available' : 'unavailable'
-      },
-      {
         id: 'openai',
         name: 'OpenAI GPT-4.1',
-        description: 'Latest GPT-4.1 with enhanced reasoning and function calling capabilities',
+        description: 'Advanced AI analysis with GPT-4.1 reasoning and custom pandas execution on cached data',
         features: [
-          'GPT-4.1 advanced reasoning',
-          'Function calling & tools',
-          'Structured outputs',
-          'Large context window (1M tokens)',
-          'Enhanced data analysis',
-          'Better instruction following'
+          'Advanced reasoning and understanding',
+          'Python code generation',
+          'Intelligent data analysis',
+          'Long context window',
+          'Superior business intelligence'
         ],
         status: openaiService.getStatus().api_key_configured ? 'available' : 'unavailable'
+      },
+      {
+        id: 'gpt4AgentOrchestration',
+        name: 'GPT-4.1 Agent Orchestration',
+        description: 'Advanced multi-agent orchestration with GPT-4.1 function calling, structured outputs, and semantic models',
+        features: [
+          'GPT-4.1 function calling for agent coordination',
+          'Structured outputs for semantic models',
+          'Advanced multi-agent coordination',
+          'Semantic model understanding',
+          'Inter-agent communication protocols',
+          'Data source agent management',
+          'Complex reasoning and strategic analysis',
+          'Predictive analytics capabilities',
+          'Strategic business intelligence'
+        ],
+        status: gpt4AgentOrchestrator.getStatus().initialized ? 'available' : 'unavailable'
       }
     ];
     
     res.json({
       success: true,
       backends: backends,
-      default: 'openai', // Default to GPT-4.1
+      default: 'gpt4AgentOrchestration', // Default to GPT-4.1 Agent Orchestration
       timestamp: new Date().toISOString()
     });
   } catch (error) {
@@ -952,8 +968,8 @@ Rules:
 6. Key features should list 3 relevant data points/dimensions from that source
 7. Return ONLY the JSON, no other text`;
 
-    // Call Anthropic API
-    const result = await anthropicService.makeRecommendation(recommendationPrompt);
+    // Call GPT-4.1 Agent Orchestrator for intelligent recommendation
+    const result = await gpt4AgentOrchestrator.makeRecommendation(recommendationPrompt);
     
     const duration = Date.now() - startTime;
     
@@ -1001,7 +1017,7 @@ app.post('/api/ai/analyze', async (req, res) => {
     const identifier = sessionId || req.ip || 'anonymous';
     
     const questionText = question || userContext || '';
-    const selectedBackend = backend || 'openai'; // Default to OpenAI GPT-4.1
+    const selectedBackend = backend || 'gpt4AgentOrchestration'; // Default to GPT-4.1 Agent Orchestration
     
     console.log(`🤖 AI Analysis request: ${data.length} rows, question: "${questionText}", backend: ${selectedBackend}, type: ${analysisType || 'general'}`);
     
@@ -1012,17 +1028,17 @@ app.post('/api/ai/analyze', async (req, res) => {
     
     let result;
     
-    if (selectedBackend === 'openai') {
-      console.log('🤖 Using OpenAI GPT-4.1 backend');
-      result = await openaiService.analyzeData(
+    if (selectedBackend === 'gpt4AgentOrchestration') {
+      console.log('🤖 Using GPT-4.1 Agent Orchestration backend');
+      result = await gpt4AgentOrchestrator.analyzeData(
         data, 
         analysisType || 'general',
         enhancedQuestion,
         identifier
       );
-    } else if (selectedBackend === 'anthropic') {
-      console.log('🤖 Using Anthropic Claude backend');
-      result = await anthropicService.analyzeData(
+    } else if (selectedBackend === 'openai') {
+      console.log('🤖 Using OpenAI GPT-4.1 backend');
+      result = await openaiService.analyzeData(
         data, 
         analysisType || 'general',
         enhancedQuestion,
@@ -1031,7 +1047,7 @@ app.post('/api/ai/analyze', async (req, res) => {
     } else {
       return res.status(400).json({
         success: false,
-        error: `Unsupported backend: ${selectedBackend}. Available: openai, anthropic`,
+        error: `Unsupported backend: ${selectedBackend}. Available: gpt4AgentOrchestration, openai`,
         timestamp: new Date().toISOString()
       });
     }
@@ -1070,7 +1086,7 @@ app.post('/api/ai/analyze', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'AI analysis service temporarily unavailable. Please check API key configuration in Vercel environment variables.',
-      help: 'Set ANTHROPIC_API_KEY in Vercel Dashboard: Settings → Environment Variables',
+      help: 'Set OPENAI_API_KEY in Vercel Dashboard: Settings → Environment Variables',
       timestamp: new Date().toISOString()
     });
   }

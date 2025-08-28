@@ -576,7 +576,7 @@ const AIAnalysisResults = ({
     );
   };
 
-  // Render interpretation showing GPT-4.1's reasoning and methodology
+  // Render interpretation showing Claude's reasoning and methodology
   const renderInterpretation = () => {
     if (!analysis) {
       return (
@@ -621,7 +621,7 @@ const AIAnalysisResults = ({
       <div className="interpretation-container">
         <div className="interpretation-header">
           <h3>🧠 AI Analysis Interpretation</h3>
-          <p>Understanding how GPT-4.1 approached this analysis</p>
+          <p>Understanding how Claude Agent Orchestration approached this analysis</p>
         </div>
 
         {hasStructuredSections ? (
@@ -669,7 +669,7 @@ const AIAnalysisResults = ({
               <p>{analysis}</p>
             </div>
             <div className="interpretation-note">
-              <small>💡 This shows the complete analytical reasoning from GPT-4.1</small>
+              <small>💡 This shows the complete analytical reasoning from Claude Agent Orchestration</small>
             </div>
           </div>
         )}

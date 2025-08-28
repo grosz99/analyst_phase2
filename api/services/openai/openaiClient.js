@@ -1,19 +1,20 @@
-const Anthropic = require('@anthropic-ai/sdk');
+const OpenAI = require('openai');
 const fs = require('fs');
 const path = require('path');
 
 /**
- * Anthropic API Client - Handles authentication, rate limiting, and security
+ * OpenAI GPT-4.1 API Client - Handles authentication, rate limiting, and security
  * Responsible for: API initialization, credentials management, rate limiting, health checks
+ * Supports: GPT-4.1 function calling, structured outputs, and advanced reasoning
  */
-class AnthropicClient {
+class OpenAIClient {
   constructor() {
     this.client = null;
     this.initialized = false;
     this.rateLimiter = new Map(); // Simple rate limiting
-    this.MAX_REQUESTS_PER_MINUTE = 10;
-    this.MAX_DATA_ROWS = 1000; // Limit data size for security
-    this.MAX_PROMPT_LENGTH = 50000; // Prevent prompt injection attacks
+    this.MAX_REQUESTS_PER_MINUTE = 30; // Higher rate limit for GPT-4.1
+    this.MAX_DATA_ROWS = 2000; // Increased for GPT-4.1's better context handling
+    this.MAX_PROMPT_LENGTH = 100000; // GPT-4.1 handles longer prompts
     
     this.initializeClient();
   }
@@ -23,9 +24,9 @@ class AnthropicClient {
       let apiKey = null;
 
       // Try environment variable first (for production/Vercel)
-      if (process.env.ANTHROPIC_API_KEY) {
-        apiKey = process.env.ANTHROPIC_API_KEY;
-        console.log('✅ Using Anthropic API key from environment variable');
+      if (process.env.OPENAI_API_KEY) {
+        apiKey = process.env.OPENAI_API_KEY;
+        console.log('✅ Using OpenAI API key from environment variable');
       } else {
         // Fallback to local credentials file (for development)
         const credentialsPath = path.resolve(__dirname, '../../../snowcred.env');
@@ -42,39 +43,38 @@ class AnthropicClient {
             }
           });
 
-          apiKey = credentials.ANTHROPIC_API_KEY;
+          apiKey = credentials.OPENAI_API_KEY;
           if (apiKey) {
-            console.log('✅ Using Anthropic API key from local credentials file');
+            console.log('✅ Using OpenAI API key from local credentials file');
           }
         }
       }
       
       if (!apiKey) {
-        console.error('❌ ANTHROPIC_API_KEY not found. AI analysis will be disabled.');
-        console.error('Please set ANTHROPIC_API_KEY environment variable in Vercel settings.');
-        console.error('For Vercel deployment: Settings → Environment Variables → Add ANTHROPIC_API_KEY');
+        console.error('❌ OPENAI_API_KEY not found. AI analysis will be disabled.');
+        console.error('Please set OPENAI_API_KEY environment variable in Vercel settings.');
+        console.error('For Vercel deployment: Settings → Environment Variables → Add OPENAI_API_KEY');
         this.initialized = false;
         return;
       }
 
       // Validate API key format (basic security check)
-      if (!apiKey.startsWith('sk-ant-') || apiKey.length < 50) {
-        console.error('Invalid Anthropic API key format. AI analysis will be disabled.');
+      if (!apiKey.startsWith('sk-') || apiKey.length < 20) {
+        console.error('Invalid OpenAI API key format. AI analysis will be disabled.');
         return;
       }
 
-      this.client = new Anthropic({
+      this.client = new OpenAI({
         apiKey: apiKey,
-        // Add additional security configurations
-        timeout: 30000, // 30 second timeout
-        maxRetries: 2,
+        timeout: 60000, // 60 second timeout for GPT-4.1
+        maxRetries: 3, // Higher retry count for reliability
       });
 
       this.initialized = true;
-      console.log('✅ Anthropic API service initialized successfully');
+      console.log('✅ OpenAI GPT-4.1 API service initialized successfully');
       
     } catch (error) {
-      console.error('Failed to initialize Anthropic service:', error.message);
+      console.error('Failed to initialize OpenAI service:', error.message);
       this.initialized = false;
     }
   }
@@ -176,24 +176,80 @@ class AnthropicClient {
     return cleaned;
   }
 
-  // Send message to Anthropic API
-  async sendMessage(messages, maxTokens = 4000) {
+  // Send message to OpenAI GPT-4.1 API with function calling support
+  async sendMessage(messages, options = {}) {
     if (!this.initialized) {
-      throw new Error('Anthropic service not initialized. Please check ANTHROPIC_API_KEY is set in environment variables.');
+      throw new Error('OpenAI service not initialized. Please check OPENAI_API_KEY is set in environment variables.');
     }
 
+    const {
+      model = 'gpt-4-1106-preview', // Latest GPT-4.1 model
+      maxTokens = 4000,
+      temperature = 0.1, // Lower temperature for more consistent analysis
+      functions = null,
+      function_call = null,
+      response_format = null // For structured outputs
+    } = options;
+
     try {
-      const response = await this.client.messages.create({
-        model: 'claude-3-5-sonnet-20241022',
+      const requestOptions = {
+        model: model,
+        messages: messages,
         max_tokens: maxTokens,
-        messages: messages
-      });
+        temperature: temperature,
+        stream: false
+      };
+
+      // Add function calling support
+      if (functions) {
+        requestOptions.functions = functions;
+        if (function_call) {
+          requestOptions.function_call = function_call;
+        }
+      }
+
+      // Add structured output support
+      if (response_format) {
+        requestOptions.response_format = response_format;
+      }
+
+      const response = await this.client.chat.completions.create(requestOptions);
 
       return response;
     } catch (error) {
-      console.error('Anthropic API error:', error);
-      throw new Error(`Anthropic API request failed: ${error.message}`);
+      console.error('OpenAI API error:', error);
+      if (error.status === 429) {
+        throw new Error('Rate limit exceeded. Please wait a moment and try again.');
+      }
+      throw new Error(`OpenAI API request failed: ${error.message}`);
     }
+  }
+
+  // Send message with function calling for agent orchestration
+  async sendMessageWithFunctions(messages, functions, options = {}) {
+    const functionCallOptions = {
+      ...options,
+      functions: functions,
+      function_call: options.function_call || 'auto'
+    };
+
+    return this.sendMessage(messages, functionCallOptions);
+  }
+
+  // Send message with structured output for semantic models
+  async sendMessageWithStructuredOutput(messages, responseSchema, options = {}) {
+    const structuredOptions = {
+      ...options,
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "analysis_response",
+          schema: responseSchema
+        }
+      }
+    };
+
+    return this.sendMessage(messages, structuredOptions);
   }
 
   // Health check method
@@ -201,30 +257,32 @@ class AnthropicClient {
     if (!this.initialized) {
       return {
         status: 'unavailable',
-        message: 'Anthropic service not initialized. Missing ANTHROPIC_API_KEY environment variable.'
+        message: 'OpenAI service not initialized. Missing OPENAI_API_KEY environment variable.'
       };
     }
 
     try {
       // Simple test to verify API connectivity
-      const response = await this.client.messages.create({
-        model: 'claude-3-5-sonnet-20241022',
-        max_tokens: 10,
+      const response = await this.client.chat.completions.create({
+        model: 'gpt-4-1106-preview',
         messages: [{
           role: 'user',
           content: 'Say "OK" if you can respond.'
-        }]
+        }],
+        max_tokens: 10
       });
 
       return {
         status: 'healthy',
-        message: 'Anthropic API accessible',
-        model: 'claude-3-5-sonnet-20241022'
+        message: 'OpenAI GPT-4.1 API accessible',
+        model: 'gpt-4-1106-preview',
+        response: response.choices[0]?.message?.content || 'No response'
       };
     } catch (error) {
       return {
         status: 'error',
-        message: 'Anthropic API connectivity issue'
+        message: 'OpenAI API connectivity issue',
+        error: error.message
       };
     }
   }
@@ -233,6 +291,14 @@ class AnthropicClient {
   getStatus() {
     return {
       initialized: this.initialized,
+      model: 'gpt-4-1106-preview',
+      capabilities: [
+        'Function calling',
+        'Structured outputs',
+        'Long context window',
+        'Advanced reasoning',
+        'Code generation'
+      ],
       rate_limits: {
         max_requests_per_minute: this.MAX_REQUESTS_PER_MINUTE,
         max_data_rows: this.MAX_DATA_ROWS
@@ -248,4 +314,4 @@ class AnthropicClient {
   }
 }
 
-module.exports = AnthropicClient;
+module.exports = OpenAIClient;

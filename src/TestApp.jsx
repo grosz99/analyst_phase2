@@ -4,7 +4,7 @@ function TestApp() {
   return (
     <div style={{ padding: '20px', textAlign: 'center' }}>
       <h1>🎉 React is Working!</h1>
-      <p>OpenAI GPT-4.1 + Supabase Integration Test</p>
+      <p>Claude Agent Orchestration + Supabase Integration Test</p>
       <div style={{ 
         background: '#f0f8ff', 
         padding: '20px', 
@@ -13,9 +13,10 @@ function TestApp() {
       }}>
         <h3>✅ Migration Status</h3>
         <ul style={{ textAlign: 'left', maxWidth: '400px', margin: '0 auto' }}>
-          <li>✅ OpenAI GPT-4.1 Service: Ready</li>
+          <li>✅ Claude Agent Orchestration: Ready</li>
           <li>✅ Supabase Database: Connected</li>
-          <li>✅ NCC Dataset: Configured</li>
+          <li>✅ Semantic Models: Configured</li>
+          <li>✅ Multi-Agent System: Active</li>
           <li>✅ Frontend: Loading...</li>
         </ul>
       </div>

@@ -33,8 +33,10 @@ class Settings:
     SNOWFLAKE_SCHEMA: str = os.getenv('SNOWFLAKE_SCHEMA', '')
     SNOWFLAKE_ROLE: str = os.getenv('SNOWFLAKE_ROLE', '')
     
-    # Anthropic
-    ANTHROPIC_API_KEY: str = os.getenv('ANTHROPIC_API_KEY', '')
+    # OpenAI GPT-4.1 (Primary AI Backend)
+    OPENAI_API_KEY: str = os.getenv('OPENAI_API_KEY', '')
+    
+    # Migration Note: Replaced Anthropic with OpenAI GPT-4.1 for enhanced capabilities
     
     # Redis
     REDIS_URL: str = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
@@ -61,7 +63,7 @@ class Settings:
             'SNOWFLAKE_USER',
             'SNOWFLAKE_PASSWORD',
             'SNOWFLAKE_ACCOUNT',
-            'ANTHROPIC_API_KEY'
+            'OPENAI_API_KEY'
         ]
         
         missing = [setting for setting in required_settings if not getattr(self, setting)]

@@ -177,7 +177,7 @@ class StreamingAnalysisService {
       analysisType: analysisType,
       userContext: question || `Perform ${analysisType} analysis on this business data`,
       sessionId: sessionId || `session-${Date.now()}`,
-      backend: 'openai', // Default to OpenAI GPT-4.1
+      backend: 'gpt4AgentOrchestration', // Default to GPT-4.1 Agent Orchestration
       contextPrompt: enhancedContextPrompt,
       datasetId: datasetId
     };

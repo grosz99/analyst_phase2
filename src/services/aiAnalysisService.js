@@ -82,7 +82,7 @@ class AIAnalysisService {
 
 
   // Main AI analysis method with dataset-specific context
-  async analyzeData(data, question = '', analysisType = 'general', sessionId = null, backend = 'anthropic', contextPrompt = null, datasetId = null) {
+  async analyzeData(data, question = '', analysisType = 'general', sessionId = null, backend = 'gpt4AgentOrchestration', contextPrompt = null, datasetId = null) {
     try {
       console.log(`🤖 Starting AI analysis: ${question || analysisType}`);
       console.log(`📊 Data: ${data.length} rows`);
@@ -99,7 +99,7 @@ class AIAnalysisService {
         analysisType: analysisType,
         userContext: question || `Perform ${analysisType} analysis on this business data`,
         sessionId: sessionId || `session-${Date.now()}`,
-        backend: 'anthropic',
+        backend: backend,
         contextPrompt: enhancedContextPrompt,
         datasetId: datasetId // Include dataset ID for specialized handling
       };
