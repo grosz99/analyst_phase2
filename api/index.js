@@ -27,7 +27,7 @@ app.use(express.json());
 
 // Session configuration for CSRF protection
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'fallback-secret-change-in-production',
+  secret: process.env.SESSION_SECRET || (() => { throw new Error('SESSION_SECRET environment variable is required') })(),
   resave: false,
   saveUninitialized: false,
   cookie: {
@@ -293,7 +293,7 @@ app.get('/api', (req, res) => {
       snowflake_test: '/api/snowflake/test',
       available_datasets: '/api/available-datasets',
       load_dataset: 'POST /api/load-dataset',
-      ai_query: 'POST /api/ai-query',
+      // ai_query: REMOVED - was generating mock data
       ai_health: '/api/ai/health',
       ai_status: '/api/ai/status',
       ai_backends: '/api/ai/backends',
@@ -489,127 +489,8 @@ app.post('/api/load-dataset', async (req, res) => {
   }
 });
 
-// AI-powered natural language query
-app.post('/api/ai-query', (req, res) => {
-  try {
-    const { query, datasetId } = req.body;
-    
-    if (!query || !datasetId) {
-      return res.status(400).json({
-        success: false,
-        error: 'query and datasetId are required'
-      });
-    }
-
-    // AI query endpoint - requires real Snowflake connection
-    if (!datasetId || !['attendance', 'ncc', 'pipeline'].includes(datasetId)) {
-      return res.status(404).json({
-        success: false,
-        error: 'Dataset not found. Only ATTENDANCE, NCC, and PIPELINE datasets are available.'
-      });
-    }
-
-    // Generate mock response based on query keywords
-    const generateMockResponse = (query, datasetId) => {
-      const queryLower = query.toLowerCase();
-      
-      if (queryLower.includes('top') || queryLower.includes('highest') || queryLower.includes('best')) {
-        return {
-          data: [
-            { region: 'North America', total_revenue: 42500000, growth: 12.5 },
-            { region: 'Europe', total_revenue: 38900000, growth: 8.3 },
-            { region: 'Asia Pacific', total_revenue: 45600000, growth: 15.7 },
-            { region: 'Latin America', total_revenue: 23400000, growth: 6.2 },
-            { region: 'Middle East', total_revenue: 18700000, growth: 4.1 }
-          ],
-          summary: 'Top 5 regions by revenue with growth rates',
-          chart_type: 'bar',
-          insights: ['Asia Pacific leads with highest revenue and growth', 'North America shows strong performance', 'Middle East has potential for improvement']
-        };
-      }
-      
-      if (queryLower.includes('trend') || queryLower.includes('growth') || queryLower.includes('time')) {
-        return {
-          data: [
-            { month: 'Jan 2024', revenue: 8200000, growth: 5.2 },
-            { month: 'Feb 2024', revenue: 7800000, growth: -4.9 },
-            { month: 'Mar 2024', revenue: 9100000, growth: 16.7 },
-            { month: 'Apr 2024', revenue: 9500000, growth: 4.4 },
-            { month: 'May 2024', revenue: 10200000, growth: 7.4 },
-            { month: 'Jun 2024', revenue: 11100000, growth: 8.8 }
-          ],
-          summary: 'Monthly revenue trends with growth analysis',
-          chart_type: 'line',
-          insights: ['Strong growth trajectory overall', 'February dip recovered quickly', 'Acceleration in Q2']
-        };
-      }
-
-      if (queryLower.includes('product') || queryLower.includes('category')) {
-        return {
-          data: [
-            { product: 'Electronics', revenue: 45600000, margin: 24.5, units: 125000 },
-            { product: 'Clothing', revenue: 32100000, margin: 18.2, units: 89000 },
-            { product: 'Home & Garden', revenue: 28900000, margin: 21.7, units: 67000 },
-            { product: 'Sports', revenue: 21400000, margin: 19.8, units: 45000 },
-            { product: 'Books', revenue: 12300000, margin: 15.4, units: 78000 }
-          ],
-          summary: 'Product performance by revenue and margin',
-          chart_type: 'scatter',
-          insights: ['Electronics dominates revenue', 'Books have lower margins but high volume', 'Home & Garden shows balanced performance']
-        };
-      }
-
-      // Default response
-      return {
-        data: [
-          { metric: 'Total Revenue', value: 168900000, change: 8.7 },
-          { metric: 'Total Customers', value: 145000, change: 12.3 },
-          { metric: 'Avg Order Value', value: 89.50, change: -2.1 },
-          { metric: 'Customer Retention', value: 73.2, change: 4.8 }
-        ],
-        summary: 'Key business metrics overview',
-        chart_type: 'kpi',
-        insights: ['Overall positive growth', 'Customer base expanding', 'Order value needs attention']
-      };
-    };
-
-    // Simulate AI processing time
-    setTimeout(() => {
-      const mockPythonCode = `
-# Generated analysis for: "${query}"
-import polars as pl
-
-# Filter and aggregate data
-result = df.group_by("region").agg([
-    pl.col("revenue").sum().alias("total_revenue"),
-    pl.col("revenue").mean().alias("avg_revenue")
-]).sort("total_revenue", descending=True)
-
-# Format output
-result = result.head(5)`.trim();
-
-      const response = {
-        success: true,
-        result: generateMockResponse(query, datasetId),
-        python_code: mockPythonCode,
-        cached: false,
-        execution_time: Math.random() * 1500 + 500,
-        query_interpretation: `Analyzing ${query} across ${dataset.name}`,
-        timestamp: new Date().toISOString(),
-        source: 'mock_ai'
-      };
-
-      res.json(response);
-    }, 1200); // Simulate AI processing time
-    
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-      timestamp: new Date().toISOString()
-    });
-  }
-});
+// REMOVED: /api/ai-query endpoint completely - was generating mock data violating CLAUDE.md policy
+// Use /api/ai/analyze endpoint instead which uses real GPT-4.1 analysis
 
 // Get distinct values for a field (for filter options) - Now using fixed metadata to reduce costs
 app.get('/api/dataset/:datasetId/field/:fieldName/values', async (req, res) => {
@@ -1164,7 +1045,7 @@ app.use('/api/*', (req, res) => {
       'GET /api/status', 
       'GET /api/available-datasets',
       'POST /api/load-dataset',
-      'POST /api/ai-query',
+      // 'POST /api/ai-query' - REMOVED (was generating mock data)
       'GET /api/dataset/:id/schema',
       'GET /api/ai/health',
       'GET /api/ai/status',

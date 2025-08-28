@@ -59,7 +59,7 @@ const SEMANTIC_MODEL = {
 };
 
 const DataSourceDiscovery = ({ 
-  mockDataSources, 
+  availableDataSources, 
   selectedDataSource, 
   setSelectedDataSource, 
   availableFields, 
@@ -68,7 +68,7 @@ const DataSourceDiscovery = ({
   const [selectedMode, setSelectedMode] = useState('agent'); // 'agent' or 'list'
   
   // Debug: Check if data sources are passed correctly
-  console.log('DataSourceDiscovery received mockDataSources:', mockDataSources);
+  console.log('DataSourceDiscovery received availableDataSources:', availableDataSources);
   
   const [messages, setMessages] = useState([
     {
@@ -163,7 +163,7 @@ const DataSourceDiscovery = ({
     const scoredSources = [];
 
     // Check each data source against the semantic model
-    mockDataSources.forEach(source => {
+    availableDataSources.forEach(source => {
       let score = 0;
       const semanticInfo = SEMANTIC_MODEL.tables[source];
       
@@ -251,7 +251,7 @@ const DataSourceDiscovery = ({
 
     try {
       // Check if we have data sources
-      if (!mockDataSources || mockDataSources.length === 0) {
+      if (!availableDataSources || availableDataSources.length === 0) {
         const botResponse = {
           id: Date.now() + 1,
           type: 'bot',
@@ -266,7 +266,7 @@ const DataSourceDiscovery = ({
       // Call Anthropic API for intelligent recommendation
       const aiRecommendation = await aiAnalysisService.getDataSourceRecommendation(
         currentQuery,
-        mockDataSources,
+        availableDataSources,
         SEMANTIC_MODEL
       );
       
@@ -344,7 +344,7 @@ const DataSourceDiscovery = ({
         }
       } else {
         // Show all sources as final fallback
-        const allSources = mockDataSources.map(source => ({
+        const allSources = availableDataSources.map(source => ({
           name: source,
           description: SEMANTIC_MODEL.tables[source]?.description || `${source} from Snowflake`,
           confidence: 'medium'
@@ -384,7 +384,7 @@ const DataSourceDiscovery = ({
     setMessages(prev => [...prev, confirmMessage]);
   };
 
-  const filteredDataSources = mockDataSources.filter(source =>
+  const filteredDataSources = availableDataSources.filter(source =>
     source.toLowerCase().includes(searchTerm.toLowerCase())
   );
 

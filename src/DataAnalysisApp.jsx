@@ -256,7 +256,7 @@ const DataAnalysisApp = () => {
         <div className="step-content-container">
           {currentStep === 1 && (
             <DataSourceDiscovery
-              mockDataSources={availableDataSources}
+              availableDataSources={availableDataSources}
               selectedDataSource={selectedDataSource}
               setSelectedDataSource={setSelectedDataSource}
               availableFields={availableFields}
