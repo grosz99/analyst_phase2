@@ -65,9 +65,9 @@ class OpenAIClient {
       }
 
       this.client = new OpenAI({
-        apiKey: apiKey,
-        timeout: 60000, // 60 second timeout for GPT-4.1
-        maxRetries: 3, // Higher retry count for reliability
+        apiKey: apiKey
+        // Removed timeout - not supported in this version
+        // Will handle timeout at request level
       });
 
       this.initialized = true;
@@ -197,8 +197,7 @@ class OpenAIClient {
         messages: messages,
         max_tokens: maxTokens,
         temperature: temperature,
-        stream: false,
-        timeout: 30000 // 30 second timeout
+        stream: false
       };
 
       // Add function calling support

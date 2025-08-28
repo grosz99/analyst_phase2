@@ -50,32 +50,25 @@ class GPT4AgentOrchestrator {
       const analysisText = response.choices[0].message.content;
       console.log('📝 Received orchestrated analysis from GPT-4.1');
 
-      // Let GPT-4.1 analyze the data directly and tell us what it did
-      console.log('🧠 GPT-4.1 is analyzing the full dataset...');
+      // GPT-4.1 explains the SQL operations in simple terms
+      console.log('🧠 GPT-4.1 explained the analysis approach');
       
-      // Parse GPT-4.1's response to extract the actual calculations it performed
-      const calculationsPerformed = this.extractCalculationsFromAnalysis(analysisText, sanitizedData);
+      // Now perform the actual calculations on the real data
+      const executionResults = await this.performActualCalculations(sanitizedData, sanitizedContext);
       
-      // Generate Python code that matches what GPT-4.1 actually did
-      const pythonCode = await this.generatePythonCode(sanitizedData, sanitizedContext, analysisType);
-      
-      // Use GPT-4.1's actual calculations to create results
-      const executionResults = await this.executeGPT4Calculations(calculationsPerformed, sanitizedData, sanitizedContext);
-      
-      // Create results table from GPT-4.1's actual analysis
+      // Create results table from actual data
       const resultsTable = executionResults.resultsTable;
       
-      // Create visualization from GPT-4.1's actual results
+      // Create visualization from actual results
       const visualization = executionResults.visualization;
       
-      // Document what GPT-4.1 actually calculated
+      // Document the execution
       const pythonResults = {
         success: true,
         results: executionResults.data,
         execution_time: Date.now() - startTime,
-        method: 'gpt4_actual_analysis',
-        calculations_performed: calculationsPerformed,
-        code_executed: pythonCode
+        method: 'direct_calculation',
+        sql_explanation: analysisText
       };
 
       // Generate refined question suggestions using multi-agent approach
@@ -135,15 +128,9 @@ class GPT4AgentOrchestrator {
 
   // Build orchestration messages for multi-agent analysis
   buildOrchestrationMessages(data, analysisType, userContext) {
-    const dataStructure = this.analyzeDataStructure(data);
-    
-    // For Vercel's 10-second timeout, we need to be smart about data size
-    // Send a representative sample + statistics for GPT-4.1 to analyze
-    const sampleSize = Math.min(data.length, 10); // Send max 10 rows to avoid timeout
-    const sampleData = data.slice(0, sampleSize);
-    
-    // But also calculate the REAL statistics from the FULL dataset
-    const realStats = this.calculateRealStatistics(data, userContext);
+    // Just ask GPT-4 to explain the SQL operations in simple terms
+    // Don't send the actual data - just the schema
+    const columns = data.length > 0 ? Object.keys(data[0]) : [];
     
     const systemMessage = {
       role: "system",
@@ -168,63 +155,33 @@ Your analysis should be so clear that the CEO could recreate it themselves in Ex
 
     const userMessage = {
       role: "user",
-      content: `Coordinate multi-agent analysis of this business dataset:
+      content: `I have a dataset with these columns: ${columns.join(', ')}
 
-DATASET OVERVIEW:
-- Total Records: ${data.length}
-- Columns: ${dataStructure.columns.join(', ')}
-- Numeric: ${dataStructure.numericColumns.join(', ') || 'None'}
-- Categorical: ${dataStructure.categoricalColumns.join(', ') || 'None'}
+The user asks: "${userContext}"
 
-DATASET SAMPLE (showing ${sampleData.length} of ${data.length} total records):
-${JSON.stringify(sampleData, null, 2)}
+Please explain in simple, CEO-friendly terms exactly what SQL operations you would perform to answer this question. 
 
-ACTUAL STATISTICS FROM FULL DATASET:
-${JSON.stringify(realStats, null, 2)}
+Format your response like this:
 
-USER REQUEST: "${userContext}"
+**Step 1: Filter the data**
+"I would use WHERE to filter for [specific condition]"
 
-USER QUESTION: "${userContext}"
+**Step 2: Group the data**
+"I would use GROUP BY on the [column] field to aggregate by [dimension]"
 
-You are explaining to a CEO exactly how you analyzed their data to arrive at the answer. Be transparent about every step.
+**Step 3: Calculate totals**
+"I would use SUM(NCC) to add up the revenue for each group"
 
-Please provide:
+**Step 4: Sort the results**
+"I would use ORDER BY total_ncc DESC to sort from highest to lowest"
 
-1. **EXACT DATA OPERATIONS PERFORMED** (Show your work like a math problem):
-   - Step 1: What data did you start with? (e.g., "Started with 20 records from the NCC dataset")
-   - Step 2: What filtering did you apply? (e.g., "Filtered for year 2024, reducing to 15 records")
-   - Step 3: How did you group the data? (e.g., "Grouped by Office column")
-   - Step 4: What calculations did you perform? (e.g., "Summed NCC values: Singapore = $450K + $380K = $830K")
-   - Step 5: How did you sort/rank? (e.g., "Sorted by total NCC descending")
+**Step 5: Limit results**
+"I would use LIMIT 5 to get just the top 5"
 
-2. **THE ANSWER WITH PROOF**:
-   Show the exact results with the numbers that prove it:
-   - List the top N items with their exact totals
-   - Show the calculation trail (X + Y = Total)
-   - Include record counts for transparency
+**In plain English:**
+"This means I'm finding which offices generated the most revenue by adding up all their project values and showing you the top performers."
 
-3. **VALIDATION & TRUST FACTORS**:
-   - Data completeness check (e.g., "All 20 records were processed, no nulls found")
-   - Calculation verification (e.g., "Total sum of $X matches the sum of individual items")
-   - Any assumptions made (e.g., "Assumed NCC values are in USD")
-
-4. **BUSINESS INSIGHT**:
-   What does this mean for the business in plain English?
-
-Format as if you're walking the CEO through your Excel spreadsheet step-by-step. Use actual numbers from the data, not placeholders.
-
-Example for "top 5 offices":
-"Here's exactly how I calculated your top 5 offices:
-1. Started with your complete dataset of 20 NCC records
-2. Grouped all records by the Office column
-3. For each office, I summed their NCC values:
-   - Singapore: 2 projects ($450,000 + $380,000) = $830,000 total
-   - London: 2 projects ($520,000 + $410,000) = $930,000 total
-   - Sydney: 1 project = $650,000 total
-4. Ranked them by total NCC from highest to lowest
-5. Your top office is London at $930,000, followed by Singapore at $830,000..."
-
-Be specific, transparent, and show every calculation.`
+Be specific but concise. Explain it like you're teaching someone Excel, not SQL.`
     };
     
     return [systemMessage, userMessage];
@@ -803,6 +760,21 @@ result = output
 `;
 
     return pythonCode;
+  }
+
+  /**
+   * Perform actual calculations on the real data based on the query
+   */
+  async performActualCalculations(data, userQuestion) {
+    const queryLower = userQuestion.toLowerCase();
+    
+    if (queryLower.includes('top') && queryLower.includes('office')) {
+      return this.performActualOfficeAnalysis(data, userQuestion);
+    } else if (queryLower.includes('top') && queryLower.includes('client')) {
+      return this.performActualClientAnalysis(data, userQuestion);
+    } else {
+      return this.performActualGeneralAnalysis(data, userQuestion);
+    }
   }
 
   /**
