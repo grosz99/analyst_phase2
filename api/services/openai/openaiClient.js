@@ -197,7 +197,8 @@ class OpenAIClient {
         messages: messages,
         max_tokens: maxTokens,
         temperature: temperature,
-        stream: false
+        stream: false,
+        timeout: 30000 // 30 second timeout
       };
 
       // Add function calling support

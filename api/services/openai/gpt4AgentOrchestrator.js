@@ -113,18 +113,21 @@ class GPT4AgentOrchestrator {
 
     } catch (error) {
       console.error('GPT-4.1 Agent Orchestration error:', error.message);
+      console.error('Full error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
       
-      let clientError = 'AI agent orchestration failed. Please try again.';
-      
-      if (error.message.includes('Rate limit')) {
-        clientError = error.message;
-      } else if (error.message.includes('not initialized')) {
-        clientError = 'AI orchestration service unavailable.';
-      }
-
+      // Return the actual error - no fallback or mock data
       return {
         success: false,
-        error: clientError,
+        error: error.message || 'GPT-4.1 analysis failed',
+        debug_info: {
+          error_type: error.name,
+          error_message: error.message,
+          api_status: error.response?.status
+        },
         timestamp: new Date().toISOString()
       };
     }
@@ -133,8 +136,14 @@ class GPT4AgentOrchestrator {
   // Build orchestration messages for multi-agent analysis
   buildOrchestrationMessages(data, analysisType, userContext) {
     const dataStructure = this.analyzeDataStructure(data);
-    // SEND FULL DATASET TO GPT-4.1 FOR REAL ANALYSIS
-    const fullData = data; // Use ALL data, not just sample
+    
+    // For Vercel's 10-second timeout, we need to be smart about data size
+    // Send a representative sample + statistics for GPT-4.1 to analyze
+    const sampleSize = Math.min(data.length, 10); // Send max 10 rows to avoid timeout
+    const sampleData = data.slice(0, sampleSize);
+    
+    // But also calculate the REAL statistics from the FULL dataset
+    const realStats = this.calculateRealStatistics(data, userContext);
     
     const systemMessage = {
       role: "system",
@@ -167,8 +176,11 @@ DATASET OVERVIEW:
 - Numeric: ${dataStructure.numericColumns.join(', ') || 'None'}
 - Categorical: ${dataStructure.categoricalColumns.join(', ') || 'None'}
 
-COMPLETE DATASET (${data.length} records):
-${JSON.stringify(fullData, null, 2)}
+DATASET SAMPLE (showing ${sampleData.length} of ${data.length} total records):
+${JSON.stringify(sampleData, null, 2)}
+
+ACTUAL STATISTICS FROM FULL DATASET:
+${JSON.stringify(realStats, null, 2)}
 
 USER REQUEST: "${userContext}"
 
@@ -216,6 +228,63 @@ Be specific, transparent, and show every calculation.`
     };
     
     return [systemMessage, userMessage];
+  }
+
+  // Calculate real statistics from the full dataset
+  calculateRealStatistics(data, userContext) {
+    const stats = {
+      total_records: data.length,
+      by_office: {},
+      by_client: {},
+      by_sector: {},
+      total_ncc: 0
+    };
+    
+    // Calculate real aggregations
+    data.forEach(row => {
+      // Office stats
+      if (!stats.by_office[row.Office]) {
+        stats.by_office[row.Office] = { count: 0, total_ncc: 0 };
+      }
+      stats.by_office[row.Office].count++;
+      stats.by_office[row.Office].total_ncc += row.NCC;
+      
+      // Client stats
+      if (!stats.by_client[row.Client]) {
+        stats.by_client[row.Client] = { count: 0, total_ncc: 0 };
+      }
+      stats.by_client[row.Client].count++;
+      stats.by_client[row.Client].total_ncc += row.NCC;
+      
+      // Sector stats
+      if (!stats.by_sector[row.Sector]) {
+        stats.by_sector[row.Sector] = { count: 0, total_ncc: 0 };
+      }
+      stats.by_sector[row.Sector].count++;
+      stats.by_sector[row.Sector].total_ncc += row.NCC;
+      
+      // Total NCC
+      stats.total_ncc += row.NCC;
+    });
+    
+    // Sort and get top items based on query
+    const queryLower = userContext.toLowerCase();
+    
+    if (queryLower.includes('office')) {
+      stats.top_offices = Object.entries(stats.by_office)
+        .sort((a, b) => b[1].total_ncc - a[1].total_ncc)
+        .slice(0, 5)
+        .map(([name, data]) => ({ name, ...data }));
+    }
+    
+    if (queryLower.includes('client')) {
+      stats.top_clients = Object.entries(stats.by_client)
+        .sort((a, b) => b[1].total_ncc - a[1].total_ncc)
+        .slice(0, 10)
+        .map(([name, data]) => ({ name, ...data }));
+    }
+    
+    return stats;
   }
 
   // Helper methods
