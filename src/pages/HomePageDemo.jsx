@@ -52,13 +52,12 @@ function HomePageDemo() {
       <Header />
       
       <Container maxWidth="xl" sx={{ py: 4 }}>
-        <Grid container spacing={3}>
+        <Box sx={{ display: 'flex', gap: 3, height: 'calc(100vh - 150px)' }}>
           {/* Left Panel - Data Source Selection */}
-          <Grid item xs={12} md={6}>
-            <Paper sx={{ p: 3, height: '100%' }}>
-              <Typography variant="h6" sx={{ mb: 2, fontWeight: 500 }}>
-                Choose Data Source
-              </Typography>
+          <Paper sx={{ p: 3, flex: 1, overflow: 'auto' }}>
+            <Typography variant="h6" sx={{ mb: 2, fontWeight: 500 }}>
+              Choose Data Source
+            </Typography>
               
               {/* Search Bar */}
               <TextField
@@ -133,12 +132,10 @@ function HomePageDemo() {
                   </React.Fragment>
                 ))}
               </List>
-            </Paper>
-          </Grid>
+          </Paper>
 
           {/* Right Panel - Data Fields */}
-          <Grid item xs={12} md={6}>
-            <Paper sx={{ p: 3, height: '100%' }}>
+          <Paper sx={{ p: 3, flex: 1, overflow: 'auto' }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                 <Typography variant="h6" sx={{ fontWeight: 500 }}>
                   Data Fields
@@ -266,9 +263,8 @@ function HomePageDemo() {
                   })()}
                 </Box>
               )}
-            </Paper>
-          </Grid>
-        </Grid>
+          </Paper>
+        </Box>
 
         {/* Continue Button */}
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3 }}>
